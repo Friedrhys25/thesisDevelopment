@@ -4,8 +4,7 @@ export default function RootLayout() {
   return (
     <Tabs>
       <Tabs.Screen name="home" options={{ headerShown: false}} />
-      <Tabs.Screen name="complaints" options={{ headerShown: false}} />
-      <Tabs.Screen name="nlpcom" options={{ headerShown: false}} />
+      <Tabs.Screen name="complain" options={{ headerShown: false}} />
       <Tabs.Screen name="emergency" options={{ headerShown: false}} />
       <Tabs.Screen name="feedback" options={{ headerShown: false}} />
       <Tabs.Screen name="messages" options={{ headerShown: false}} />

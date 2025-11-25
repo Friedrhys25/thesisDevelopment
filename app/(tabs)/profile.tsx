@@ -20,7 +20,9 @@ import * as Location from "expo-location";
 
 // ✅ Emoji-based Ionicons (no dependency)
 type UserData = {
-  name: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
   email: string;
   phone: string;
   address: string;
@@ -72,7 +74,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [userData, setUserData] = useState<UserData>({
-    name: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     email: "",
     phone: "",
     address: "",
@@ -127,7 +131,9 @@ export default function ProfilePage() {
           });
 
           setUserData({
-            name: data.name || "User",
+            firstName: data.firstName || "",
+            middleName: data.middleName || "",
+            lastName: data.lastName || "",
             email: data.email || currentUser.email || "",
             phone: data.number || "No phone number",
             address: data.address || "No address",
@@ -401,7 +407,11 @@ export default function ProfilePage() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
             {[
-              { icon: "person-outline", label: "Full Name", value: userData.name },
+              { 
+                icon: "person-outline", 
+                label: "Full Name", 
+                value: `${userData.firstName} ${userData.middleName} ${userData.lastName}`.trim() 
+              },
               { icon: "mail-outline", label: "Email", value: userData.email },
               { icon: "call-outline", label: "Phone", value: userData.phone },
               {

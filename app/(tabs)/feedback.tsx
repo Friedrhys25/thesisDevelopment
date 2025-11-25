@@ -12,40 +12,70 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { db } from "../../backend/firebaseConfig";
-import { ref, get, update } from "firebase/database"; // ✅ changed from push,set to update
+import { ref, get, update } from "firebase/database";
+
+type PersonType = "official" | "employee";
+
+interface Person {
+  id: string;
+  name: string;
+  position: string;
+  type: PersonType;
+}
 
 export default function FeedbackPage() {
   const router = useRouter();
-  const [officials, setOfficials] = useState<any[]>([]);
+  const [officials, setOfficials] = useState<Person[]>([]);
+  const [employees, setEmployees] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<PersonType>("official");
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
-  const [feedback, setFeedback] = useState("");
+  const [generalFeedback, setGeneralFeedback] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // ✅ Fetch officials from Firebase
+  // Fetch officials and employees from Firebase
   useEffect(() => {
-    const fetchOfficials = async () => {
+    const fetchData = async () => {
       try {
+        // Fetch Officials
         const officialsRef = ref(db, "officials");
-        const snapshot = await get(officialsRef);
-
-        if (snapshot.exists()) {
-          const data = snapshot.val();
+        const officialsSnapshot = await get(officialsRef);
+        
+        if (officialsSnapshot.exists()) {
+          const data = officialsSnapshot.val();
           const officialsArray = Object.keys(data).map((key) => ({
             id: key,
-            ...data[key],
+            name: data[key].name,
+            position: data[key].position,
+            type: "official" as PersonType,
           }));
           setOfficials(officialsArray);
         }
+
+        // Fetch Employees
+        const employeesRef = ref(db, "employees");
+        const employeesSnapshot = await get(employeesRef);
+        
+        if (employeesSnapshot.exists()) {
+          const data = employeesSnapshot.val();
+          const employeesArray = Object.keys(data).map((key) => ({
+            id: key,
+            name: data[key].name,
+            position: data[key].position,
+            type: "employee" as PersonType,
+          }));
+          setEmployees(employeesArray);
+        }
       } catch (error) {
-        console.error("Error fetching officials:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchOfficials();
+    fetchData();
   }, []);
 
   const handleRating = (id: string, rating: number) => {
@@ -56,48 +86,62 @@ export default function FeedbackPage() {
     setComments((prev) => ({ ...prev, [id]: text }));
   };
 
-  // ✅ Submit feedback to Firebase (per official)
   const handleSubmit = async () => {
-  try {
-    // ✅ Loop through each official that has a rating
-    for (const id of Object.keys(ratings)) {
-      const officialRef = ref(db, `officials/${id}/feedback/${Date.now()}`);
+    setSubmitting(true);
+    
+    try {
+      // Save feedback for officials
+      for (const official of officials) {
+        if (ratings[official.id]) {
+          const feedbackRef = ref(db, `officials/${official.id}/feedback/${Date.now()}`);
+          const feedbackData = {
+            rating: ratings[official.id],
+            comment: comments[official.id] || "",
+            timestamp: Date.now(),
+          };
+          await update(feedbackRef, feedbackData);
+        }
+      }
 
-      const feedbackData = {
-        rating: ratings[id],
-        comment: comments[id] || "",
-        timestamp: Date.now(),
-      };
+      // Save feedback for employees
+      for (const employee of employees) {
+        if (ratings[employee.id]) {
+          const feedbackRef = ref(db, `employees/${employee.id}/feedback/${Date.now()}`);
+          const feedbackData = {
+            rating: ratings[employee.id],
+            comment: comments[employee.id] || "",
+            timestamp: Date.now(),
+          };
+          await update(feedbackRef, feedbackData);
+        }
+      }
 
-      // ✅ Save the feedback as an object
-      await update(officialRef, feedbackData);
+      // Save general feedback
+      if (generalFeedback.trim()) {
+        const generalFeedbackRef = ref(db, `generalFeedback/${Date.now()}`);
+        const feedbackData = {
+          feedback: generalFeedback,
+          timestamp: Date.now(),
+        };
+        await update(generalFeedbackRef, feedbackData);
+      }
+
+      setSubmitted(true);
+      console.log("✅ Feedback saved successfully!");
+    } catch (error) {
+      console.error("Error saving feedback:", error);
+    } finally {
+      setSubmitting(false);
     }
 
-    // ✅ Store general feedback separately if provided
-    if (feedback.trim()) {
-      const generalFeedbackRef = ref(db, `generalFeedback/${Date.now()}`);
-      const feedbackData = {
-        feedback,
-        timestamp: Date.now(),
-      };
-      await update(generalFeedbackRef, feedbackData);
-    }
-
-    setSubmitted(true);
-    console.log("✅ Feedback saved successfully!");
-  } catch (error) {
-    console.error("Error saving feedback:", error);
-  }
-
-  // ✅ Reset after a short delay
-  setTimeout(() => {
-    setRatings({});
-    setComments({});
-    setFeedback("");
-    setSubmitted(false);
-  }, 3000);
-};
-
+    // Reset after delay
+    setTimeout(() => {
+      setRatings({});
+      setComments({});
+      setGeneralFeedback("");
+      setSubmitted(false);
+    }, 3000);
+  };
 
   const RatingStars = ({
     id,
@@ -108,8 +152,16 @@ export default function FeedbackPage() {
   }) => (
     <View style={styles.starsContainer}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <TouchableOpacity key={star} onPress={() => handleRating(id, star)}>
-          <Text style={styles.star}>{star <= currentRating ? "⭐" : "☆"}</Text>
+        <TouchableOpacity 
+          key={star} 
+          onPress={() => handleRating(id, star)}
+          style={styles.starButton}
+        >
+          <Ionicons 
+            name={star <= currentRating ? "star" : "star-outline"} 
+            size={32} 
+            color={star <= currentRating ? "#FFB800" : "#D1D5DB"} 
+          />
         </TouchableOpacity>
       ))}
     </View>
@@ -119,82 +171,202 @@ export default function FeedbackPage() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.successContainer}>
-          <Text style={styles.successIcon}>✅</Text>
-          <Text style={styles.successTitle}>Thank you!</Text>
+          <View style={styles.successIconContainer}>
+            <Ionicons name="checkmark-circle" size={100} color="#10B981" />
+          </View>
+          <Text style={styles.successTitle}>Thank You!</Text>
           <Text style={styles.successMessage}>
-            Your feedback helps us improve the services of our barangay.
+            Your feedback has been submitted successfully.{"\n"}
+            We appreciate your input to help us improve our services.
           </Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  const currentList = activeTab === "official" ? officials : employees;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.headercon}>
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
-          <Text style={styles.headerText}>Feedback & Rating</Text>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>Feedback & Rating</Text>
+            <Text style={styles.headerSubtitle}>Help us improve our services</Text>
+          </View>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#667eea" style={{ marginTop: 40 }} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4A90E2" />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            {officials.map((official) => (
-              <View key={official.id} style={styles.officialCard}>
-                <View style={styles.officialHeader}>
-                  <View style={styles.officialIconContainer}>
-                    <Ionicons name="person" size={24} color="#667eea" />
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Tab Selector */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.tab,
+                  activeTab === "official" && styles.activeTab,
+                ]}
+                onPress={() => setActiveTab("official")}
+              >
+                <Ionicons 
+                  name="briefcase" 
+                  size={20} 
+                  color={activeTab === "official" ? "#4A90E2" : "#6B7280"} 
+                />
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === "official" && styles.activeTabText,
+                  ]}
+                >
+                  Officials
+                </Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{officials.length}</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.tab,
+                  activeTab === "employee" && styles.activeTab,
+                ]}
+                onPress={() => setActiveTab("employee")}
+              >
+                <Ionicons 
+                  name="people" 
+                  size={20} 
+                  color={activeTab === "employee" ? "#4A90E2" : "#6B7280"} 
+                />
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === "employee" && styles.activeTabText,
+                  ]}
+                >
+                  Employees
+                </Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{employees.length}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Info Card */}
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle" size={20} color="#4A90E2" />
+              <Text style={styles.infoText}>
+                Rate and provide feedback for our barangay {activeTab === "official" ? "officials" : "employees"}
+              </Text>
+            </View>
+
+            {/* Person Cards */}
+            {currentList.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="folder-open-outline" size={64} color="#D1D5DB" />
+                <Text style={styles.emptyText}>
+                  No {activeTab === "official" ? "officials" : "employees"} found
+                </Text>
+              </View>
+            ) : (
+              currentList.map((person) => (
+                <View key={person.id} style={styles.personCard}>
+                  {/* Person Header */}
+                  <View style={styles.personHeader}>
+                    <View style={styles.avatarContainer}>
+                      <Ionicons 
+                        name={activeTab === "official" ? "shield" : "person"} 
+                        size={28} 
+                        color="#4A90E2" 
+                      />
+                    </View>
+                    <View style={styles.personInfo}>
+                      <Text style={styles.personName}>{person.name}</Text>
+                      <Text style={styles.personPosition}>{person.position}</Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={styles.officialName}>{official.name}</Text>
-                    <Text style={styles.officialPosition}>
-                      {official.position}
-                    </Text>
+
+                  {/* Rating Section */}
+                  <View style={styles.ratingSection}>
+                    <Text style={styles.ratingLabel}>Your Rating</Text>
+                    <RatingStars
+                      id={person.id}
+                      currentRating={ratings[person.id] || 0}
+                    />
+                    {ratings[person.id] > 0 && (
+                      <Text style={styles.ratingValue}>
+                        {ratings[person.id]} out of 5 stars
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Comment Section */}
+                  <View style={styles.commentSection}>
+                    <Text style={styles.commentLabel}>Your Comment (Optional)</Text>
+                    <TextInput
+                      style={styles.commentInput}
+                      placeholder={`Share your feedback about ${person.name}...`}
+                      placeholderTextColor="#9CA3AF"
+                      value={comments[person.id] || ""}
+                      onChangeText={(text) => handleComment(person.id, text)}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                    />
                   </View>
                 </View>
+              ))
+            )}
 
-                <RatingStars
-                  id={official.id}
-                  currentRating={ratings[official.id] || 0}
-                />
-
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder={`Write a comment for ${official.name}...`}
-                  placeholderTextColor="#999"
-                  value={comments[official.id] || ""}
-                  onChangeText={(text) => handleComment(official.id, text)}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
+            {/* General Feedback Section */}
+            <View style={styles.generalFeedbackSection}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="chatbox-ellipses" size={24} color="#4A90E2" />
+                <Text style={styles.sectionTitle}>General Feedback</Text>
               </View>
-            ))}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Additional Feedback</Text>
+              <Text style={styles.sectionDescription}>
+                Share your overall thoughts about our barangay services
+              </Text>
               <TextInput
-                style={styles.textInput}
+                style={styles.generalFeedbackInput}
                 placeholder="Write your general feedback here..."
-                placeholderTextColor="#999"
+                placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={5}
-                value={feedback}
-                onChangeText={setFeedback}
+                value={generalFeedback}
+                onChangeText={setGeneralFeedback}
                 textAlignVertical="top"
               />
             </View>
 
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>Submit Feedback</Text>
-              <Ionicons name="send" size={18} color="white" />
+            {/* Submit Button */}
+            <TouchableOpacity 
+              style={[styles.submitButton, submitting && styles.submitButtonDisabled]} 
+              onPress={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.submitButtonText}>Submit Feedback</Text>
+                  <Ionicons name="send" size={20} color="white" />
+                </>
+              )}
             </TouchableOpacity>
           </ScrollView>
         )}
@@ -203,79 +375,286 @@ export default function FeedbackPage() {
   );
 }
 
-// ✅ Keep your existing styles
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F5F7FA" },
-  container: { flex: 1, backgroundColor: "white" },
-  headercon: {
-    padding: 20,
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F5F7FA",
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#F5F7FA",
+  },
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F6FA",
+    padding: 20,
+    paddingTop: 10,
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "#E5E7EB",
   },
-  backButton: { padding: 8, marginRight: 12 },
-  backIcon: { fontSize: 24, color: "#333" },
-  headerText: { fontSize: 24, fontWeight: "700", color: "#333" },
-  scrollContent: { padding: 20 },
-  officialCard: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+  backButton: {
+    padding: 8,
+    marginRight: 12,
   },
-  officialHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  officialIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#EEF2FF",
+  headerTextContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 14,
   },
-  officialName: { fontSize: 16, fontWeight: "600", color: "#1A1A1A" },
-  officialPosition: { fontSize: 13, color: "#6B7280" },
-  starsContainer: { flexDirection: "row", justifyContent: "center", gap: 8 },
-  star: { fontSize: 32, padding: 4 },
-  commentInput: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 10,
-    padding: 10,
-    fontSize: 14,
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#6B7280",
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  tabContainer: {
+    flexDirection: "row",
     backgroundColor: "#FFFFFF",
-    color: "#333",
+    borderRadius: 16,
+    padding: 6,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  section: { marginTop: 30, marginBottom: 40 },
-  sectionTitle: { fontSize: 20, fontWeight: "700", color: "#1A1A1A", marginBottom: 10 },
-  textInput: {
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  activeTab: {
+    backgroundColor: "#EFF6FF",
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  activeTabText: {
+    color: "#4A90E2",
+  },
+  badge: {
+    backgroundColor: "#E5E7EB",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 10,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4B5563",
+  },
+  infoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4A90E2",
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1E40AF",
+    lineHeight: 20,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#6B7280",
+    marginTop: 16,
+  },
+  personCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  personHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  personInfo: {
+    flex: 1,
+  },
+  personName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  personPosition: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  ratingSection: {
+    alignItems: "center",
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
+  ratingLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4B5563",
+    marginBottom: 12,
+  },
+  starsContainer: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  starButton: {
+    padding: 4,
+  },
+  ratingValue: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 8,
+  },
+  commentSection: {
+    marginTop: 16,
+  },
+  commentLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4B5563",
+    marginBottom: 8,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    backgroundColor: "#F9FAFB",
+    color: "#1F2937",
+    minHeight: 80,
+  },
+  generalFeedbackSection: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 8,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 16,
+  },
+  generalFeedbackInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
     padding: 14,
     fontSize: 15,
     minHeight: 120,
-    backgroundColor: "#FFFFFF",
-    color: "#333",
+    backgroundColor: "#F9FAFB",
+    color: "#1F2937",
   },
   submitButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    paddingVertical: 18,
-    backgroundColor: "#667eea",
+    gap: 12,
+    paddingVertical: 16,
+    backgroundColor: "#4A90E2",
     borderRadius: 16,
-    marginBottom: 40,
+    shadowColor: "#4A90E2",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  submitButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
-  successContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },
-  successIcon: { fontSize: 80, marginBottom: 20 },
-  successTitle: { fontSize: 28, fontWeight: "700", color: "#1A1A1A", marginBottom: 12 },
-  successMessage: { fontSize: 16, color: "#6B7280", textAlign: "center", lineHeight: 24 },
+  submitButtonDisabled: {
+    backgroundColor: "#A8C9E8",
+  },
+  submitButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  successContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  successIconContainer: {
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 16,
+  },
+  successMessage: {
+    fontSize: 16,
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 24,
+  },
 });

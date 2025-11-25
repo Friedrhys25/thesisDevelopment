@@ -22,9 +22,13 @@ import { ref, set } from "firebase/database";
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [address, setAddress] = useState("");
   const [purok, setPurok] = useState("1");
   const [age, setAge] = useState("");
@@ -32,7 +36,6 @@ export default function RegisterPage() {
   const [idImage, setIdImage] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Pick image (to follow upload later)
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -45,16 +48,19 @@ export default function RegisterPage() {
     }
   };
 
-  // Register user
   const handleRegister = async () => {
     console.log("Register button pressed");
 
-    if (!email || !password || !name) {
-      Alert.alert("Missing fields", "Please fill in all required fields!");
+    if (!email || !password || !confirmPassword || !firstName || !lastName) {
+      Alert.alert("Missing Fields", "Please fill in all required fields marked with *");
       return;
     }
 
-    // Validate password length
+    if (password !== confirmPassword) {
+      Alert.alert("Password Mismatch", "Passwords do not match. Please try again.");
+      return;
+    }
+
     if (password.length < 6) {
       Alert.alert("Weak Password", "Password must be at least 6 characters long");
       return;
@@ -64,28 +70,29 @@ export default function RegisterPage() {
       console.log("Creating user with email:", email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      console.log("✅ User created successfully:", user.uid);
 
-      // Save additional user data to Realtime Database
+      console.log("User created:", user.uid);
+
       await set(ref(db, `users/${user.uid}`), {
-        name,
+        firstName,
+        middleName: middleName || null,
+        lastName,
         email,
         address,
         purok,
         age,
         number,
-        idImage: null, // Will implement image upload later
+        idImage: null,
         createdAt: new Date().toISOString(),
       });
 
-      console.log("✅ User data saved to database");
+      console.log("Saved to database");
       setModalVisible(true);
     } catch (error: any) {
-      console.error("❌ Firebase Error:", error.code, error.message);
-      
-      // Show user-friendly error messages
+      console.error("Firebase Error:", error.code, error.message);
+
       let errorMessage = "Something went wrong";
-      
+
       switch (error.code) {
         case "auth/email-already-in-use":
           errorMessage = "This email is already registered";
@@ -96,24 +103,20 @@ export default function RegisterPage() {
         case "auth/invalid-email":
           errorMessage = "Invalid email address";
           break;
-        case "auth/operation-not-allowed":
-          errorMessage = "Email/Password sign-in is not enabled. Please contact support.";
-          break;
         case "auth/network-request-failed":
           errorMessage = "Network error. Please check your internet connection.";
           break;
         default:
-          errorMessage = error.message || "Registration failed";
+          errorMessage = error.message;
       }
-      
+
       Alert.alert("Registration Error", errorMessage);
     }
   };
 
-  // When OK is pressed, go back to index.tsx
   const handleSuccessClose = () => {
     setModalVisible(false);
-    router.push("/"); // goes back to index.tsx
+    router.push("/");
   };
 
   return (
@@ -122,99 +125,198 @@ export default function RegisterPage() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Register</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          value={name}
-          onChangeText={setName}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Password (min 6 characters)"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Address"
-          value={address}
-          onChangeText={setAddress}
-        />
-
-        <View style={styles.pickerContainer}>
-          <Text style={styles.label}>Select Purok:</Text>
-          <Picker
-            selectedValue={purok}
-            onValueChange={(itemValue) => setPurok(itemValue)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Purok 1" value="1" />
-            <Picker.Item label="Purok 2" value="2" />
-            <Picker.Item label="Purok 3" value="3" />
-            <Picker.Item label="Purok 4" value="4" />
-            <Picker.Item label="Purok 5" value="5" />
-          </Picker>
+        <View style={styles.header}>
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>Join us today</Text>
         </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Age"
-          keyboardType="numeric"
-          value={age}
-          onChangeText={setAge}
-        />
+        <View style={styles.formContainer}>
+          {/* Personal Information Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>First Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your first name"
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholderTextColor="#999"
+              />
+            </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Contact Number"
-          keyboardType="phone-pad"
-          value={number}
-          onChangeText={setNumber}
-        />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Middle Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your middle name (optional)"
+                value={middleName}
+                onChangeText={setMiddleName}
+                placeholderTextColor="#999"
+              />
+            </View>
 
-        <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-          <Text style={styles.imageButtonText}>
-            {idImage ? "Change ID Picture" : "Upload ID Picture (Optional)"}
-          </Text>
-        </TouchableOpacity>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Last Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your last name"
+                value={lastName}
+                onChangeText={setLastName}
+                placeholderTextColor="#999"
+              />
+            </View>
 
-        {idImage && <Image source={{ uri: idImage }} style={styles.idImage} />}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Age</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your age"
+                keyboardType="numeric"
+                value={age}
+                onChangeText={setAge}
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
 
-        <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-          <Text style={styles.registerButtonText}>Register</Text>
-        </TouchableOpacity>
+          {/* Account Information Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account Information</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Password *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Min. 6 characters"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Confirm Password *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  confirmPassword && password !== confirmPassword && styles.inputError
+                ]}
+                placeholder="Re-enter your password"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                autoCapitalize="none"
+                placeholderTextColor="#999"
+              />
+              {confirmPassword && password !== confirmPassword && (
+                <Text style={styles.errorText}>Passwords do not match</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Contact Information Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Contact Information</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Address</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your address"
+                value={address}
+                onChangeText={setAddress}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Purok</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={purok}
+                  onValueChange={(itemValue) => setPurok(itemValue)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Purok 1" value="1" />
+                  <Picker.Item label="Purok 2" value="2" />
+                  <Picker.Item label="Purok 3" value="3" />
+                  <Picker.Item label="Purok 4" value="4" />
+                  <Picker.Item label="Purok 5" value="5" />
+                </Picker>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Contact Number</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your phone number"
+                keyboardType="phone-pad"
+                value={number}
+                onChangeText={setNumber}
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          {/* ID Upload Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Identification</Text>
+            
+            <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
+              <Text style={styles.imageButtonText}>
+                {idImage ? "📷 Change ID Picture" : "📷 Upload ID Picture (Optional)"}
+              </Text>
+            </TouchableOpacity>
+
+            {idImage && (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: idImage }} style={styles.idImage} />
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
+            <Text style={styles.registerButtonText}>Create Account</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => router.push("/")}>
+            <Text style={styles.loginText}>
+              Already have an account? <Text style={styles.loginLink}>Log in</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Success Modal */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
+        <Modal animationType="fade" transparent={true} visible={modalVisible}>
           <View style={styles.modalBackground}>
             <View style={styles.modalBox}>
-              <Text style={styles.modalText}>✅ Registration Successful!</Text>
-              <Text style={styles.modalSubText}>You can now log in with your credentials</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={handleSuccessClose}
-              >
-                <Text style={styles.closeButtonText}>OK</Text>
+              <View style={styles.successIcon}>
+                <Text style={styles.successIconText}>✓</Text>
+              </View>
+              <Text style={styles.modalText}>Registration Successful!</Text>
+              <Text style={styles.modalSubText}>
+                Your account has been created. You can now log in with your credentials.
+              </Text>
+              <TouchableOpacity style={styles.closeButton} onPress={handleSuccessClose}>
+                <Text style={styles.closeButtonText}>Get Started</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -227,104 +329,207 @@ export default function RegisterPage() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#f5f7fa",
+    paddingBottom: 40,
+  },
+  header: {
+    backgroundColor: "#4a90e2",
+    paddingTop: 60,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   title: {
-    fontSize: 40,
+    fontSize: 36,
     fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: "#e3f2fd",
+  },
+  formContainer: {
+    padding: 20,
+  },
+  section: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#2c3e50",
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4a90e2",
+    paddingLeft: 12,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#555",
+    marginBottom: 8,
   },
   input: {
     width: "100%",
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginBottom: 12,
-    backgroundColor: "#fff",
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: "#e0e0e0",
+    borderRadius: 12,
+    backgroundColor: "#fafafa",
+    fontSize: 16,
+    color: "#333",
+  },
+  inputError: {
+    borderColor: "#e74c3c",
+    backgroundColor: "#fff5f5",
+  },
+  errorText: {
+    color: "#e74c3c",
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
   pickerContainer: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    backgroundColor: "#fff",
-    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: "#e0e0e0",
+    borderRadius: 12,
+    backgroundColor: "#fafafa",
     overflow: "hidden",
   },
-  label: {
-    padding: 8,
-    fontWeight: "bold",
+  picker: {
+    width: "100%",
   },
-  picker: { width: "100%" },
   imageButton: {
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#3498db",
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "#f0f8ff",
+    borderWidth: 2,
+    borderColor: "#4a90e2",
+    borderStyle: "dashed",
     alignItems: "center",
     marginBottom: 12,
-    width: "100%",
   },
   imageButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+    color: "#4a90e2",
+    fontWeight: "600",
+    fontSize: 15,
+  },
+  imagePreviewContainer: {
+    alignItems: "center",
+    marginTop: 12,
   },
   idImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 8,
-    marginBottom: 12,
+    width: 180,
+    height: 180,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#e0e0e0",
   },
   registerButton: {
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: "#2ecc71",
+    padding: 18,
+    borderRadius: 12,
+    backgroundColor: "#4a90e2",
     alignItems: "center",
-    width: "100%",
     marginTop: 10,
+    marginBottom: 16,
+    shadowColor: "#4a90e2",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   registerButtonText: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 18,
+  },
+  loginText: {
+    textAlign: "center",
+    color: "#666",
+    fontSize: 14,
+  },
+  loginLink: {
+    color: "#4a90e2",
+    fontWeight: "600",
   },
   modalBackground: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
   modalBox: {
-    width: 280,
-    padding: 25,
+    width: 320,
+    padding: 30,
     backgroundColor: "#fff",
-    borderRadius: 10,
+    borderRadius: 20,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  successIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#4caf50",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  successIconText: {
+    fontSize: 40,
+    color: "#fff",
+    fontWeight: "bold",
   },
   modalText: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 10,
+    marginBottom: 12,
     textAlign: "center",
+    color: "#2c3e50",
   },
   modalSubText: {
-    fontSize: 14,
+    fontSize: 15,
     color: "#666",
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: "center",
+    lineHeight: 22,
   },
   closeButton: {
-    backgroundColor: "#3498db",
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    borderRadius: 8,
+    backgroundColor: "#4a90e2",
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 12,
+    shadowColor: "#4a90e2",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   closeButtonText: {
     color: "#fff",
     fontWeight: "bold",
+    fontSize: 16,
   },
 });

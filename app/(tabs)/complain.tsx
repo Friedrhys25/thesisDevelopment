@@ -13,9 +13,10 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { Picker } from "@react-native-picker/picker";
 
 import { auth, db } from "../../backend/firebaseConfig";
-import { ref, push, set, onValue } from "firebase/database";
+import { ref, push, set, onValue, get } from "firebase/database";
 
 interface NotificationItem {
   id: number;
@@ -25,6 +26,8 @@ interface NotificationItem {
   timestamp: string;
   purok: string;
   status: string;
+  incidentPurok?: string;
+  incidentLocation?: string;
   evidencePhoto?: string;
 }
 
@@ -39,8 +42,36 @@ export default function App() {
   const [selectedComplaint, setSelectedComplaint] = useState<NotificationItem | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [incidentPurok, setIncidentPurok] = useState("1");
+  const [incidentLocation, setIncidentLocation] = useState("");
+  const [userPurok, setUserPurok] = useState<string>("");
+  const [idStatus, setIdStatus] = useState<string>("pending");
 
-  const userPurok = "Purok 4";
+  // ===========================
+  // Fetch User's Purok from Database
+  // ===========================
+useEffect(() => {
+  const fetchUserData = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const userRef = ref(db, `users/${user.uid}`);
+      const snapshot = await get(userRef);
+
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
+        setUserPurok(userData.purok || "");
+        setIdStatus(userData.idstatus || "pending"); // <-- add this line
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+  };
+
+  fetchUserData();
+}, []);
+
 
   // ===========================
   // Pick Image from Gallery
@@ -154,6 +185,8 @@ export default function App() {
           timestamp: value.timestamp,
           purok: value.purok,
           status: value.status,
+          incidentPurok: value.incidentPurok,
+          incidentLocation: value.incidentLocation,
           evidencePhoto: value.evidencePhoto,
         }));
         setNotifications(complaintsArray.reverse());
@@ -179,6 +212,11 @@ export default function App() {
       return;
     }
 
+    if (!incidentLocation.trim()) {
+      Alert.alert("Error", "Please enter the location of the incident");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -201,10 +239,16 @@ export default function App() {
         label: normalizedLabel,
         type: normalizedType,
         timestamp: new Date().toLocaleString(),
-        purok: userPurok,
+        purok: userPurok, // Use the fetched user's purok
+        incidentPurok: incidentPurok,
+        incidentLocation: incidentLocation,
         status: "pending",
-        evidencePhoto: selectedImage || undefined,
       };
+
+      // Prevents the Firebase undefined error
+      if (selectedImage) {
+        newItem.evidencePhoto = selectedImage;
+      }
 
       const user = auth.currentUser;
       if (!user) {
@@ -217,6 +261,7 @@ export default function App() {
       await set(complaintRef, newItem);
 
       setMessage("");
+      setIncidentLocation("");
       setSelectedImage(null);
       setComplaintModalVisible(false);
       setModalVisible(true);
@@ -309,8 +354,7 @@ export default function App() {
                   </Text>
 
                   {/* Footer Row */}
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.footerText}>📍 {n.purok}</Text>
+                  <View style={styles.cardFooter}> 
                     <Text style={styles.footerText}>🕒 {n.timestamp}</Text>
                   </View>
                 </TouchableOpacity>
@@ -322,11 +366,22 @@ export default function App() {
 
       {/* Add Complaint Button */}
       <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setComplaintModalVisible(true)}
+        style={[
+          styles.addButton,
+          idStatus !== "approved" && { backgroundColor: "#d1d5db" } // gray out if not approved
+        ]}
+        onPress={() => idStatus === "approved" && setComplaintModalVisible(true)}
+        disabled={idStatus !== "approved"} // disable click
       >
         <Text style={styles.addButtonText}>+ New Complaint</Text>
       </TouchableOpacity>
+      {idStatus !== "approved" && (
+        <Text style={styles.disabledMessage}>
+          You cannot submit a complaint until your ID is approved.
+        </Text>
+      )}
+
+
 
       {/* DETAIL MODAL */}
       <Modal
@@ -337,6 +392,7 @@ export default function App() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.detailModalBox}>
+            
             {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Complaint Details</Text>
@@ -350,20 +406,22 @@ export default function App() {
 
             {selectedComplaint && (
               <ScrollView showsVerticalScrollIndicator={false}>
+
                 {/* Evidence Photo */}
                 {selectedComplaint.evidencePhoto && (
-                  <Image 
-                    source={{ uri: selectedComplaint.evidencePhoto }} 
+                  <Image
+                    source={{ uri: selectedComplaint.evidencePhoto }}
                     style={styles.detailImage}
                     resizeMode="cover"
                   />
                 )}
 
-                {/* Status & Label */}
+                {/* Badges */}
                 <View style={styles.detailBadges}>
                   <View style={[styles.detailBadge, { backgroundColor: getLabelColor(selectedComplaint.label) }]}>
                     <Text style={styles.detailBadgeText}>{selectedComplaint.label.toUpperCase()}</Text>
                   </View>
+
                   <View style={[styles.detailBadge, { backgroundColor: getStatusColor(selectedComplaint.status) }]}>
                     <Text style={styles.detailBadgeText}>{selectedComplaint.status.toUpperCase()}</Text>
                   </View>
@@ -381,10 +439,17 @@ export default function App() {
                   <Text style={styles.detailValue}>{selectedComplaint.type}</Text>
                 </View>
 
-                {/* Location */}
+
+                {/* Incident Purok */}
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>Location</Text>
-                  <Text style={styles.detailValue}>📍 {selectedComplaint.purok}</Text>
+                  <Text style={styles.detailLabel}>Incident Purok</Text>
+                  <Text style={styles.detailValue}>🏠 Purok {selectedComplaint.incidentPurok}</Text>
+                </View>
+
+                {/* Incident Location */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailLabel}>Specific Location</Text>
+                  <Text style={styles.detailValue}>{selectedComplaint.incidentLocation}</Text>
                 </View>
 
                 {/* Timestamp */}
@@ -392,6 +457,7 @@ export default function App() {
                   <Text style={styles.detailLabel}>Submitted</Text>
                   <Text style={styles.detailValue}>🕒 {selectedComplaint.timestamp}</Text>
                 </View>
+
               </ScrollView>
             )}
 
@@ -402,6 +468,7 @@ export default function App() {
             >
               <Text style={styles.detailCloseButtonText}>Close</Text>
             </TouchableOpacity>
+
           </View>
         </View>
       </Modal>
@@ -422,6 +489,7 @@ export default function App() {
                   setComplaintModalVisible(false);
                   setSelectedImage(null);
                   setMessage("");
+                  setIncidentLocation("");
                 }}
                 style={styles.closeButton}
               >
@@ -430,8 +498,34 @@ export default function App() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+
+              {/* INCIDENT PUROK DROPDOWN */}
+              <Text style={styles.label}>Incident Purok *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={incidentPurok}
+                  onValueChange={(v) => setIncidentPurok(v)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Purok 1" value="1" />
+                  <Picker.Item label="Purok 2" value="2" />
+                  <Picker.Item label="Purok 3" value="3" />
+                  <Picker.Item label="Purok 4" value="4" />
+                  <Picker.Item label="Purok 5" value="5" />
+                  <Picker.Item label="Purok 6" value="6" />
+                </Picker>
+              </View>
+
+              {/* LOCATION OF INCIDENT */}
+              <Text style={styles.label}>Location of Incident *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter specific location (e.g., near basketball court)"
+                value={incidentLocation}
+                onChangeText={setIncidentLocation}
+              />
+
               <Text style={styles.label}>Description *</Text>
-              
               <TextInput
                 style={styles.textArea}
                 placeholder="Please describe your complaint in detail..."
@@ -489,7 +583,9 @@ export default function App() {
                   <Text style={styles.submitButtonText}>Submit Complaint ➔</Text>
                 )}
               </TouchableOpacity>
+
             </ScrollView>
+
           </View>
         </View>
       </Modal>
@@ -690,7 +786,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
     shadowColor: "#6366f1",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -870,4 +966,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     borderRadius: 10,
   },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginBottom: 12,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  picker: {
+    width: "100%",
+  },
+  input: {
+    width: "100%",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginBottom: 12,
+    backgroundColor: "#fff",
+  },
+  disabledMessage: {
+  color: "#ef4444",
+  fontSize: 14,
+  marginBottom: 6,
+  textAlign: "center",
+},
+
 });
