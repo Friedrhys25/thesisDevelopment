@@ -12,7 +12,8 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
+
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import { auth, db } from "../backend/firebaseConfig";
@@ -31,27 +32,32 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [address, setAddress] = useState("");
   const [purok, setPurok] = useState("1");
-  const [age, setAge] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const [number, setNumber] = useState("");
-  const [idImage, setIdImage] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 4],
-      quality: 1,
-    });
-    if (!result.canceled) {
-      setIdImage(result.assets[0].uri);
+
+  const calculateAge = (birthdate: string) => {
+    const today = new Date();
+    const birth = new Date(birthdate);
+
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
     }
+
+    return age;
   };
+
 
   const handleRegister = async () => {
     console.log("Register button pressed");
 
-    if (!email || !password || !confirmPassword || !firstName || !lastName) {
+    if (!email || !password || !confirmPassword || !firstName || !lastName || !birthday) {
       Alert.alert("Missing Fields", "Please fill in all required fields marked with *");
       return;
     }
@@ -80,7 +86,8 @@ export default function RegisterPage() {
         email,
         address,
         purok,
-        age,
+        birthday,
+        age: calculateAge(birthday),
         number,
         idImage: null,
         createdAt: new Date().toISOString(),
@@ -169,16 +176,37 @@ export default function RegisterPage() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Age</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your age"
-                keyboardType="numeric"
-                value={age}
-                onChangeText={setAge}
-                placeholderTextColor="#999"
-              />
+              <Text style={styles.inputLabel}>Birthday *</Text>
+
+              <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                <View style={styles.input}>
+                  <Text style={{ color: birthday ? "#333" : "#999" }}>
+                    {birthday || "Select your birthday"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={birthday ? new Date(birthday) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(false);
+
+                    if (selectedDate) {
+                      const year = selectedDate.getFullYear();
+                      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                      const day = String(selectedDate.getDate()).padStart(2, "0");
+                      setBirthday(`${year}-${month}-${day}`);
+                    }
+                  }}
+                />
+              )}
             </View>
+
+
+
           </View>
 
           {/* Account Information Section */}
@@ -276,22 +304,6 @@ export default function RegisterPage() {
             </View>
           </View>
 
-          {/* ID Upload Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Identification</Text>
-            
-            <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-              <Text style={styles.imageButtonText}>
-                {idImage ? "📷 Change ID Picture" : "📷 Upload ID Picture (Optional)"}
-              </Text>
-            </TouchableOpacity>
-
-            {idImage && (
-              <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: idImage }} style={styles.idImage} />
-              </View>
-            )}
-          </View>
 
           <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
             <Text style={styles.registerButtonText}>Create Account</Text>

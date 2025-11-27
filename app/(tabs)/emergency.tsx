@@ -143,45 +143,8 @@ export default function EmergencyPage() {
           </View>
         ))}
 
-        {/* Recent Emergencies */}
-        <Text style={styles.sectionTitle}>Recent Emergency Reports</Text>
-        {recentEmergencies.map((item) => (
-          <View key={item.id} style={styles.recentItem}>
-            <View style={styles.recentIcon}>
-              <Ionicons name="megaphone" size={20} color="#666" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.recentHeader}>
-                <Text style={styles.recentType}>{item.type}</Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor:
-                        item.status === "Resolved" ? "#D4EDDA" : "#FFF3CD",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: item.status === "Resolved" ? "#155724" : "#856404",
-                      fontWeight: "600",
-                      fontSize: 12,
-                    }}
-                  >
-                    {item.status}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.recentDetails}>
-                <Text style={styles.recentText}>
-                  📍 {item.location}
-                </Text>
-                <Text style={styles.recentText}>🕐 {item.time}</Text>
-              </View>
-            </View>
-          </View>
-        ))}
+        
+      
 
         {/* Important Note */}
         <View style={styles.noteCard}>

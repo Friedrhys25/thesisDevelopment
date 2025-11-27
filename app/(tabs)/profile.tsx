@@ -17,6 +17,8 @@ import { db, auth } from "../../backend/firebaseConfig";
 import { signOut } from "firebase/auth";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
+import { RefreshControl } from "react-native";
+
 
 // ✅ Emoji-based Ionicons (no dependency)
 type UserData = {
@@ -70,6 +72,7 @@ const Ionicons: React.FC<IoniconsProps> = ({ name, size, color = "#000" }) => {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -88,7 +91,44 @@ export default function ProfilePage() {
     idstatus: "Pending",
   });
 
-  
+  const refreshProfile = async () => {
+    setRefreshing(true);
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const userRef = ref(db, `users/${currentUser.uid}`);
+    const snapshot = await get(userRef);
+
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      const createdDate = data.createdAt ? new Date(data.createdAt) : new Date();
+
+      const memberSince = createdDate.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      });
+
+      setUserData({
+        firstName: data.firstName || "",
+        middleName: data.middleName || "",
+        lastName: data.lastName || "",
+        email: data.email || currentUser.email || "",
+        phone: data.number || "No phone number",
+        address: data.address || "No address",
+        purok: data.purok || "",
+        age: data.age || "",
+        memberSince,
+        id_verification: data.id_verification || "",
+        avatar: data.avatar || "",
+        idstatus: data.idstatus || "Pending",
+      });
+    }
+
+    setRefreshing(false);
+  };
+
+
   // Helper functions for ID status
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -284,7 +324,6 @@ export default function ProfilePage() {
   const stats = [
     { label: "Complaints Filed", value: "12", icon: "📋", color: "#4A90E2" },
     { label: "Resolved", value: "9", icon: "✅", color: "#50C878" },
-    { label: "Response Rate", value: "95%", icon: "📈", color: "#F39C12" },
   ];
 
   const recentActivity = [
@@ -341,11 +380,13 @@ export default function ProfilePage() {
           <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
             <Ionicons name="arrow-back" size={22} color="#333" />
           </TouchableOpacity>
+
           <Text style={styles.headerText}>Profile</Text>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="create-outline" size={22} color="#667eea" />
-          </TouchableOpacity>
+
+          {/* Removed the create-outline button */}
+          <View style={{ width: 30 }} /> 
         </View>
+
 
         {/* Logout Modal */}
         <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={cancelLogout}>
@@ -368,7 +409,15 @@ export default function ProfilePage() {
           </View>
         </Modal>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={styles.scroll}  
+            refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshProfile}
+              colors={["#667eea"]}     // Android spinner color
+              tintColor="#667eea"      // iOS spinner color
+            />
+          }>
           {/* Avatar */}
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
@@ -508,36 +557,6 @@ export default function ProfilePage() {
             </View>
           </View>
 
-          {/* Recent Activity */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            {recentActivity.map((act) => (
-              <View key={act.id} style={styles.activityItem}>
-                <View style={styles.activityIcon}>
-                  <Ionicons name="document-text-outline" size={20} color="#667eea" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.activityAction}>{act.action}</Text>
-                  <Text style={styles.activityTitle}>{act.title}</Text>
-                  <View style={styles.activityFooter}>
-                    <Text style={styles.activityTime}>🕐 {act.time}</Text>
-                    <View
-                      style={[
-                        styles.activityBadge,
-                        act.status === "Resolved"
-                          ? styles.badgeResolved
-                          : act.status === "In Progress"
-                          ? styles.badgeProgress
-                          : styles.badgeReviewed,
-                      ]}
-                    >
-                      <Text style={styles.badgeText}>{act.status}</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
 
           {/* Logout Button */}
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -561,7 +580,7 @@ const styles = StyleSheet.create({
   avatarContainer: { position: "relative" },
   avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
   avatarBadge: { position: "absolute", bottom: 0, right: 0, backgroundColor: "#667eea", borderRadius: 16, padding: 6 },
-  statsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
+  statsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 , marginTop: 20},
   statCard: { flex: 1, backgroundColor: "#fff", borderRadius: 14, padding: 12, alignItems: "center", marginHorizontal: 4, elevation: 2 },
   statIcon: { width: 48, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   statValue: { fontSize: 20, fontWeight: "700" },

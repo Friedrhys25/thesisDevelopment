@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Picker } from "@react-native-picker/picker";
+import { RefreshControl } from "react-native";
 
 import { auth, db } from "../../backend/firebaseConfig";
 import { ref, push, set, onValue, get } from "firebase/database";
@@ -46,6 +47,8 @@ export default function App() {
   const [incidentLocation, setIncidentLocation] = useState("");
   const [userPurok, setUserPurok] = useState<string>("");
   const [idStatus, setIdStatus] = useState<string>("pending");
+  const [refreshing, setRefreshing] = useState(false);
+  
 
   // ===========================
   // Fetch User's Purok from Database
@@ -203,6 +206,44 @@ useEffect(() => {
     return () => unsubscribe();
   }, []);
 
+  const onRefresh = async () => {
+  setRefreshing(true);
+
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const complaintsRef = ref(db, `users/${user.uid}/userComplaints`);
+    const snapshot = await get(complaintsRef);
+
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      const complaintsArray = Object.entries(data).map(([key, value]: [string, any]) => ({
+        id: value.id || Date.now(),
+        message: value.message,
+        label: value.label,
+        type: value.type,
+        timestamp: value.timestamp,
+        purok: value.purok,
+        status: value.status,
+        incidentPurok: value.incidentPurok,
+        incidentLocation: value.incidentLocation,
+        evidencePhoto: value.evidencePhoto,
+      }));
+      setNotifications(complaintsArray.reverse());
+    } else {
+      setNotifications([]);
+    }
+  } catch (err) {
+    console.error(err);
+    Alert.alert("Error", "Failed to refresh");
+  }
+
+  setRefreshing(false);
+};
+
+
+
   // ===========================
   // Submit Complaint
   // ===========================
@@ -220,7 +261,7 @@ useEffect(() => {
     setLoading(true);
 
     try {
-      const API_URL = "https://talk2us.onrender.com";
+      const API_URL = "http://localhost:5000"; // For iOS simulator or Expo web
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",
@@ -314,7 +355,14 @@ useEffect(() => {
       ) : (
         <>
           {/* Complaint Cards */}
-          <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+
             {notifications.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>📋</Text>
