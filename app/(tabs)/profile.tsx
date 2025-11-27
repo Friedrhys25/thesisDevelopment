@@ -76,6 +76,10 @@ export default function ProfilePage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+
+  const [complaintsFiled, setComplaintsFiled] = useState(0);
+  const [complaintsResolved, setComplaintsResolved] = useState(0);
+
   
   const [userData, setUserData] = useState<UserData>({
     firstName: "",
@@ -92,8 +96,39 @@ export default function ProfilePage() {
     idstatus: "Pending",
   });
 
+const fetchComplaintsStats = async () => {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const complaintsRef = ref(db, `users/${currentUser.uid}/userComplaints`);
+    const snapshot = await get(complaintsRef);
+
+    if (snapshot.exists()) {
+      const complaints = snapshot.val(); // { complaintId1: {...}, complaintId2: {...} }
+      const allComplaints = Object.values(complaints);
+      
+      const resolvedComplaints = allComplaints.filter(
+        (c: any) => c.status?.toLowerCase() === "resolved"
+      );
+
+      setComplaintsFiled(allComplaints.length);
+      setComplaintsResolved(resolvedComplaints.length);
+    } else {
+      setComplaintsFiled(0);
+      setComplaintsResolved(0);
+    }
+  } catch (error) {
+    console.error("Error fetching complaints:", error);
+  }
+};
+
+
+
   const refreshProfile = async () => {
     setRefreshing(true);
+    await fetchComplaintsStats();
+
 
     const currentUser = auth.currentUser;
     if (!currentUser) return;
@@ -152,6 +187,8 @@ export default function ProfilePage() {
   // Fetch user data from Firebase
   useEffect(() => {
     const fetchUserData = async () => {
+      await refreshProfile();
+      await fetchComplaintsStats();
       try {
         const currentUser = auth.currentUser;
         if (!currentUser) {
@@ -322,10 +359,10 @@ export default function ProfilePage() {
     ? `Purok ${userData.purok}, ${userData.address}`
     : userData.address;
 
-  const stats = [
-    { label: "Complaints Filed", value: "12", icon: "📋", color: "#4A90E2" },
-    { label: "Resolved", value: "9", icon: "✅", color: "#50C878" },
-  ];
+ const stats = [
+  { label: "Complaints Filed", value: complaintsFiled.toString(), icon: "📋", color: "#4A90E2" },
+  { label: "Resolved", value: complaintsResolved.toString(), icon: "✅", color: "#50C878" },
+];
 
   const recentActivity = [
     { id: 1, action: "Filed complaint", title: "Road repair needed", time: "2 days ago", status: "In Progress" },
