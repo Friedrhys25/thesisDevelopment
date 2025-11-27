@@ -20,6 +20,7 @@ import { auth, db } from "../../backend/firebaseConfig";
 import { ref, push, set, onValue, get } from "firebase/database";
 
 interface NotificationItem {
+  firebaseKey?: string; // <-- add this
   id: number;
   message: string;
   label: string;
@@ -48,6 +49,9 @@ export default function App() {
   const [userPurok, setUserPurok] = useState<string>("");
   const [idStatus, setIdStatus] = useState<string>("pending");
   const [refreshing, setRefreshing] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ id: string; senderId: string; message: string; timestamp: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+
   
 
   // ===========================
@@ -178,30 +182,28 @@ useEffect(() => {
     const complaintsRef = ref(db, `users/${user.uid}/userComplaints`);
     
     const unsubscribe = onValue(complaintsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const complaintsArray = Object.entries(data).map(([key, value]: [string, any]) => ({
-          id: value.id || Date.now(),
-          message: value.message,
-          label: value.label,
-          type: value.type,
-          timestamp: value.timestamp,
-          purok: value.purok,
-          status: value.status,
-          incidentPurok: value.incidentPurok,
-          incidentLocation: value.incidentLocation,
-          evidencePhoto: value.evidencePhoto,
-        }));
-        setNotifications(complaintsArray.reverse());
-      } else {
-        setNotifications([]);
-      }
-      setFetchingComplaints(false);
-    }, (error) => {
-      console.error("Error fetching complaints:", error);
-      Alert.alert("Error", "Failed to load complaints");
-      setFetchingComplaints(false);
-    });
+  const data = snapshot.val();
+  if (data) {
+    const complaintsArray = Object.entries(data).map(([key, value]: [string, any]) => ({
+      firebaseKey: key, // <-- store Firebase key here
+      id: value.id || Date.now(),
+      message: value.message,
+      label: value.label,
+      type: value.type,
+      timestamp: value.timestamp,
+      purok: value.purok,
+      status: value.status,
+      incidentPurok: value.incidentPurok,
+      incidentLocation: value.incidentLocation,
+      evidencePhoto: value.evidencePhoto,
+    }));
+    setNotifications(complaintsArray.reverse());
+  } else {
+    setNotifications([]);
+  }
+  setFetchingComplaints(false);
+});
+
 
     return () => unsubscribe();
   }, []);
@@ -219,6 +221,7 @@ useEffect(() => {
     if (snapshot.exists()) {
       const data = snapshot.val();
       const complaintsArray = Object.entries(data).map(([key, value]: [string, any]) => ({
+        firebaseKey: key,  // <-- store the actual key here
         id: value.id || Date.now(),
         message: value.message,
         label: value.label,
@@ -261,7 +264,8 @@ useEffect(() => {
     setLoading(true);
 
     try {
-      const API_URL = "http://localhost:5000"; // For iOS simulator or Expo web
+      const API_URL = "http://192.168.1.42:5000";
+ // For iOS simulator or Expo web 
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",
@@ -313,29 +317,74 @@ useEffect(() => {
     }
   };
 
-  const openDetailModal = (complaint: NotificationItem) => {
-    setSelectedComplaint(complaint);
-    setDetailModalVisible(true);
-  };
+const openDetailModal = (complaint: NotificationItem) => {
+  setSelectedComplaint(complaint); // now complaint has firebaseKey
+  setDetailModalVisible(true);
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending": return "#f59e0b";
-      case "resolved": return "#10b981";
-      case "in progress": return "#3b82f6";
-      default: return "#6b7280";
-    }
-  };
+  if (!complaint.firebaseKey) return; // safety check
 
-  const getLabelColor = (label: string) => {
-    switch (label.toLowerCase()) {
-      case "urgent": return "#ef4444";
-      case "high": return "#f97316";
-      case "medium": return "#eab308";
-      case "low": return "#22c55e";
-      default: return "#6366f1";
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const chatRef = ref(db, `users/${user.uid}/userComplaints/${complaint.firebaseKey}/chat`);
+
+  onValue(chatRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      const messagesArray = Object.entries(data).map(([key, value]: [string, any]) => ({
+        id: key,
+        senderId: value.senderId,
+        message: value.message,
+        timestamp: value.timestamp,
+      }));
+      setChatMessages(messagesArray);
+    } else {
+      setChatMessages([]);
     }
-  };
+  });
+};
+
+
+const sendMessage = async () => {
+  if (!chatInput.trim() || !selectedComplaint?.firebaseKey) return;
+
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const chatRef = push(ref(db, `users/${user.uid}/userComplaints/${selectedComplaint.firebaseKey}/chat`));
+
+  await set(chatRef, {
+    senderId: user.uid,
+    message: chatInput,
+    timestamp: new Date().toLocaleString(),
+  });
+
+  setChatInput("");
+};
+
+
+
+
+
+const getStatusColor = (status?: string) => {
+  switch ((status || "").toLowerCase()) {
+    case "pending": return "#f59e0b";
+    case "resolved": return "#10b981";
+    case "in progress": return "#3b82f6";
+    default: return "#6b7280";
+  }
+};
+
+const getLabelColor = (label?: string) => {
+  switch ((label || "").toLowerCase()) {
+    case "urgent": return "#ef4444";
+    case "high": return "#f97316";
+    case "medium": return "#eab308";
+    case "low": return "#22c55e";
+    default: return "#6366f1";
+  }
+};
+
 
   // ===========================
   // UI
@@ -463,6 +512,64 @@ useEffect(() => {
                     resizeMode="cover"
                   />
                 )}
+                {/* Chat Section */}
+                <View style={{ marginTop: 20, marginBottom: 20 }}>
+                  <Text style={{ fontWeight: "bold", fontSize: 16, marginBottom: 8 }}>Chat</Text>
+                  <ScrollView style={{ maxHeight: 200, marginBottom: 10 }}>
+                    {chatMessages.length === 0 ? (
+                      <Text style={{ color: "#6b7280", fontStyle: "italic" }}>No messages yet</Text>
+                    ) : (
+                      chatMessages.map((msg) => (
+                        <View
+                          key={msg.id}
+                          style={{
+                            alignSelf: msg.senderId === auth.currentUser?.uid ? "flex-end" : "flex-start",
+                            backgroundColor: msg.senderId === auth.currentUser?.uid ? "#6366f1" : "#e5e7eb",
+                            padding: 8,
+                            borderRadius: 10,
+                            marginVertical: 2,
+                            maxWidth: "80%",
+                          }}
+                        >
+                          <Text style={{ color: msg.senderId === auth.currentUser?.uid ? "#fff" : "#374151" }}>
+                            {msg.message}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>{msg.timestamp}</Text>
+                        </View>
+                      ))
+                    )}
+                  </ScrollView>
+
+                  {/* Input Row */}
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        borderWidth: 1,
+                        borderColor: "#d1d5db",
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        height: 40,
+                        backgroundColor: "#fff",
+                      }}
+                      placeholder="Type a message..."
+                      value={chatInput}
+                      onChangeText={setChatInput}
+                    />
+                    <TouchableOpacity
+                      onPress={sendMessage}
+                      style={{
+                        backgroundColor: "#6366f1",
+                        padding: 10,
+                        borderRadius: 12,
+                        marginLeft: 6,
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "bold" }}>Send</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
 
                 {/* Badges */}
                 <View style={styles.detailBadges}>

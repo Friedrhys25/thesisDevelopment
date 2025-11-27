@@ -76,6 +76,7 @@ export default function ProfilePage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  
   const [userData, setUserData] = useState<UserData>({
     firstName: "",
     middleName: "",
