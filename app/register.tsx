@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
+import * as Location from "expo-location";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import { auth, db } from "../backend/firebaseConfig";
@@ -52,6 +53,34 @@ export default function RegisterPage() {
 
     return age;
   };
+
+
+const handleFetchLocation = async () => {
+  try {
+    // Request permission
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Denied", "Enable location permissions to continue.");
+      return;
+    }
+
+    // Get coordinates
+    const location = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = location.coords;
+
+    // Convert to readable address
+    const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+    let addressText = `${geocode[0].street}, ${geocode[0].city}, ${geocode[0].region}`;
+
+    // Put into TextInput
+    setAddress(addressText);
+
+    Alert.alert("Success", "Address filled using GPS.");
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Error", "Failed to get location");
+  }
+};
 
 
   const handleRegister = async () => {
@@ -265,14 +294,25 @@ export default function RegisterPage() {
             
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Address</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your address"
-                value={address}
-                onChangeText={setAddress}
-                placeholderTextColor="#999"
-              />
+
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="Enter your address"
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholderTextColor="#999"
+                />
+
+                <TouchableOpacity
+                  onPress={handleFetchLocation}
+                  style={styles.locationButton}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>Get</Text>
+                </TouchableOpacity>
+              </View>
             </View>
+
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Purok</Text>
@@ -544,4 +584,14 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
+  locationButton: {
+  marginLeft: 8,
+  backgroundColor: "#4a90e2",
+  paddingVertical: 14,
+  paddingHorizontal: 16,
+  borderRadius: 12,
+  justifyContent: "center",
+  alignItems: "center",
+},
+
 });

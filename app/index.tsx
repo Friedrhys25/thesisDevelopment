@@ -125,7 +125,7 @@ export default function LoginPage() {
           <View style={styles.logoContainer}>
             <Text style={styles.logoText}>💬</Text>
           </View>
-          <Text style={styles.title}>Talk2us</Text>
+          <Text style={styles.title}>Talk2Kap</Text>
           <Text style={styles.subtitle}>Welcome back! Sign in to continue</Text>
         </View>
 
