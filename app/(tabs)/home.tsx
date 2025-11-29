@@ -30,6 +30,7 @@ const iconMap = {
   "flame-outline": "🔥",
   "chevron-forward": "→",
   "chatbubble-outline": "💬",
+  "faqs": "❓",
 };
 
 // ✅ Typed Ionicons component
@@ -68,11 +69,11 @@ export default function HomePage() {
   }, []);
 
   const services: Service[] = [
-    { id: 1, name: "Complaints", icon: "mail-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/complaints" },
-    { id: 2, name: "Emergency", icon: "alert-circle-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/emergency" },
-    { id: 3, name: "Feedback", icon: "analytics-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/feedback" },
+    { id: 1, name: "Complaints", icon: "alert-circle-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/complaints" },
+    { id: 2, name: "Emergency", icon: "medical-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/emergency" },
+    { id: 3, name: "Feedback", icon: "mail-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/feedback" },
     { id: 4, name: "Profile", icon: "people-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/profile" },
-    { id: 5, name: "Messages", icon: "chatbubble-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/messages" },
+    { id: 5, name: "FAQS", icon: "faqs", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/FAQS" },
   ];
 
   const handleServiceClick = (id: number) => {

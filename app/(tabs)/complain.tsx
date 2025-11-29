@@ -435,9 +435,9 @@ export default function App() {
         }));
         setChatMessages(messagesArray);
 
-        // Mark all admin messages as read
+        // Mark all admin messages as read (use isUnread so we handle boolean/string/missing formats)
         Object.entries(data).forEach(async ([key, value]: [string, any]) => {
-          if (value.senderId !== user.uid && value.read === false) {
+          if (value.senderId !== user.uid && isUnread(value, user.uid)) {
             await set(ref(db, `users/${user.uid}/userComplaints/${complaint.firebaseKey}/chat/${key}/read`), true);
           }
         });
@@ -746,7 +746,7 @@ export default function App() {
 
                 {/* Chat Section - ONLY show when status is IN PROGRESS or RESOLVED */}
                 {selectedComplaint?.status?.toLowerCase() !== "pending" && (
-                  <View style={styles.chatContainer}>
+                  <View style={{ flex: 1 }}>
                     <Text style={styles.chatTitle}>Chat</Text>
 
                     <ScrollView 
