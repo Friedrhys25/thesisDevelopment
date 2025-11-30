@@ -69,7 +69,7 @@ export default function HomePage() {
   }, []);
 
   const services: Service[] = [
-    { id: 1, name: "Complaints", icon: "alert-circle-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/complaints" },
+    { id: 1, name: "Complaints", icon: "alert-circle-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/complain" },
     { id: 2, name: "Emergency", icon: "medical-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/emergency" },
     { id: 3, name: "Feedback", icon: "mail-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/feedback" },
     { id: 4, name: "Profile", icon: "people-outline", gradient: ["#FF6B6B", "#FF8E8E"] as const, route: "/profile" },

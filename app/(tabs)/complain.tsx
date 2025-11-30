@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 
-import { get, onValue, push, ref, set } from "firebase/database";
+import { get, onValue, push, ref, remove, set } from "firebase/database";
 import { auth, db } from "../../backend/firebaseConfig";
 
 interface NotificationItem {
@@ -58,6 +58,11 @@ export default function App() {
     inprogress: new Set(),
     resolved: new Set(),
   });
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [viewingFeedback, setViewingFeedback] = useState<string>("");
+  const [feedbackComplaintKey, setFeedbackComplaintKey] = useState<string>("");
+  const [complaintFeedbacks, setComplaintFeedbacks] = useState<Record<string, string>>({});
   
   
   
@@ -110,6 +115,31 @@ export default function App() {
     };
 
     fetchUserData();
+  }, []);
+
+  // ===========================
+// Fetch Feedbacks from Firebase
+// ===========================
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const feedbackRef = ref(db, "complaintFeedback");
+    
+    const unsubscribe = onValue(feedbackRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const feedbacks: Record<string, string> = {};
+        Object.entries(data).forEach(([complaintKey, feedbackData]: [string, any]) => {
+          if (feedbackData.feedbackMessage) {
+            feedbacks[complaintKey] = feedbackData.feedbackMessage;
+          }
+        });
+        setComplaintFeedbacks(feedbacks);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // ===========================
@@ -358,7 +388,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const API_URL = "http://192.168.68.101:5000";
+      const API_URL = "http://192.168.68.150:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",
@@ -406,7 +436,7 @@ export default function App() {
       Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
-    }
+    } 
   };
 
   const openDetailModal = (complaint: NotificationItem) => {
@@ -431,7 +461,7 @@ export default function App() {
           senderId: value.senderId,
           message: value.message,
           timestamp: value.timestamp,
-          read: value.read,
+          read: value.read === true || value.read === "true" ? true : false,
         }));
         setChatMessages(messagesArray);
 
@@ -474,27 +504,130 @@ export default function App() {
     }
   };
 
+  // Confirm and delete a complaint (only allowed for pending complaints)
+  const confirmAndDelete = (complaint: NotificationItem) => {
+    if (!complaint.firebaseKey) return;
+
+    Alert.alert(
+      "Delete Complaint",
+      "Are you sure you want to delete this complaint? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const user = auth.currentUser;
+              if (!user) return;
+
+              const complaintRef = ref(db, `users/${user.uid}/userComplaints/${complaint.firebaseKey}`);
+              await remove(complaintRef);
+
+              // Close modal and clear selected complaint
+              setDetailModalVisible(false);
+              setSelectedComplaint(null);
+
+              // Remove locally cached notification and any status update markers
+              setNotifications((prev) => prev.filter((c) => c.firebaseKey !== complaint.firebaseKey));
+              setStatusUpdates((prev) => {
+                const copy: Record<string, Set<string>> = {
+                  pending: new Set(prev.pending),
+                  inprogress: new Set(prev.inprogress),
+                  resolved: new Set(prev.resolved),
+                };
+                Object.keys(copy).forEach((k) => copy[k].delete(complaint.firebaseKey as string));
+                return copy;
+              });
+
+              Alert.alert("Deleted", "Complaint deleted successfully.");
+            } catch (err) {
+              console.error("Failed to delete complaint:", err);
+              Alert.alert("Error", "Failed to delete complaint. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const sendMessage = async () => {
-    if (!chatInput.trim() || !selectedComplaint?.firebaseKey) return;
+    const text = chatInput.trim();
+    if (!text || !selectedComplaint?.firebaseKey) return;
 
     const user = auth.currentUser;
     if (!user) return;
 
     const chatRef = push(ref(db, `users/${user.uid}/userComplaints/${selectedComplaint.firebaseKey}/chat`));
 
-    await set(chatRef, {
+    const newMessage = {
       senderId: user.uid,
-      message: chatInput,
+      message: text,
       timestamp: new Date().toLocaleString(),
-      read: true,
-    });
+      read: false, // ensure boolean false is written to Firebase
+    } as const;
 
-    setChatInput("");
+    try {
+      // Optimistic UI update: show the message immediately
+      setChatMessages((prev) => [
+        ...prev,
+        { id: chatRef.key || String(Date.now()), senderId: newMessage.senderId, message: newMessage.message, timestamp: newMessage.timestamp, read: false },
+      ]);
+
+      setChatInput("");
+
+      await set(chatRef, newMessage);
+
+      // Auto-scroll to bottom after sending
+      setTimeout(() => {
+        chatScrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (err: any) {
+      console.error("Failed to send message:", err);
+      Alert.alert("Error", "Failed to send message. Please try again.");
+      // Revert optimistic update on failure
+      setChatMessages((prev) => prev.filter((m) => m.id !== (chatRef.key || "")));
+    }
+  };
+
+// Submit Feedback
+  const submitFeedback = async () => {
+    if (!feedbackMessage.trim()) {
+      Alert.alert("Error", "Please enter your feedback");
+      return;
+    }
+
+    if (!feedbackComplaintKey) return;
+
+    try {
+      const feedbackRef = ref(db, `complaintFeedback/${feedbackComplaintKey}`);
+      await set(feedbackRef, {
+        feedbackMessage: feedbackMessage.trim(),
+        timestamp: new Date().toLocaleString(),
+      });
+
+      setFeedbackMessage("");
+      setFeedbackModalVisible(false);
+      Alert.alert("Success", "Feedback submitted successfully!");
+    } catch (error: any) {
+      Alert.alert("Error", "Failed to submit feedback: " + error.message);
+    }
+  };
+
+  // Open feedback modal for sending or viewing
+  const handleFeedbackAction = (complaintKey: string) => {
+    setFeedbackComplaintKey(complaintKey);
     
-    // Auto-scroll to bottom after sending
-    setTimeout(() => {
-      chatScrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    if (complaintFeedbacks[complaintKey]) {
+      // View existing feedback
+      setViewingFeedback(complaintFeedbacks[complaintKey]);
+      setFeedbackModalVisible(true);
+    } else {
+      // Send new feedback
+      setViewingFeedback("");
+      setFeedbackMessage("");
+      setFeedbackModalVisible(true);
+    }
   };
 
   const getStatusColor = (status?: string) => {
@@ -602,53 +735,103 @@ export default function App() {
           <ScrollView
             style={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 20 }}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
           >
             {notifications
               .filter((n) => {
-                const status = (n.status || "").toLowerCase().replace(" ", ""); 
-              const filterKey = filterStatus.toLowerCase().replace(" ", "");
-              return filterStatus === "all" || status === filterKey;
+                if (filterStatus === "all") return true;
+                
+                // Normalize both strings by removing ALL spaces and converting to lowercase
+                const status = (n.status || "").toLowerCase().replace(/\s+/g, "").trim();
+                const filterKey = filterStatus.toLowerCase().replace(/\s+/g, "").trim();
+                
+                // Handle various "in progress" formats
+                if (filterKey === "inprogress") {
+                  return status === "inprogress" || 
+                        status === "in-progress" || 
+                        status === "in_progress" ||
+                        status === "inprocess" ||
+                        status === "processing";
+                }
+                
+                return status === filterKey;
               })
               .map((n) => (
-                <TouchableOpacity
-                  key={n.id}
-                  style={styles.complaintCard}
-                  onPress={() => openDetailModal(n)}
-                  activeOpacity={0.7}
-                >
-                  {(n.hasUpdate || hasStatusUpdate(n)) && (
-                    <View style={styles.updateBadge}>
-                      <Text style={styles.updateText}>!</Text>
-                    </View>
-                  )}
+  <TouchableOpacity
+    key={n.id}
+    style={[
+      styles.complaintCard,
+      n.status?.toLowerCase() === "resolved" && styles.resolvedCard
+    ]}
+    onPress={() => n.status?.toLowerCase() !== "resolved" && openDetailModal(n)}
+    activeOpacity={n.status?.toLowerCase() === "resolved" ? 1 : 0.7}
+    disabled={n.status?.toLowerCase() === "resolved"}
+  >
+    {(n.hasUpdate || hasStatusUpdate(n)) && (
+      <View style={styles.updateBadge}>
+        <Text style={styles.updateText}>!</Text>
+      </View>
+    )}
 
-                  {/* Evidence Photo */}
-                  {n.evidencePhoto && (
-                    <Image source={{ uri: n.evidencePhoto }} style={styles.cardImage} />
-                  )}
+    {/* Evidence Photo */}
+    {n.evidencePhoto && (
+      <Image 
+        source={{ uri: n.evidencePhoto }} 
+        style={[
+          styles.cardImage,
+          n.status?.toLowerCase() === "resolved" && styles.blurredImage
+        ]} 
+      />
+    )}
 
-                  {/* Header Row */}
-                  <View style={styles.cardHeader}>
-                    <View style={[styles.labelBadge, { backgroundColor: getLabelColor(n.label) }]}>
-                      <Text style={styles.labelText}>{n.label.toUpperCase()}</Text>
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(n.status) }]}>
-                      <Text style={styles.statusText}>{n.status.toUpperCase()}</Text>
-                    </View>
-                  </View>
+    {/* Header Row */}
+    <View style={styles.cardHeader}>
+      <View style={[styles.labelBadge, { backgroundColor: getLabelColor(n.label) }]}>
+        <Text style={styles.labelText}>{n.label.toUpperCase()}</Text>
+      </View>
+      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(n.status) }]}>
+        <Text style={styles.statusText}>{n.status.toUpperCase()}</Text>
+      </View>
+    </View>
 
-                  {/* Message Preview */}
-                  <Text style={styles.messagePreview} numberOfLines={2}>{n.message}</Text>
+    {/* Message Preview */}
+    <Text 
+      style={[
+        styles.messagePreview,
+        n.status?.toLowerCase() === "resolved" && styles.blurredText
+      ]} 
+      numberOfLines={2}
+    >
+      {n.message}
+    </Text>
 
-                  {/* Footer Row */}
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.footerText}>🕒 {n.timestamp}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+    {/* Footer Row */}
+    <View style={styles.cardFooter}>
+      <Text style={styles.footerText}>🕒 {n.timestamp}</Text>
+    </View>
+
+    {/* Feedback Button Overlay for Resolved Complaints */}
+    {n.status?.toLowerCase() === "resolved" && (
+      <View style={styles.feedbackOverlay}>
+        <TouchableOpacity
+          style={styles.feedbackButton}
+          onPress={() => n.firebaseKey && handleFeedbackAction(n.firebaseKey)}
+        >
+          <Text style={styles.feedbackButtonText}>
+            {n.firebaseKey && complaintFeedbacks[n.firebaseKey] 
+              ? "📝 View Feedback" 
+              : "✍️ Send Feedback"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    )}
+  </TouchableOpacity>
+))}
           </ScrollView>
         </>
       )}
@@ -683,16 +866,90 @@ export default function App() {
             {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Complaint Details</Text>
-              <TouchableOpacity
-                onPress={() => setDetailModalVisible(false)}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {selectedComplaint?.status?.toLowerCase()?.replace(/\s+/g, "") === "pending" && (
+                  <TouchableOpacity
+                    onPress={() => selectedComplaint && confirmAndDelete(selectedComplaint)}
+                    style={styles.deleteButton}
+                  >
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => setDetailModalVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {selectedComplaint && (
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
+
+                {/* Chat Section - ONLY show when status is IN PROGRESS or RESOLVED */}
+                {selectedComplaint?.status?.toLowerCase() !== "pending" && (
+                  <View style={{ flex: 1, marginBottom: 20 }}>
+                    <Text style={styles.chatTitle}>Chat</Text>
+
+                    <ScrollView 
+                      ref={chatScrollViewRef}
+                      style={styles.chatScrollView}
+                      nestedScrollEnabled={true}
+                      keyboardShouldPersistTaps="handled"
+                      showsVerticalScrollIndicator={true}
+                      onContentSizeChange={() => chatScrollViewRef.current?.scrollToEnd({ animated: true })}
+                      contentContainerStyle={{ paddingBottom: 12 }}
+                    >
+                      {chatMessages.length === 0 ? (
+                        <Text style={styles.emptyChat}>No messages yet</Text>
+                      ) : (
+                        chatMessages.map((msg) => {
+                          const isMine = msg.senderId === auth.currentUser?.uid;
+                          return (
+                            <View key={msg.id} style={[
+                              styles.messageContainer,
+                              isMine ? styles.myMessageContainer : styles.theirMessageContainer
+                            ]}>
+                              <View style={[
+                                styles.messageBubble,
+                                isMine ? styles.myMessageBubble : styles.theirMessageBubble
+                              ]}>
+                                <Text style={[
+                                  styles.messageText,
+                                  isMine ? styles.myMessageText : styles.theirMessageText
+                                ]}>
+                                  {msg.message}
+                                </Text>
+                              </View>
+                              <Text style={styles.messageTimestamp}>
+                                {msg.timestamp} {isMine && (msg.read === true ? " • Read" : " • Unread")}
+                              </Text>
+                            </View>
+                          );
+                        })
+                      )}
+                    </ScrollView>
+
+                    {/* Chat Input */}
+                    <View style={styles.chatInputContainer}>
+                      <TextInput
+                        value={chatInput}
+                        onChangeText={setChatInput}
+                        placeholder="Type a message..."
+                        style={styles.chatInput}
+                        multiline
+                      />
+                      <TouchableOpacity
+                        onPress={sendMessage}
+                        style={styles.sendButton}
+                      >
+                        <Text style={styles.sendButtonText}>Send</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
 
                 {/* Evidence Photo */}
                 {selectedComplaint.evidencePhoto && (
@@ -744,65 +1001,7 @@ export default function App() {
                   <Text style={styles.detailValue}>🕒 {selectedComplaint.timestamp}</Text>
                 </View>
 
-                {/* Chat Section - ONLY show when status is IN PROGRESS or RESOLVED */}
-                {selectedComplaint?.status?.toLowerCase() !== "pending" && (
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.chatTitle}>Chat</Text>
-
-                    <ScrollView 
-                      ref={chatScrollViewRef}
-                      style={styles.chatScrollView}
-                      showsVerticalScrollIndicator={true}
-                      onContentSizeChange={() => chatScrollViewRef.current?.scrollToEnd({ animated: true })}
-                    >
-                      {chatMessages.length === 0 ? (
-                        <Text style={styles.emptyChat}>No messages yet</Text>
-                      ) : (
-                        chatMessages.map((msg) => {
-                          const isMine = msg.senderId === auth.currentUser?.uid;
-                          return (
-                            <View key={msg.id} style={[
-                              styles.messageContainer,
-                              isMine ? styles.myMessageContainer : styles.theirMessageContainer
-                            ]}>
-                              <View style={[
-                                styles.messageBubble,
-                                isMine ? styles.myMessageBubble : styles.theirMessageBubble
-                              ]}>
-                                <Text style={[
-                                  styles.messageText,
-                                  isMine ? styles.myMessageText : styles.theirMessageText
-                                ]}>
-                                  {msg.message}
-                                </Text>
-                              </View>
-                              <Text style={styles.messageTimestamp}>
-                                {msg.timestamp} {isMine && (msg.read ? " • Read" : " • Unread")}
-                              </Text>
-                            </View>
-                          );
-                        })
-                      )}
-                    </ScrollView>
-
-                    {/* Chat Input */}
-                    <View style={styles.chatInputContainer}>
-                      <TextInput
-                        value={chatInput}
-                        onChangeText={setChatInput}
-                        placeholder="Type a message..."
-                        style={styles.chatInput}
-                        multiline
-                      />
-                      <TouchableOpacity
-                        onPress={sendMessage}
-                        style={styles.sendButton}
-                      >
-                        <Text style={styles.sendButtonText}>Send</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
+                
 
               </ScrollView>
             )}
@@ -951,6 +1150,59 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      {/* FEEDBACK MODAL */}
+<Modal visible={feedbackModalVisible} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <View style={styles.complaintModalBox}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>
+          {viewingFeedback ? "Your Feedback" : "Send Feedback"}
+        </Text>
+        <TouchableOpacity
+          onPress={() => {
+            setFeedbackModalVisible(false);
+            setFeedbackMessage("");
+            setViewingFeedback("");
+          }}
+          style={styles.closeButton}
+        >
+          <Text style={styles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {viewingFeedback ? (
+          // View existing feedback
+          <View style={styles.feedbackViewContainer}>
+            <Text style={styles.feedbackViewText}>{viewingFeedback}</Text>
+          </View>
+        ) : (
+          // Send new feedback
+          <>
+            <Text style={styles.label}>Your Feedback *</Text>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Please share your feedback about how this complaint was handled..."
+              value={feedbackMessage}
+              onChangeText={setFeedbackMessage}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={submitFeedback}
+            >
+              <Text style={styles.submitButtonText}>Submit Feedback ➔</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </ScrollView>
+    </View>
+  </View>
+</Modal>
 
     </View>
   );
@@ -1273,6 +1525,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: "#6b7280",
   },
+  deleteButton: {
+    backgroundColor: "#ef4444",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
   label: {
     fontSize: 14,
     fontWeight: "600",
@@ -1454,4 +1717,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
   },
+  resolvedCard: {
+  opacity: 0.85,
+},
+blurredImage: {
+  opacity: 0.3,
+},
+blurredText: {
+  opacity: 0.3,
+},
+feedbackOverlay: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "rgba(255, 255, 255, 0.5)",
+  borderRadius: 12,
+},
+feedbackButton: {
+  backgroundColor: "#6366f1",
+  paddingHorizontal: 24,
+  paddingVertical: 12,
+  borderRadius: 10,
+  shadowColor: "#6366f1",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 5,
+},
+feedbackButtonText: {
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: "bold",
+},
+feedbackViewContainer: {
+  backgroundColor: "#f9fafb",
+  padding: 16,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+  minHeight: 150,
+},
+feedbackViewText: {
+  fontSize: 15,
+  color: "#1f2937",
+  lineHeight: 22,
+},
 });

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,11 +30,40 @@ export default function FeedbackPage() {
   const [employees, setEmployees] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<PersonType>("official");
+  const [selectedPosition, setSelectedPosition] = useState<string>("all categories");
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [generalFeedback, setGeneralFeedback] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const officialPositions = [
+    "all categories",
+    "kapitan",
+    "kagawad",
+    "secretary",
+    "treasurer",
+    "barangay record keeper",
+    "barangay clerk"
+  ];
+
+  const employeePositions = [
+    "all categories",
+    "day care services",
+    "vawc",
+    "bns",
+    "bhw",
+    "chief bantay bayan",
+    "bantay bayan",
+    "bantay bayan/utility",
+    "bantay bayan/driver",
+    "lupon tagapamayapa"
+  ];
+
+  // Reset selected position when switching tabs
+  useEffect(() => {
+    setSelectedPosition("all categories");
+  }, [activeTab]);
 
   // Fetch officials and employees from Firebase
   useEffect(() => {
@@ -86,61 +116,69 @@ export default function FeedbackPage() {
     setComments((prev) => ({ ...prev, [id]: text }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmitIndividual = async (personId: string, personName: string, personType: PersonType) => {
+    if (!ratings[personId]) {
+      Alert.alert("Error", "Please provide a rating before submitting");
+      return;
+    }
+
+    try {
+      const feedbackRef = ref(db, `${personType === "official" ? "officials" : "employees"}/${personId}/feedback/${Date.now()}`);
+      const feedbackData = {
+        rating: ratings[personId],
+        comment: comments[personId] || "",
+        timestamp: Date.now(),
+      };
+      await update(feedbackRef, feedbackData);
+      
+      Alert.alert("Success", `Feedback for ${personName} submitted successfully!`);
+      
+      // Clear this person's feedback after submission
+      setRatings(prev => {
+        const newRatings = { ...prev };
+        delete newRatings[personId];
+        return newRatings;
+      });
+      setComments(prev => {
+        const newComments = { ...prev };
+        delete newComments[personId];
+        return newComments;
+      });
+    } catch (error) {
+      console.error("Error saving feedback:", error);
+      Alert.alert("Error", "Failed to submit feedback");
+    }
+  };
+
+  const handleSubmitGeneral = async () => {
+    if (!generalFeedback.trim()) {
+      Alert.alert("Error", "Please write some feedback before submitting");
+      return;
+    }
+
     setSubmitting(true);
     
     try {
-      // Save feedback for officials
-      for (const official of officials) {
-        if (ratings[official.id]) {
-          const feedbackRef = ref(db, `officials/${official.id}/feedback/${Date.now()}`);
-          const feedbackData = {
-            rating: ratings[official.id],
-            comment: comments[official.id] || "",
-            timestamp: Date.now(),
-          };
-          await update(feedbackRef, feedbackData);
-        }
-      }
-
-      // Save feedback for employees
-      for (const employee of employees) {
-        if (ratings[employee.id]) {
-          const feedbackRef = ref(db, `employees/${employee.id}/feedback/${Date.now()}`);
-          const feedbackData = {
-            rating: ratings[employee.id],
-            comment: comments[employee.id] || "",
-            timestamp: Date.now(),
-          };
-          await update(feedbackRef, feedbackData);
-        }
-      }
-
-      // Save general feedback
-      if (generalFeedback.trim()) {
-        const generalFeedbackRef = ref(db, `generalFeedback/${Date.now()}`);
-        const feedbackData = {
-          feedback: generalFeedback,
-          timestamp: Date.now(),
-        };
-        await update(generalFeedbackRef, feedbackData);
-      }
-
+      const generalFeedbackRef = ref(db, `generalFeedback/${Date.now()}`);
+      const feedbackData = {
+        feedback: generalFeedback,
+        timestamp: Date.now(),
+      };
+      await update(generalFeedbackRef, feedbackData);
+      
+      Alert.alert("Success", "General feedback submitted successfully!");
+      setGeneralFeedback("");
       setSubmitted(true);
-      console.log("✅ Feedback saved successfully!");
+      
+      setTimeout(() => {
+        setSubmitted(false);
+      }, 3000);
     } catch (error) {
       console.error("Error saving feedback:", error);
+      Alert.alert("Error", "Failed to submit feedback");
     } finally {
       setSubmitting(false);
     }
-
-    // Reset after delay
-    setTimeout(() => {
-      setRatings({});
-      setComments({});
-      setGeneralFeedback("");
-      setSubmitted(false);
-    }, 3000);
   };
 
   const RatingStars = ({
@@ -185,6 +223,12 @@ export default function FeedbackPage() {
   }
 
   const currentList = activeTab === "official" ? officials : employees;
+  const currentPositions = activeTab === "official" ? officialPositions : employeePositions;
+  
+  // Filter by position
+  const filteredList = selectedPosition === "all categories" 
+    ? currentList 
+    : currentList.filter(person => person.position.toLowerCase() === selectedPosition.toLowerCase());
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -266,6 +310,34 @@ export default function FeedbackPage() {
               </TouchableOpacity>
             </View>
 
+            {/* Position Filter */}
+            <View style={styles.filterContainer}>
+              <Text style={styles.filterLabel}>Filter by Position:</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.filterScrollView}
+              >
+                {currentPositions.map((position) => (
+                  <TouchableOpacity
+                    key={position}
+                    style={[
+                      styles.filterChip,
+                      selectedPosition === position && styles.filterChipActive
+                    ]}
+                    onPress={() => setSelectedPosition(position)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedPosition === position && styles.filterChipTextActive
+                    ]}>
+                      {position}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
             {/* Info Card */}
             <View style={styles.infoCard}>
               <Ionicons name="information-circle" size={20} color="#4A90E2" />
@@ -275,15 +347,15 @@ export default function FeedbackPage() {
             </View>
 
             {/* Person Cards */}
-            {currentList.length === 0 ? (
+            {filteredList.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="folder-open-outline" size={64} color="#D1D5DB" />
                 <Text style={styles.emptyText}>
-                  No {activeTab === "official" ? "officials" : "employees"} found
+                  No {activeTab === "official" ? "officials" : "employees"} found for this position
                 </Text>
               </View>
             ) : (
-              currentList.map((person) => (
+              filteredList.map((person) => (
                 <View key={person.id} style={styles.personCard}>
                   {/* Person Header */}
                   <View style={styles.personHeader}>
@@ -327,6 +399,15 @@ export default function FeedbackPage() {
                       numberOfLines={3}
                       textAlignVertical="top"
                     />
+                    
+                    {/* Individual Submit Button */}
+                    <TouchableOpacity 
+                      style={styles.individualSubmitButton}
+                      onPress={() => handleSubmitIndividual(person.id, person.name, person.type)}
+                    >
+                      <Text style={styles.individualSubmitText}>Submit Feedback</Text>
+                      <Ionicons name="send" size={16} color="white" />
+                    </TouchableOpacity>
                   </View>
                 </View>
               ))
@@ -351,23 +432,23 @@ export default function FeedbackPage() {
                 onChangeText={setGeneralFeedback}
                 textAlignVertical="top"
               />
+              
+              {/* General Feedback Submit Button */}
+              <TouchableOpacity 
+                style={[styles.submitButton, submitting && styles.submitButtonDisabled]} 
+                onPress={handleSubmitGeneral}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Text style={styles.submitButtonText}>Submit General Feedback</Text>
+                    <Ionicons name="send" size={20} color="white" />
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity 
-              style={[styles.submitButton, submitting && styles.submitButtonDisabled]} 
-              onPress={handleSubmit}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Text style={styles.submitButtonText}>Submit Feedback</Text>
-                  <Ionicons name="send" size={20} color="white" />
-                </>
-              )}
-            </TouchableOpacity>
           </ScrollView>
         )}
       </View>
@@ -429,7 +510,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 6,
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -468,6 +549,41 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#4B5563",
   },
+  filterContainer: {
+    marginBottom: 16,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4B5563",
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  filterScrollView: {
+    flexDirection: "row",
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  filterChipActive: {
+    backgroundColor: "#4A90E2",
+    borderColor: "#4A90E2",
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B7280",
+    textTransform: "capitalize",
+  },
+  filterChipTextActive: {
+    color: "#FFFFFF",
+  },
   infoCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -494,6 +610,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#6B7280",
     marginTop: 16,
+    textAlign: "center",
   },
   personCard: {
     backgroundColor: "#FFFFFF",
@@ -532,6 +649,7 @@ const styles = StyleSheet.create({
   personPosition: {
     fontSize: 14,
     color: "#6B7280",
+    textTransform: "capitalize",
   },
   ratingSection: {
     alignItems: "center",
@@ -575,6 +693,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
     color: "#1F2937",
     minHeight: 80,
+    marginBottom: 12,
+  },
+  individualSubmitButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    backgroundColor: "#4A90E2",
+    borderRadius: 12,
+  },
+  individualSubmitText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
   generalFeedbackSection: {
     backgroundColor: "#FFFFFF",
@@ -613,6 +746,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
     backgroundColor: "#F9FAFB",
     color: "#1F2937",
+    marginBottom: 16,
   },
   submitButton: {
     flexDirection: "row",
@@ -657,4 +791,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
-});
+}); 

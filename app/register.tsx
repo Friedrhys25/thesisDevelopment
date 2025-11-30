@@ -13,13 +13,13 @@ import {
   Alert,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-
 import * as Location from "expo-location";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import { auth, db } from "../backend/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { ref, set } from "firebase/database";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -31,6 +31,10 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+
   const [address, setAddress] = useState("");
   const [purok, setPurok] = useState("1");
   const [birthday, setBirthday] = useState("");
@@ -39,7 +43,10 @@ export default function RegisterPage() {
   const [number, setNumber] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
 
+  // BLOCK NUMBERS ON NAME FIELDS
+  const allowOnlyLetters = (text: string) => text.replace(/[^A-Za-z\s]/g, "");
 
+  // AGE CALCULATION
   const calculateAge = (birthdate: string) => {
     const today = new Date();
     const birth = new Date(birthdate);
@@ -54,59 +61,55 @@ export default function RegisterPage() {
     return age;
   };
 
+  // FETCH LOCATION
+  const handleFetchLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Enable location permissions to continue.");
+        return;
+      }
 
-const handleFetchLocation = async () => {
-  try {
-    // Request permission
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission Denied", "Enable location permissions to continue.");
-      return;
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+      let addressText = `${geocode[0].street}, ${geocode[0].city}, ${geocode[0].region}`;
+
+      setAddress(addressText);
+      Alert.alert("Success", "Address filled using GPS.");
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to get location");
     }
+  };
 
-    // Get coordinates
-    const location = await Location.getCurrentPositionAsync({});
-    const { latitude, longitude } = location.coords;
-
-    // Convert to readable address
-    const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
-    let addressText = `${geocode[0].street}, ${geocode[0].city}, ${geocode[0].region}`;
-
-    // Put into TextInput
-    setAddress(addressText);
-
-    Alert.alert("Success", "Address filled using GPS.");
-  } catch (error) {
-    console.error(error);
-    Alert.alert("Error", "Failed to get location");
-  }
-};
-
-
+  // REGISTER FUNCTION
   const handleRegister = async () => {
-    console.log("Register button pressed");
-
     if (!email || !password || !confirmPassword || !firstName || !lastName || !birthday) {
       Alert.alert("Missing Fields", "Please fill in all required fields marked with *");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Password Mismatch", "Passwords do not match. Please try again.");
+      Alert.alert("Password Mismatch", "Passwords do not match.");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Weak Password", "Password must be at least 6 characters long");
+      Alert.alert("Weak Password", "Password must be at least 6 characters long.");
+      return;
+    }
+
+    // MOBILE NUMBER VALIDATION (11 digits only)
+    if (number.length !== 11 || !/^\d+$/.test(number)) {
+      Alert.alert("Incorrect Mobile Format", "Contact number must be exactly 11 digits.");
       return;
     }
 
     try {
-      console.log("Creating user with email:", email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
-      console.log("User created:", user.uid);
 
       await set(ref(db, `users/${user.uid}`), {
         firstName,
@@ -122,11 +125,8 @@ const handleFetchLocation = async () => {
         createdAt: new Date().toISOString(),
       });
 
-      console.log("Saved to database");
       setModalVisible(true);
     } catch (error: any) {
-      console.error("Firebase Error:", error.code, error.message);
-
       let errorMessage = "Something went wrong";
 
       switch (error.code) {
@@ -150,16 +150,17 @@ const handleFetchLocation = async () => {
     }
   };
 
+  // SUCCESS MODAL CLOSE
   const handleSuccessClose = () => {
     setModalVisible(false);
     router.push("/");
   };
 
+  // LIMIT DATE PICKER TO TODAY ONLY
+  const today = new Date();
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Create Account</Text>
@@ -167,18 +168,17 @@ const handleFetchLocation = async () => {
         </View>
 
         <View style={styles.formContainer}>
-          {/* Personal Information Section */}
+          {/* PERSONAL INFO */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
-            
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>First Name *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter your first name"
                 value={firstName}
-                onChangeText={setFirstName}
-                placeholderTextColor="#999"
+                onChangeText={(t) => setFirstName(allowOnlyLetters(t))}
               />
             </View>
 
@@ -186,10 +186,9 @@ const handleFetchLocation = async () => {
               <Text style={styles.inputLabel}>Middle Name</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your middle name (optional)"
+                placeholder="Optional"
                 value={middleName}
-                onChangeText={setMiddleName}
-                placeholderTextColor="#999"
+                onChangeText={(t) => setMiddleName(allowOnlyLetters(t))}
               />
             </View>
 
@@ -199,8 +198,7 @@ const handleFetchLocation = async () => {
                 style={styles.input}
                 placeholder="Enter your last name"
                 value={lastName}
-                onChangeText={setLastName}
-                placeholderTextColor="#999"
+                onChangeText={(t) => setLastName(allowOnlyLetters(t))}
               />
             </View>
 
@@ -209,9 +207,7 @@ const handleFetchLocation = async () => {
 
               <TouchableOpacity onPress={() => setShowDatePicker(true)}>
                 <View style={styles.input}>
-                  <Text style={{ color: birthday ? "#333" : "#999" }}>
-                    {birthday || "Select your birthday"}
-                  </Text>
+                  <Text style={{ color: birthday ? "#333" : "#999" }}>{birthday || "Select your birthday"}</Text>
                 </View>
               </TouchableOpacity>
 
@@ -219,29 +215,27 @@ const handleFetchLocation = async () => {
                 <DateTimePicker
                   value={birthday ? new Date(birthday) : new Date()}
                   mode="date"
+                  maximumDate={today} // CANNOT PICK FUTURE DATE
                   display="default"
                   onChange={(event, selectedDate) => {
                     setShowDatePicker(false);
 
                     if (selectedDate) {
-                      const year = selectedDate.getFullYear();
-                      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
-                      const day = String(selectedDate.getDate()).padStart(2, "0");
-                      setBirthday(`${year}-${month}-${day}`);
+                      const y = selectedDate.getFullYear();
+                      const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                      const d = String(selectedDate.getDate()).padStart(2, "0");
+                      setBirthday(`${y}-${m}-${d}`);
                     }
                   }}
                 />
               )}
             </View>
-
-
-
           </View>
 
-          {/* Account Information Section */}
+          {/* ACCOUNT INFO */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Account Information</Text>
-            
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Email *</Text>
               <TextInput
@@ -249,79 +243,73 @@ const handleFetchLocation = async () => {
                 placeholder="Enter your email"
                 value={email}
                 onChangeText={setEmail}
-                keyboardType="email-address"
                 autoCapitalize="none"
-                placeholderTextColor="#999"
+                keyboardType="email-address"
               />
             </View>
 
+            {/* PASSWORD WITH EYE BUTTON */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Password *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Min. 6 characters"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
-                placeholderTextColor="#999"
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Min. 6 characters"
+                  secureTextEntry={!passwordVisible}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+                  <Ionicons name={passwordVisible ? "eye-off" : "eye"} size={22} color="#555" />
+                </TouchableOpacity>
+              </View>
             </View>
 
+            {/* CONFIRM PASSWORD */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Confirm Password *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  confirmPassword && password !== confirmPassword && styles.inputError
-                ]}
-                placeholder="Re-enter your password"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                autoCapitalize="none"
-                placeholderTextColor="#999"
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Re-enter password"
+                  secureTextEntry={!confirmPasswordVisible}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                />
+                <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
+                  <Ionicons name={confirmPasswordVisible ? "eye-off" : "eye"} size={22} color="#555" />
+                </TouchableOpacity>
+              </View>
+
               {confirmPassword && password !== confirmPassword && (
                 <Text style={styles.errorText}>Passwords do not match</Text>
               )}
             </View>
           </View>
 
-          {/* Contact Information Section */}
+          {/* CONTACT INFO */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Contact Information</Text>
-            
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Address</Text>
-
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <TextInput
                   style={[styles.input, { flex: 1 }]}
-                  placeholder="Enter your address"
-                  value={address}
+                  placeholder="lot / block / street"
+                  value={address} 
                   onChangeText={setAddress}
-                  placeholderTextColor="#999"
                 />
-
-                <TouchableOpacity
-                  onPress={handleFetchLocation}
-                  style={styles.locationButton}
-                >
+                <TouchableOpacity onPress={handleFetchLocation} style={styles.locationButton}>
                   <Text style={{ color: "#fff", fontWeight: "700" }}>Get</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Purok</Text>
               <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={purok}
-                  onValueChange={(itemValue) => setPurok(itemValue)}
-                  style={styles.picker}
-                >
+                <Picker selectedValue={purok} onValueChange={setPurok}>
                   <Picker.Item label="Purok 1" value="1" />
                   <Picker.Item label="Purok 2" value="2" />
                   <Picker.Item label="Purok 3" value="3" />
@@ -331,19 +319,23 @@ const handleFetchLocation = async () => {
               </View>
             </View>
 
+            {/* CONTACT NUMBER VALIDATION */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Contact Number</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your phone number"
-                keyboardType="phone-pad"
+                placeholder="11-digit number"
+                keyboardType="numeric"
+                maxLength={11}
                 value={number}
-                onChangeText={setNumber}
-                placeholderTextColor="#999"
+                onChangeText={(t) => setNumber(t.replace(/[^0-9]/g, ""))} // only digits
               />
+
+              {number.length > 0 && number.length !== 11 && (
+                <Text style={styles.errorText}>Incorrect mobile format (must be 11 digits)</Text>
+              )}
             </View>
           </View>
-
 
           <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
             <Text style={styles.registerButtonText}>Create Account</Text>
@@ -356,7 +348,7 @@ const handleFetchLocation = async () => {
           </TouchableOpacity>
         </View>
 
-        {/* Success Modal */}
+        {/* SUCCESS MODAL */}
         <Modal animationType="fade" transparent={true} visible={modalVisible}>
           <View style={styles.modalBackground}>
             <View style={styles.modalBox}>
@@ -391,34 +383,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
     elevation: 5,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: "#e3f2fd",
-  },
-  formContainer: {
-    padding: 20,
-  },
+  title: { fontSize: 36, fontWeight: "bold", color: "#fff" },
+  subtitle: { fontSize: 18, color: "#e3f2fd" },
+  formContainer: { padding: 20 },
+
   section: {
     backgroundColor: "#fff",
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
     elevation: 2,
   },
   sectionTitle: {
@@ -430,15 +405,11 @@ const styles = StyleSheet.create({
     borderLeftColor: "#4a90e2",
     paddingLeft: 12,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#555",
-    marginBottom: 8,
-  },
+
+  inputGroup: { marginBottom: 16 },
+
+  inputLabel: { fontSize: 14, fontWeight: "600", color: "#555", marginBottom: 8 },
+
   input: {
     width: "100%",
     padding: 14,
@@ -449,97 +420,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
-  inputError: {
-    borderColor: "#e74c3c",
-    backgroundColor: "#fff5f5",
+
+  passwordContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#e0e0e0",
+    borderRadius: 12,
+    backgroundColor: "#fafafa",
+    paddingHorizontal: 12,
   },
-  errorText: {
-    color: "#e74c3c",
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
-  },
+
+  passwordInput: { flex: 1, padding: 12, fontSize: 16 },
+
+  errorText: { color: "#e74c3c", fontSize: 12, marginTop: 4 },
+
   pickerContainer: {
     borderWidth: 1.5,
     borderColor: "#e0e0e0",
     borderRadius: 12,
     backgroundColor: "#fafafa",
-    overflow: "hidden",
   },
-  picker: {
-    width: "100%",
-  },
-  imageButton: {
-    padding: 16,
+
+  locationButton: {
+    marginLeft: 8,
+    backgroundColor: "#4a90e2",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: "#f0f8ff",
-    borderWidth: 2,
-    borderColor: "#4a90e2",
-    borderStyle: "dashed",
-    alignItems: "center",
-    marginBottom: 12,
   },
-  imageButtonText: {
-    color: "#4a90e2",
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  imagePreviewContainer: {
-    alignItems: "center",
-    marginTop: 12,
-  },
-  idImage: {
-    width: 180,
-    height: 180,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#e0e0e0",
-  },
+
   registerButton: {
     padding: 18,
     borderRadius: 12,
     backgroundColor: "#4a90e2",
     alignItems: "center",
     marginTop: 10,
-    marginBottom: 16,
-    shadowColor: "#4a90e2",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  registerButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 18,
-  },
-  loginText: {
-    textAlign: "center",
-    color: "#666",
-    fontSize: 14,
-  },
-  loginLink: {
-    color: "#4a90e2",
-    fontWeight: "600",
-  },
+  registerButtonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+
+  loginText: { textAlign: "center", color: "#666", marginTop: 10 },
+  loginLink: { color: "#4a90e2", fontWeight: "bold" },
+
   modalBackground: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.6)",
   },
+
   modalBox: {
     width: 320,
     padding: 30,
     backgroundColor: "#fff",
     borderRadius: 20,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
   },
+
   successIcon: {
     width: 70,
     height: 70,
@@ -549,49 +486,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  successIconText: {
-    fontSize: 40,
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  modalText: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 12,
-    textAlign: "center",
-    color: "#2c3e50",
-  },
-  modalSubText: {
-    fontSize: 15,
-    color: "#666",
-    marginBottom: 24,
-    textAlign: "center",
-    lineHeight: 22,
-  },
+
+  successIconText: { fontSize: 40, color: "#fff" },
+
+  modalText: { fontSize: 22, fontWeight: "bold", marginBottom: 12 },
+  modalSubText: { textAlign: "center", color: "#666", marginBottom: 20 },
+
   closeButton: {
     backgroundColor: "#4a90e2",
-    paddingVertical: 14,
     paddingHorizontal: 40,
+    paddingVertical: 14,
     borderRadius: 12,
-    shadowColor: "#4a90e2",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  closeButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  locationButton: {
-  marginLeft: 8,
-  backgroundColor: "#4a90e2",
-  paddingVertical: 14,
-  paddingHorizontal: 16,
-  borderRadius: 12,
-  justifyContent: "center",
-  alignItems: "center",
-},
-
+  closeButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });
