@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { get, onValue, push, ref, remove, set } from "firebase/database";
 import { auth, db } from "../../backend/firebaseConfig";
@@ -35,6 +36,7 @@ interface NotificationItem {
 }
 
 export default function App() {
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -388,7 +390,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const API_URL = "http://192.168.68.150:5000";
+      const API_URL = "http://192.168.68.119:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",
@@ -664,7 +666,7 @@ export default function App() {
   // UI
   // ===========================
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}> 
       
       {/* Header */}
       <Text style={styles.header}>Complaints</Text>
@@ -1204,7 +1206,7 @@ export default function App() {
   </View>
 </Modal>
 
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -1215,7 +1217,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f3f4f6",
-    paddingTop: 50,
+    paddingTop: 0,
     paddingHorizontal: 15,
   },
   header: {

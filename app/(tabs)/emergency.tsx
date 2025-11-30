@@ -1,15 +1,16 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
   Alert,
   Linking,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 
 type IoniconsProps = {
@@ -35,6 +36,7 @@ const Ionicons = ({ name, size, color }: IoniconsProps) => {
 
 export default function EmergencyPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [selectedEmergency, setSelectedEmergency] = useState<number | null>(null);
 
 
@@ -77,7 +79,7 @@ export default function EmergencyPage() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -162,7 +164,10 @@ export default function EmergencyPage() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F5F7FA" },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F5F7FA",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -273,4 +278,5 @@ const styles = StyleSheet.create({
   noteIcon: { fontSize: 28, marginRight: 10 },
   noteTitle: { fontWeight: "700", fontSize: 15, color: "#F57C00" },
   noteText: { color: "#E65100", fontSize: 13, lineHeight: 18 },
+  
 });

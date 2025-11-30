@@ -62,27 +62,7 @@ export default function RegisterPage() {
   };
 
   // FETCH LOCATION
-  const handleFetchLocation = async () => {
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Denied", "Enable location permissions to continue.");
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-
-      const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
-      let addressText = `${geocode[0].street}, ${geocode[0].city}, ${geocode[0].region}`;
-
-      setAddress(addressText);
-      Alert.alert("Success", "Address filled using GPS.");
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to get location");
-    }
-  };
+  
 
   // REGISTER FUNCTION
   const handleRegister = async () => {
@@ -96,10 +76,15 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert("Weak Password", "Password must be at least 6 characters long.");
-      return;
-    }
+    // PASSWORD STRENGTH VALIDATION
+  if (!isPasswordStrong(password)) {
+    Alert.alert(
+      "Weak Password",
+      "Password must include:\n• At least 1 uppercase letter\n• At least 1 lowercase letter\n• At least 1 digit\n• Minimum 6 characters"
+    );
+    return;
+  }
+
 
     // MOBILE NUMBER VALIDATION (11 digits only)
     if (number.length !== 11 || !/^\d+$/.test(number)) {
@@ -155,6 +140,12 @@ export default function RegisterPage() {
     setModalVisible(false);
     router.push("/");
   };
+
+  const isPasswordStrong = (password: string) => {
+  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+  return regex.test(password);
+};
+
 
   // LIMIT DATE PICKER TO TODAY ONLY
   const today = new Date();
@@ -300,9 +291,7 @@ export default function RegisterPage() {
                   value={address} 
                   onChangeText={setAddress}
                 />
-                <TouchableOpacity onPress={handleFetchLocation} style={styles.locationButton}>
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>Get</Text>
-                </TouchableOpacity>
+                
               </View>
             </View>
 
@@ -315,6 +304,7 @@ export default function RegisterPage() {
                   <Picker.Item label="Purok 3" value="3" />
                   <Picker.Item label="Purok 4" value="4" />
                   <Picker.Item label="Purok 5" value="5" />
+                  <Picker.Item label="Purok 6" value="6" />
                 </Picker>
               </View>
             </View>
@@ -441,15 +431,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#fafafa",
   },
-
-  locationButton: {
-    marginLeft: 8,
-    backgroundColor: "#4a90e2",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-
+  
   registerButton: {
     padding: 18,
     borderRadius: 12,

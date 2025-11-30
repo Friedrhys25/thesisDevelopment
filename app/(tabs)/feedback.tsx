@@ -30,6 +30,10 @@ export default function FeedbackPage() {
   const [employees, setEmployees] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<PersonType>("official");
+  
+  // ✅ Added search state
+  const [searchQuery, setSearchQuery] = useState(""); 
+  
   const [selectedPosition, setSelectedPosition] = useState<string>("all categories");
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -60,9 +64,10 @@ export default function FeedbackPage() {
     "lupon tagapamayapa"
   ];
 
-  // Reset selected position when switching tabs
+  // ✅ Reset selected position AND search query when switching tabs
   useEffect(() => {
     setSelectedPosition("all categories");
+    setSearchQuery("");
   }, [activeTab]);
 
   // Fetch officials and employees from Firebase
@@ -225,10 +230,16 @@ export default function FeedbackPage() {
   const currentList = activeTab === "official" ? officials : employees;
   const currentPositions = activeTab === "official" ? officialPositions : employeePositions;
   
-  // Filter by position
-  const filteredList = selectedPosition === "all categories" 
-    ? currentList 
-    : currentList.filter(person => person.position.toLowerCase() === selectedPosition.toLowerCase());
+  // ✅ Updated Filter Logic: Checks Position AND Search Query
+  const filteredList = currentList.filter(person => {
+    const matchesPosition = selectedPosition === "all categories" 
+      ? true 
+      : person.position.toLowerCase() === selectedPosition.toLowerCase();
+    
+    const matchesSearch = person.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesPosition && matchesSearch;
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -257,6 +268,23 @@ export default function FeedbackPage() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* ✅ Search Bar */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={`Search ${activeTab === "official" ? "officials" : "employees"} by name...`}
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.searchClearButton}>
+                  <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+
             {/* Tab Selector */}
             <View style={styles.tabContainer}>
               <TouchableOpacity
@@ -349,9 +377,12 @@ export default function FeedbackPage() {
             {/* Person Cards */}
             {filteredList.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="folder-open-outline" size={64} color="#D1D5DB" />
+                <Ionicons name="search-outline" size={64} color="#D1D5DB" />
                 <Text style={styles.emptyText}>
-                  No {activeTab === "official" ? "officials" : "employees"} found for this position
+                  {searchQuery 
+                    ? `No matches found for "${searchQuery}"`
+                    : `No ${activeTab === "official" ? "officials" : "employees"} found for this position`
+                  }
                 </Text>
               </View>
             ) : (
@@ -504,6 +535,30 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
+  },
+  // ✅ New Search Bar Styles
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#1F2937",
+    height: "100%",
+  },
+  searchClearButton: {
+    padding: 4,
   },
   tabContainer: {
     flexDirection: "row",
@@ -791,4 +846,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
-}); 
+});

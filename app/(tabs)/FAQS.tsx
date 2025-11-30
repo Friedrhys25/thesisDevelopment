@@ -1,53 +1,114 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-  TextInput,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput, // Added TextInput
+  TouchableOpacity,
+  UIManager,
+  View
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const GEMINI_API_KEY = "AIzaSyDg_EbxqAGrgiAAOBN1jZIoPVzjeeJaXvk"; // Replace with your API key
+// Define the FAQ structure for strong typing
+const faqs = [
+  { q: "How do I submit feedback or a complaint?", a: "Go to the Feedback or Complaints section, fill in the description of the issue. You can also attach photos if needed to support your complaint. Once completed, click the submit button." },
+  { q: "How can I track the status of my complaint?", a: "You can check the status under 'My Complaints' section in the app. The status will show as 'Pending' (awaiting review), 'In Progress' (being addressed), or 'Resolved' (completed)." },
+  { q: "Who reviews my complaints or feedback?", a: "Assigned administrators or barangay officials review all submissions." },
+  { q: "Is my personal information safe?", a: "Yes, all personal information and complaint details are kept strictly confidential and protected by our privacy policies. We comply with data protection regulations and only share information with authorized barangay personnel." },
+  { q: "What should I do if I don't get a response?", a: "If you do not receive a response, you can send a follow-up message directly in the chat of your submitted complaint. The barangay staff will reply there once they review your message." },
+  { q: "How quickly will my complaint be addressed?", a: "Response times vary depending on the nature and urgency of the complaint. Urgent matters (safety issues) are prioritized and addressed within 24-48 hours. Regular complaints typically receive a response within 5-7 business days." },
+  { q: "What types of complaints can I submit?", a: "You can submit complaints about infrastructure issues (damaged roads, streetlights), sanitation concerns, noise complaints, community disputes, environmental issues, and other barangay-related matters." },
+  { q: "Can I attach photos to my complaint?", a: "Yes, you can attach photos to your complaint. Photos help officials better understand the issue and provide more accurate solutions. Photo should be under 5MB in size." },
+  { q: "How do I delete a complaint I submitted?", a: "You can delete a complaint only if it has not been reviewed yet. Go to 'My Complaints', select the complaint, and tap the delete icon. Once reviewed, complaints cannot be deleted but can be marked as withdrawn." },
+  { q: "Will I be notified about updates to my complaint?", a: "Yes, you will receive notifications whenever there is an update to your complaint status. Make sure to enable notifications in your device settings for the app." },
+  { q: "What if my issue requires urgent attention?", a: "When submitting your complaint, you can mark it as 'Urgent'. Urgent complaints are prioritized and reviewed first. For life-threatening emergencies, please visit the Emergency page in the app, which lists all the hotline numbers for immediate assistance." },
+  { q: "Can I submit feedback about good service?", a: "Absolutely! We welcome positive feedback about excellent service from barangay officials or staff. This helps us recognize outstanding performance and maintain high service standards." },
+  { q: "How do I reset my password?", a: "On the login screen, tap 'Forgot Password', enter your registered email address, and you'll receive a password reset link. Follow the instructions in the email to create a new password." },
+];
 
 export default function FAQPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [expandedFaqs, setExpandedFaqs] = useState<number[]>([]);
   const [showChatbot, setShowChatbot] = useState(false);
-  const [messages, setMessages] = useState<Array<{ text: string; isUser: boolean }>>([
-    { text: "Hi! I'm here to help answer questions about the Barangay Feedback System. How can I assist you?", isUser: false }
-  ]);
+  const [messages, setMessages] = useState<Array<{ text: string; isUser: boolean }>>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Initialize chatbot message when the view is opened or toggled
+  useEffect(() => {
+    if (showChatbot && messages.length === 0) {
+      setMessages([
+        { text: "Hi! I'm here to help answer questions about the Barangay Feedback System. Select a question below or type yours.", isUser: false }
+      ]);
+    }
+  }, [showChatbot]);
 
-  const faqs = [
-    { q: "How do I submit feedback or a complaint?", a: "Go to the Feedback or Complaints section, fill in the description of the issue. You can also attach photos if needed to support your complaint. Once completed, click the submit button." },
-    { q: "How can I track the status of my complaint?", a: "You can check the status under 'My Complaints' section in the app. The status will show as 'Pending' (awaiting review), 'In Progress' (being addressed), or 'Resolved' (completed)." },
-    { q: "Who reviews my complaints or feedback?", a: "Assigned administrators or barangay officials review all submissions." },
-    { q: "Is my personal information safe?", a: "Yes, all personal information and complaint details are kept strictly confidential and protected by our privacy policies. We comply with data protection regulations and only share information with authorized barangay personnel." },
-    { q: "What should I do if I don't get a response?", a: "If you do not receive a response, you can send a follow-up message directly in the chat of your submitted complaint. The barangay staff will reply there once they review your message." },
-    { q: "How quickly will my complaint be addressed?", a: "Response times vary depending on the nature and urgency of the complaint. Urgent matters (safety issues) are prioritized and addressed within 24-48 hours. Regular complaints typically receive a response within 5-7 business days." },
-    { q: "What types of complaints can I submit?", a: "You can submit complaints about infrastructure issues (damaged roads, streetlights), sanitation concerns, noise complaints, community disputes, environmental issues, and other barangay-related matters." },
-    { q: "Can I attach photos to my complaint?", a: "Yes, you can attach photos to your complaint. Photos help officials better understand the issue and provide more accurate solutions. Photo should be under 5MB in size." },
-    { q: "How do I delete a complaint I submitted?", a: "You can delete a complaint only if it has not been reviewed yet. Go to 'My Complaints', select the complaint, and tap the delete icon. Once reviewed, complaints cannot be deleted but can be marked as withdrawn." },
-    { q: "Will I be notified about updates to my complaint?", a: "Yes, you will receive notifications whenever there is an update to your complaint status. Make sure to enable notifications in your device settings for the app." },
-    { q: "What if my issue requires urgent attention?", a: "When submitting your complaint, you can mark it as 'Urgent'. Urgent complaints are prioritized and reviewed first. For life-threatening emergencies, please visit the Emergency page in the app, which lists all the hotline numbers for immediate assistance." },
-    { q: "Can I submit feedback about good service?", a: "Absolutely! We welcome positive feedback about excellent service from barangay officials or staff. This helps us recognize outstanding performance and maintain high service standards." },
-    { q: "How do I reset my password?", a: "On the login screen, tap 'Forgot Password', enter your registered email address, and you'll receive a password reset link. Follow the instructions in the email to create a new password." },
-  ];
+
+  // --- CHATBOT LOGIC ---
+
+  const handleChatbotResponse = (userQuestion: string) => {
+    const normalizedQuestion = userQuestion.toLowerCase().trim();
+    
+    // Simple matching function: check if the user's question contains key terms from any FAQ
+    const foundFaq = faqs.find(faq => {
+        const normalizedFaqQ = faq.q.toLowerCase();
+        
+        // Split the FAQ question into key terms (ignoring common words)
+        const keywords = normalizedFaqQ.replace(/how|do|i|my|the|a|an|of|to|be|or|and/g, '').split(/\s+/).filter(word => word.length > 3);
+        
+        // Check if the user's input contains at least one of the key terms
+        return keywords.some(keyword => normalizedQuestion.includes(keyword));
+    });
+
+    const botResponse = foundFaq
+        ? foundFaq.a
+        : "I'm sorry, I can only provide answers to the Frequently Asked Questions. Please try rephrasing your question or selecting one from the quick buttons below.";
+
+    setTimeout(() => {
+        setIsLoading(false);
+        setMessages(prev => [
+            ...prev, 
+            { text: botResponse, isUser: false }
+        ]);
+    }, 800); // Simulate network delay
+  };
+
+  const handleSend = () => {
+    if (!inputText.trim() || isLoading) return;
+
+    const userMessage = inputText.trim();
+    
+    // 1. Add user message
+    setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
+    setInputText("");
+    setIsLoading(true);
+
+    // 2. Get bot response
+    handleChatbotResponse(userMessage);
+  };
+
+  const toggleChatbot = (show: boolean) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowChatbot(show);
+    if (!show) {
+        setMessages([]); // Clear chat history when exiting chatbot
+    }
+  };
+
+  // --- END CHATBOT LOGIC ---
 
   const toggleFaq = (index: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -56,96 +117,46 @@ export default function FAQPage() {
     );
   };
 
-  const sendMessage = async () => {
-  if (!inputText.trim()) return;
+  const selectFaq = (faq: typeof faqs[0]) => {
+    // Add both user question and bot answer to the chat
+    setMessages(prev => [
+      ...prev,
+      { text: faq.q, isUser: true },
+      { text: faq.a, isUser: false }
+    ]);
+  };
 
-  const userMessage = inputText.trim();
-  setInputText("");
-  setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
-  setIsLoading(true);
-
-  try {
-    // Create context from FAQs
-    const faqContext = faqs.map(faq => `Q: ${faq.q}\nA: ${faq.a}`).join("\n\n");
-    
-    const prompt = `You are a helpful assistant for a Barangay Feedback System. Answer questions ONLY based on the following FAQs. If the question is not related to these FAQs, politely say you can only answer questions about the feedback system based on the available FAQs.
-
-FAQs:
-${faqContext}
-
-User Question: ${userMessage}
-
-Please provide a helpful, concise answer based only on the information in the FAQs above. If the question cannot be answered from the FAQs, suggest the user contact the barangay office directly.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 500,
-          },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("API Error:", errorData);
-      throw new Error(`API returned ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log("API Response:", JSON.stringify(data, null, 2)); // Debug log
-    
-    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-      const botResponse = data.candidates[0].content.parts[0].text;
-      setMessages(prev => [...prev, { text: botResponse, isUser: false }]);
-    } else {
-      console.error("Unexpected response structure:", data);
-      setMessages(prev => [...prev, { 
-        text: "I apologize, but I'm having trouble processing your question. Please try rephrasing or contact the barangay office directly.", 
-        isUser: false 
-      }]);
-    }
-  } catch (error) {
-    console.error("Error details:", error);
-    setMessages(prev => [...prev, { 
-      text: "I'm sorry, I'm having technical difficulties. Please try again later or contact the barangay office directly during office hours (8 AM - 5 PM).", 
-      isUser: false 
-    }]);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  // Auto-scroll to bottom of chat
   useEffect(() => {
     if (showChatbot) {
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages, showChatbot]);
 
+  const sendButtonDisabled = !inputText.trim() || isLoading;
+
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerText}>Help & Support</Text>
+        
+        {/* Chat/FAQ Toggle Button */}
         <TouchableOpacity 
-          style={styles.chatButton} 
-          onPress={() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setShowChatbot(!showChatbot);
-          }}
+            style={styles.toggleButton} 
+            onPress={() => toggleChatbot(!showChatbot)}
         >
-          <Ionicons name={showChatbot ? "close" : "chatbubble-ellipses"} size={24} color="#fff" />
+            <Ionicons 
+                name={showChatbot ? "list-outline" : "chatbubble-ellipses"} 
+                size={22} 
+                color="#3B82F6" 
+            />
+            <Text style={styles.toggleButtonText}>
+                {showChatbot ? "View All FAQs" : "Start Chat"}
+            </Text>
         </TouchableOpacity>
       </View>
 
@@ -200,7 +211,7 @@ Please provide a helpful, concise answer based only on the information in the FA
         <KeyboardAvoidingView 
           style={styles.chatContainer} 
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={90}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
         >
           {/* Chat Header */}
           <View style={styles.chatHeader}>
@@ -209,8 +220,8 @@ Please provide a helpful, concise answer based only on the information in the FA
                 <Ionicons name="chatbox" size={24} color="#fff" />
               </View>
               <View>
-                <Text style={styles.chatHeaderTitle}>AI Assistant</Text>
-                <Text style={styles.chatHeaderSubtitle}>Ask me anything about FAQs</Text>
+                <Text style={styles.chatHeaderTitle}>FAQ Chatbot</Text>
+                <Text style={styles.chatHeaderSubtitle}>Limited to pre-set FAQ responses</Text>
               </View>
             </View>
           </View>
@@ -248,53 +259,61 @@ Please provide a helpful, concise answer based only on the information in the FA
                 </View>
               </View>
             ))}
+            {/* Typing Indicator */}
             {isLoading && (
-              <View style={[styles.messageBubble, styles.botMessage]}>
-                <View style={styles.botAvatarSmall}>
-                  <Ionicons name="chatbox" size={16} color="#fff" />
+                <View style={[styles.messageBubble, styles.botMessage]}>
+                    <View style={styles.botAvatarSmall}>
+                        <Ionicons name="chatbox" size={16} color="#fff" />
+                    </View>
+                    <View style={[styles.messageContent, styles.botMessageContent]}>
+                        <Text style={styles.botMessageText}>...</Text> 
+                    </View>
                 </View>
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                  <Text style={styles.loadingText}>Typing...</Text>
-                </View>
-              </View>
             )}
           </ScrollView>
 
-          {/* Input */}
-          <View style={styles.inputContainer}>
+          {/* Input Area */}
+          <View style={styles.inputArea}>
             <TextInput
-              style={styles.input}
-              placeholder="Type your question..."
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={500}
+                style={styles.textInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Ask a question..."
+                returnKeyType="send"
+                onSubmitEditing={handleSend}
+                editable={!isLoading}
             />
             <TouchableOpacity 
-              style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-              onPress={sendMessage}
-              disabled={!inputText.trim() || isLoading}
+                style={[styles.sendButton, sendButtonDisabled && styles.sendButtonDisabled]} 
+                onPress={handleSend}
+                disabled={sendButtonDisabled}
             >
-              <Ionicons name="send" size={20} color="#fff" />
+                <Ionicons name="send" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
+
+          {/* FAQ Buttons (Quick Picks) */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.faqButtonsContainer}
+            contentContainerStyle={styles.faqButtonsContent}
+          >
+            {faqs.map((faq, index) => (
+              <TouchableOpacity 
+                key={index}
+                style={styles.faqButton}
+                onPress={() => selectFaq(faq)}
+              >
+                <Text style={styles.faqButtonText} numberOfLines={2}>{faq.q}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </KeyboardAvoidingView>
       )}
 
-      {/* Floating Chat Button (when FAQ is visible) */}
-      {!showChatbot && (
-        <TouchableOpacity 
-          style={styles.floatingChatButton}
-          onPress={() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setShowChatbot(true);
-          }}
-        >
-          <Ionicons name="chatbubble-ellipses" size={28} color="#fff" />
-        </TouchableOpacity>
-      )}
-    </View>
+    
+    </SafeAreaView>
   );
 }
 
@@ -304,9 +323,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     padding: 16,
-    paddingTop: Platform.OS === "ios" ? 50 : 16,
     backgroundColor: "#3B82F6",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -322,7 +339,20 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
-  chatButton: { padding: 4 },
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  toggleButtonText: {
+    color: '#3B82F6',
+    fontWeight: '600',
+    fontSize: 13,
+    marginLeft: 4,
+  },
 
   infoBanner: {
     flexDirection: "row",
@@ -457,6 +487,17 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 8,
   },
+  emptyMessageContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyMessageText: {
+    fontSize: 16,
+    color: "#64748B",
+    textAlign: "center",
+  },
   messageBubble: {
     flexDirection: "row",
     marginBottom: 16,
@@ -506,69 +547,60 @@ const styles = StyleSheet.create({
   botMessageText: {
     color: "#1E293B",
   },
-  loadingContainer: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#64748B",
-  },
-
-  inputContainer: {
-    flexDirection: "row",
-    padding: 16,
+  faqButtonsContainer: {
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
-    gap: 12,
+    maxHeight: 120,
   },
-  input: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 24,
+  faqButtonsContent: {
+    padding: 12,
+    gap: 8,
+  },
+  faqButton: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    fontSize: 14,
-    maxHeight: 100,
-    color: "#1E293B",
+    minWidth: 120,
+    borderWidth: 1,
+    borderColor: "#3B82F6",
+  },
+  faqButtonText: {
+    color: "#1E40AF",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  
+  // New Input Styles
+  inputArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  textInput: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#1E293B',
+    marginRight: 8,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#3B82F6",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#3B82F6',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sendButtonDisabled: {
-    opacity: 0.5,
-  },
-
-  floatingChatButton: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#3B82F6",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
+    backgroundColor: '#93C5FD',
+  }
 });
