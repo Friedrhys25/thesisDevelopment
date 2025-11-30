@@ -8,11 +8,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput, // Added TextInput
+  TextInput, 
   TouchableOpacity,
   UIManager,
   View
 } from "react-native";
+// Import the Google Gen AI SDK
+import { GoogleGenAI } from '@google/genai';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
@@ -20,7 +22,15 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Define the FAQ structure for strong typing
+// --- Configuration ---
+// !!! IMPORTANT: REPLACE THIS WITH YOUR ACTUAL GEMINI API KEY !!!
+const GEMINI_API_KEY = "AIzaSyDg_EbxqAGrgiAAOBN1jZIoPVzjeeJaXvk"; 
+
+// Initialize the GoogleGenAI client
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+
+// Define the FAQ structure
 const faqs = [
   { q: "How do I submit feedback or a complaint?", a: "Go to the Feedback or Complaints section, fill in the description of the issue. You can also attach photos if needed to support your complaint. Once completed, click the submit button." },
   { q: "How can I track the status of my complaint?", a: "You can check the status under 'My Complaints' section in the app. The status will show as 'Pending' (awaiting review), 'In Progress' (being addressed), or 'Resolved' (completed)." },
@@ -37,6 +47,46 @@ const faqs = [
   { q: "How do I reset my password?", a: "On the login screen, tap 'Forgot Password', enter your registered email address, and you'll receive a password reset link. Follow the instructions in the email to create a new password." },
 ];
 
+/**
+ * GEMINI API Function: Generates a response strictly based on the provided FAQs.
+ * @param userQuestion The question sent by the user.
+ * @param faqsList The list of all available FAQs.
+ * @returns A promise that resolves to the bot's response string.
+ */
+const fetchChatbotResponse = async (userQuestion: string): Promise<string> => {
+    // 1. Format the FAQs into a single reference text
+    const faqContext = faqs.map(item => `Q: ${item.q}\nA: ${item.a}`).join('\n---\n');
+
+    // 2. Define the System Instruction for strict constraint
+    const systemInstruction = `You are a helpful and constrained FAQ chatbot for the Barangay Feedback System. Your SOLE source of information is the following list of Frequently Asked Questions (FAQs). You MUST only answer questions based on the content of these FAQs. If the user asks a question that is not covered in the FAQs, you MUST respond with the following exact sentence: "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below."
+
+    Available FAQs:
+    ---
+    ${faqContext}
+    ---`;
+    
+    // 3. Construct the API call
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash", 
+            contents: userQuestion,
+            config: {
+                systemInstruction: systemInstruction,
+                // Optional: Reduce randomness to make responses more factual/lookup-based
+                temperature: 0.1, 
+            }
+        });
+
+        // 4. Return the model's text response
+            return response.text || "Unable to generate a response. Please try again.";
+    } catch (error) {
+        console.error("Gemini API Error:", error);
+        // Fallback response for API errors
+        return "Sorry, I ran into an error while connecting to the help service. Please check your API key or network connection and try again.";
+    }
+};
+
+
 export default function FAQPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -47,7 +97,7 @@ export default function FAQPage() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   
-  // Initialize chatbot message when the view is opened or toggled
+  // Initialize chatbot message
   useEffect(() => {
     if (showChatbot && messages.length === 0) {
       setMessages([
@@ -59,34 +109,7 @@ export default function FAQPage() {
 
   // --- CHATBOT LOGIC ---
 
-  const handleChatbotResponse = (userQuestion: string) => {
-    const normalizedQuestion = userQuestion.toLowerCase().trim();
-    
-    // Simple matching function: check if the user's question contains key terms from any FAQ
-    const foundFaq = faqs.find(faq => {
-        const normalizedFaqQ = faq.q.toLowerCase();
-        
-        // Split the FAQ question into key terms (ignoring common words)
-        const keywords = normalizedFaqQ.replace(/how|do|i|my|the|a|an|of|to|be|or|and/g, '').split(/\s+/).filter(word => word.length > 3);
-        
-        // Check if the user's input contains at least one of the key terms
-        return keywords.some(keyword => normalizedQuestion.includes(keyword));
-    });
-
-    const botResponse = foundFaq
-        ? foundFaq.a
-        : "I'm sorry, I can only provide answers to the Frequently Asked Questions. Please try rephrasing your question or selecting one from the quick buttons below.";
-
-    setTimeout(() => {
-        setIsLoading(false);
-        setMessages(prev => [
-            ...prev, 
-            { text: botResponse, isUser: false }
-        ]);
-    }, 800); // Simulate network delay
-  };
-
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputText.trim() || isLoading) return;
 
     const userMessage = inputText.trim();
@@ -96,8 +119,23 @@ export default function FAQPage() {
     setInputText("");
     setIsLoading(true);
 
-    // 2. Get bot response
-    handleChatbotResponse(userMessage);
+    // 2. Fetch bot response (Live Gemini API Call)
+    try {
+        // Pass the user question and the FAQs list to the API wrapper
+        const botResponse = await fetchChatbotResponse(userMessage);
+        setMessages(prev => [
+            ...prev, 
+            { text: botResponse, isUser: false }
+        ]);
+    } catch (error) {
+        console.error("Chatbot API Error:", error);
+        setMessages(prev => [
+            ...prev, 
+            { text: "Sorry, I encountered an issue. Please ensure your API key is correct and retry.", isUser: false }
+        ]);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const toggleChatbot = (show: boolean) => {
@@ -118,12 +156,15 @@ export default function FAQPage() {
   };
 
   const selectFaq = (faq: typeof faqs[0]) => {
-    // Add both user question and bot answer to the chat
+    // This now simulates the Gemini API result using the hardcoded answer
     setMessages(prev => [
       ...prev,
       { text: faq.q, isUser: true },
       { text: faq.a, isUser: false }
     ]);
+    if (!showChatbot) {
+        toggleChatbot(true); // Switch to chat view if selecting from FAQ list
+    }
   };
 
   // Auto-scroll to bottom of chat
@@ -144,17 +185,19 @@ export default function FAQPage() {
         </TouchableOpacity>
         <Text style={styles.headerText}>Help & Support</Text>
         
-        {/* Chat/FAQ Toggle Button */}
+        {/* Chat/FAQ Toggle Button (Swapped Logic) */}
         <TouchableOpacity 
             style={styles.toggleButton} 
             onPress={() => toggleChatbot(!showChatbot)}
         >
             <Ionicons 
+                // Icon shows the view the user will switch to
                 name={showChatbot ? "list-outline" : "chatbubble-ellipses"} 
                 size={22} 
                 color="#3B82F6" 
             />
             <Text style={styles.toggleButtonText}>
+                {/* Text shows the view the user will switch to */}
                 {showChatbot ? "View All FAQs" : "Start Chat"}
             </Text>
         </TouchableOpacity>
@@ -221,7 +264,7 @@ export default function FAQPage() {
               </View>
               <View>
                 <Text style={styles.chatHeaderTitle}>FAQ Chatbot</Text>
-                <Text style={styles.chatHeaderSubtitle}>Limited to pre-set FAQ responses</Text>
+                <Text style={styles.chatHeaderSubtitle}>Powered by Gemini (Limited to FAQ knowledge)</Text>
               </View>
             </View>
           </View>
@@ -573,7 +616,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   
-  // New Input Styles
+  // Input Styles
   inputArea: {
     flexDirection: 'row',
     alignItems: 'center',

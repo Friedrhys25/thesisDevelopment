@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Alert,
   Linking,
@@ -9,9 +9,24 @@ import {
   Text,
   TouchableOpacity,
   View,
+  // New Imports for Sliding Functionality
+  PanResponder,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+// Get screen width for slide calculation
+const SCREEN_WIDTH = Dimensions.get('window').width;
+// Define the distance the user must drag to trigger the call (e.g., 55% of the screen width)
+const SLIDE_THRESHOLD = SCREEN_WIDTH * 0.55; 
+
+// Constants for the 911 slide bar (calculated outside the component function)
+const PADDING = 16 * 2; // Horizontal padding in the ScrollView/Container
+const BUTTON_SIZE = 50; // Width/Height of the draggable button
+const BAR_WIDTH = SCREEN_WIDTH - PADDING; // Actual trackable width
+// Max drag distance: Track width - Button size - slight offset (10) for visual spacing
+const MAX_DRAG = BAR_WIDTH - BUTTON_SIZE - 10; 
 
 type IoniconsProps = {
   name: string;
@@ -19,7 +34,7 @@ type IoniconsProps = {
   color: string;
 };
 
-// ✅ Emoji-based icons (can replace with @expo/vector-icons)
+// Emoji-based icons (can replace with @expo/vector-icons)
 const Ionicons = ({ name, size, color }: IoniconsProps) => {
   const iconMap: Record<string, string> = {
     "arrow-back": "←",
@@ -34,6 +49,104 @@ const Ionicons = ({ name, size, color }: IoniconsProps) => {
   );
 };
 
+// --- New Component for 911 Slide-to-Call Feature (PanResponder Implemented) ---
+const Emergency911Button = () => {
+    const NATIONAL_EMERGENCY_NUMBER = "911";
+    
+    // Animated value to track the x-position of the slider
+    const translateX = useRef(new Animated.Value(0)).current;
+    
+    const handleCall911 = () => {
+        // Since the actual animation is handled in onPanResponderRelease,
+        // this function focuses on the user feedback (Alert) and the call action.
+        
+        // Reset the button immediately for visual feedback
+        Animated.timing(translateX, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: false, // Must be consistent
+        }).start();
+
+        Alert.alert(
+            "Confirm Emergency Call",
+            `Do you want to immediately call the National Emergency Hotline (${NATIONAL_EMERGENCY_NUMBER})?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Call 911", 
+                    style: "destructive", 
+                    onPress: () => {
+                        Linking.openURL(`tel:${NATIONAL_EMERGENCY_NUMBER}`);
+                    } 
+                },
+            ]
+        );
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+
+            onPanResponderMove: Animated.event(
+                [
+                    null, 
+                    { dx: translateX } // Bind the gesture delta X to the animated value
+                ],
+                { useNativeDriver: false } // CRITICAL: Must be false for position binding
+            ),
+
+            onPanResponderRelease: (e, gestureState) => {
+                // Check if the user dragged far enough
+                if (gestureState.dx > SLIDE_THRESHOLD) {
+                    // Slide completed, finalize the animation to the end
+                    Animated.timing(translateX, {
+                        toValue: MAX_DRAG, // Use the constant MAX_DRAG
+                        duration: 150,
+                        useNativeDriver: false, // CRITICAL: Must be consistent
+                    }).start(handleCall911); // Trigger the call function on completion
+                } else {
+                    // Slide not completed, snap back to the start
+                    Animated.spring(translateX, {
+                        toValue: 0,
+                        useNativeDriver: false, // CRITICAL: Must be consistent
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    // Constrain the horizontal movement to be only rightward and not off-screen
+    const panStyle = {
+        transform: [{
+            translateX: translateX.interpolate({
+                // Input and Output ranges use the MAX_DRAG constant
+                inputRange: [0, MAX_DRAG], 
+                outputRange: [0, MAX_DRAG],
+                extrapolate: 'clamp',
+            })
+        }]
+    };
+    
+    return (
+        <View style={nineOneOneStyles.container}>
+            <View style={nineOneOneStyles.buttonTrack}>
+                <Text style={nineOneOneStyles.textBackground}>SLIDE TO CALL 911</Text>
+                
+                {/* The actual draggable element, binds to panHandlers */}
+                <Animated.View
+                    style={[nineOneOneStyles.slideIndicator, panStyle]}
+                    {...panResponder.panHandlers}
+                >
+                    <Ionicons name="call" size={24} color="#E74C3C" />
+                </Animated.View>
+            </View>
+        </View>
+    );
+};
+// --- End New Component ---
+
+
 export default function EmergencyPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -44,12 +157,6 @@ export default function EmergencyPage() {
     { id: 1, name: "Police", icon: "🛡️", number: "0910 135 0863 ", color: "#4A90E2", description: "Crime, security threats" },
     { id: 2, name: "Fire", icon: "🔥", number: "0997 298 5204", color: "#FF6B35", description: "Fire incidents, rescue" },
     { id: 3, name: "Ambulance", icon: "🏥", number: "0926 532 6524", color: "#50C878", description: "Medical emergencies" },
-  ];
-
-  const recentEmergencies = [
-    { id: 1, type: "Medical", location: "Purok 1", time: "5 mins ago", status: "Responding" },
-    { id: 2, type: "Fire", location: "Purok 2", time: "15 mins ago", status: "Resolved" },
-    { id: 3, type: "Traffic", location: "Purok 4", time: "30 mins ago", status: "Responding" },
   ];
 
   const safetyTips = [
@@ -88,6 +195,7 @@ export default function EmergencyPage() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
         {/* Alert Banner */}
         <View style={styles.alertBanner}>
           <Ionicons name="alert-circle" size={32} color="#E74C3C" />
@@ -98,6 +206,11 @@ export default function EmergencyPage() {
             </Text>
           </View>
         </View>
+
+        {/* 🚨 NEW: 911 Slide-to-Call Component */}
+        <Emergency911Button />
+        {/* ---------------------------------- */}
+        
 
         {/* Emergency Buttons */}
         <Text style={styles.sectionTitle}>Quick Emergency Dial</Text>
@@ -145,9 +258,6 @@ export default function EmergencyPage() {
           </View>
         ))}
 
-        
-      
-
         {/* Important Note */}
         <View style={styles.noteCard}>
           <Text style={styles.noteIcon}>⚠️</Text>
@@ -162,6 +272,50 @@ export default function EmergencyPage() {
     </SafeAreaView>
   );
 }
+
+const nineOneOneStyles = StyleSheet.create({
+    container: {
+        width: '100%',
+        marginBottom: 20,
+    },
+    buttonTrack: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E74C3C', // Bright Red Background
+        borderRadius: 16,
+        paddingVertical: 18,
+        paddingHorizontal: 16,
+        height: 70, // Fixed height for track
+        justifyContent: 'center',
+        overflow: 'hidden', // Important for containing the slider
+    },
+    slideIndicator: {
+        backgroundColor: '#FFFFFF', // White Slider Button
+        borderRadius: 25,
+        width: BUTTON_SIZE, // Use constant
+        height: BUTTON_SIZE, // Use constant
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'absolute',
+        left: 10,
+        // Shadow for the draggable button
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+        zIndex: 10,
+    },
+    textBackground: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: 1.5,
+        textAlign: 'center',
+        position: 'absolute',
+    }
+});
+
 
 const styles = StyleSheet.create({
   safeArea: {
