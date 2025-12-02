@@ -1,18 +1,18 @@
 import { useRouter } from "expo-router";
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Dimensions,
   Linking,
+  // New Imports for Sliding Functionality
+  PanResponder,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  // New Imports for Sliding Functionality
-  PanResponder,
-  Animated,
-  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -154,7 +154,7 @@ export default function EmergencyPage() {
 
 
   const emergencyTypes = [
-    { id: 1, name: "Police", icon: "🛡️", number: "0910 135 0863 ", color: "#4A90E2", description: "Crime, security threats" },
+    { id: 1, name: "Police", icon: "🛡️", number: "09353581020 ", color: "#4A90E2", description: "Crime, security threats" },
     { id: 2, name: "Fire", icon: "🔥", number: "0997 298 5204", color: "#FF6B35", description: "Fire incidents, rescue" },
     { id: 3, name: "Ambulance", icon: "🏥", number: "0926 532 6524", color: "#50C878", description: "Medical emergencies" },
   ];
