@@ -22,70 +22,79 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Missing Fields", "Please enter your email and password.");
-      return;
+const handleLogin = async () => {
+  if (!email || !password) {
+    console.warn("Missing Fields: Please enter your email and password."); // log first
+    Alert.alert("Missing Fields", "Please enter your email and password.");
+    return;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    console.warn("Invalid Email: Please enter a valid email address."); // log first
+    Alert.alert("Invalid Email", "Please enter a valid email address.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    console.log("✅ Login successful!");
+    router.replace("/(tabs)/home");
+  } catch (error: any) {
+    let errorTitle = "Login Failed";
+    let errorMessage = "Something went wrong. Please try again.";
+
+    switch (error.code) {
+      case "auth/user-not-found":
+        errorTitle = "Account Not Found";
+        errorMessage =
+          "No account exists with this email address. Please check your email or register a new account.";
+        break;
+      case "auth/wrong-password":
+        errorTitle = "Incorrect Password";
+        errorMessage =
+          "The password you entered is incorrect. Please try again or reset your password.";
+        break;
+      case "auth/invalid-email":
+        errorTitle = "Invalid Email";
+        errorMessage = "The email address is not valid. Please check and try again.";
+        break;
+      case "auth/user-disabled":
+        errorTitle = "Account Disabled";
+        errorMessage = "This account has been disabled. Please contact support.";
+        break;
+      case "auth/too-many-requests":
+        errorTitle = "Too Many Attempts";
+        errorMessage =
+          "Too many failed login attempts. Please try again later or reset your password.";
+        break;
+      case "auth/network-request-failed":
+        errorTitle = "Network Error";
+        errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+        break;
+      case "auth/invalid-credential":
+        errorTitle = "Invalid Credentials";
+        errorMessage =
+          "The email or password is incorrect. Please check your credentials and try again.";
+        break;
+      case "auth/operation-not-allowed":
+        errorTitle = "Login Unavailable";
+        errorMessage = "Email/password login is currently disabled. Please contact support.";
+        break;
+      default:
+        errorMessage = error.message || "An unexpected error occurred. Please try again.";
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
-      return;
-    }
+    // ✅ Log first, then show Alert
+    console.warn(`${errorTitle}: ${errorMessage}`);
+    Alert.alert(errorTitle, errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
-    setLoading(true);
-
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      console.log("✅ Login successful!");
-      router.replace("/(tabs)/home");
-    } catch (error: any) {
-      let errorTitle = "Login Failed";
-      let errorMessage = "Something went wrong. Please try again.";
-      
-      switch (error.code) {
-        case "auth/user-not-found":
-          errorTitle = "Account Not Found";
-          errorMessage = "No account exists with this email address. Please check your email or register a new account.";
-          break;
-        case "auth/wrong-password":
-          errorTitle = "Incorrect Password";
-          errorMessage = "The password you entered is incorrect. Please try again or reset your password.";
-          break;
-        case "auth/invalid-email":
-          errorTitle = "Invalid Email";
-          errorMessage = "The email address is not valid. Please check and try again.";
-          break;
-        case "auth/user-disabled":
-          errorTitle = "Account Disabled";
-          errorMessage = "This account has been disabled. Please contact support.";
-          break;
-        case "auth/too-many-requests":
-          errorTitle = "Too Many Attempts";
-          errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
-          break;
-        case "auth/network-request-failed":
-          errorTitle = "Network Error";
-          errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
-          break;
-        case "auth/invalid-credential":
-          errorTitle = "Invalid Credentials";
-          errorMessage = "The email or password is incorrect. Please check your credentials and try again.";
-          break;
-        case "auth/operation-not-allowed":
-          errorTitle = "Login Unavailable";
-          errorMessage = "Email/password login is currently disabled. Please contact support.";
-          break;
-        default:
-          errorMessage = error.message || "An unexpected error occurred. Please try again.";
-      }
-      
-      Alert.alert(errorTitle, errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleForgotPassword = async () => {
     if (!email) {
@@ -101,6 +110,7 @@ export default function LoginPage() {
 
     try {
       await sendPasswordResetEmail(auth, email);
+      console.log("✅ Password reset email sent!");
       Alert.alert(
         "Reset Link Sent",
         `A password reset link has been sent to ${email}. Check your inbox.`
