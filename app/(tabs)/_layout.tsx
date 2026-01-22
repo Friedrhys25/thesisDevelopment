@@ -1,93 +1,148 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native"; 
+import { Ionicons } from "@expo/vector-icons";
+import { Platform } from "react-native";
 
-// 1. Define your Icon Map here
-const iconMap = {
-  "home": "🏠", // Added this so the Home tab has an icon
-  "mail-outline": "✉️",
-  "alert-circle-outline": "🚨",
-  "analytics-outline": "📊",
-  "people-outline": "👤",
-  "shield-outline": "🛡️",
-  "medical-outline": "🏥",
-  "flame-outline": "🔥",
-  "chevron-forward": "→",
-  "chatbubble-outline": "💬",
-  "faqs": "❓",
+const COLORS = {
+  active: "#2563EB",     // blue-600
+  inactive: "#94A3B8",   // slate-400
+  bg: "#FFFFFF",
+  shadow: "#000000",
 };
 
 export default function RootLayout() {
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: 'blue' }}> 
-      
-      {/* Home Tab */}
-      <Tabs.Screen 
-        name="home" 
-        options={{ 
-          headerShown: false,
-          tabBarLabel: "Home",
-          // We use Text instead of Ionicons here
-          tabBarIcon: ({ size }) => (
-            <Text style={{ fontSize: size }}>{iconMap["home"]}</Text>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: COLORS.active,
+        tabBarInactiveTintColor: COLORS.inactive,
+        tabBarStyle: {
+          position: "absolute",
+          backgroundColor: COLORS.bg,
+          borderTopWidth: 0,
+          elevation: 0,
+          height: Platform.OS === "ios" ? 88 : 70,
+          paddingBottom: Platform.OS === "ios" ? 28 : 12,
+          paddingTop: 12,
+          paddingHorizontal: 16,
+          marginHorizontal: 16,
+          marginBottom: Platform.OS === "ios" ? 24 : 16,
+          borderRadius: 24,
+          
+          // Enhanced shadows for depth
+          shadowColor: COLORS.shadow,
+          shadowOffset: {
+            width: 0,
+            height: 8,
+          },
+          shadowOpacity: 0.12,
+          shadowRadius: 16,
+          
+          // Android shadow
+          ...(Platform.OS === "android" && {
+            elevation: 8,
+          }),
+        },
+        // Add safe padding to prevent content overlap
+        sceneStyle: {
+          paddingBottom: Platform.OS === "ios" ? 110 : 90,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 2,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
           ),
-        }} 
+        }}
       />
 
-      {/* Complain Tab - Mapped to "alert-circle-outline" (🚨) */}
-      <Tabs.Screen 
-        name="complain" 
-        options={{ 
-          headerShown: false,
-          tabBarIcon: ({ size }) => (
-            <Text style={{ fontSize: size }}>{iconMap["alert-circle-outline"]}</Text>
+      <Tabs.Screen
+        name="complain"
+        options={{
+          title: "Complain",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "alert-circle" : "alert-circle-outline"}
+              size={24}
+              color={color}
+            />
           ),
-        }} 
+        }}
       />
 
-      {/* Emergency Tab - Mapped to "medical-outline" (🏥) */}
-      <Tabs.Screen 
-        name="emergency" 
-        options={{ 
-          headerShown: false,
-          tabBarIcon: ({ size }) => (
-            <Text style={{ fontSize: size }}>{iconMap["medical-outline"]}</Text>
+      <Tabs.Screen
+        name="emergency"
+        options={{
+          title: "Emergency",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "medical" : "medical-outline"}
+              size={24}
+              color={color}
+            />
           ),
-        }} 
+        }}
       />
 
-      {/* Feedback Tab - Mapped to "analytics-outline" (📊) or "chatbubble-outline" */}
-      <Tabs.Screen 
-        name="feedback" 
-        options={{ 
-          headerShown: false,
-          tabBarIcon: ({ size }) => (
-            <Text style={{ fontSize: size }}>{iconMap["mail-outline"]}</Text>
+      <Tabs.Screen
+        name="feedback"
+        options={{
+          title: "Feedback",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "chatbubble" : "chatbubble-outline"}
+              size={24}
+              color={color}
+            />
           ),
-        }} 
+        }}
       />
 
-      {/* Messages Tab - Mapped to "mail-outline" (✉️) */}
-      <Tabs.Screen 
-        name="FAQS" 
-        options={{ 
-          headerShown: false,
-          tabBarIcon: ({ size }) => (
-            <Text style={{ fontSize: size }}>{iconMap["faqs"]}</Text>
+      <Tabs.Screen
+        name="FAQS"
+        options={{
+          title: "FAQs",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "help-circle" : "help-circle-outline"}
+              size={24}
+              color={color}
+            />
           ),
-        }} 
+        }}
       />
 
-      {/* Profile Tab - Mapped to "people-outline" (👤) */}
-      <Tabs.Screen 
-        name="profile" 
-        options={{ 
-          headerShown: false,
-          tabBarIcon: ({ size }) => (
-            <Text style={{ fontSize: size }}>{iconMap["people-outline"]}</Text>
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={24}
+              color={color}
+            />
           ),
-        }} 
+        }}
       />
-      
     </Tabs>
   );
 }
