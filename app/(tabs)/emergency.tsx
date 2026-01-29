@@ -1,162 +1,166 @@
-import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+﻿import { useRouter } from "expo-router";
+import { useMemo, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
   Linking,
-  // New Imports for Sliding Functionality
   PanResponder,
+  Pressable,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
-// Get screen width for slide calculation
-const SCREEN_WIDTH = Dimensions.get('window').width;
-// Define the distance the user must drag to trigger the call (e.g., 55% of the screen width)
-const SLIDE_THRESHOLD = SCREEN_WIDTH * 0.55; 
-
-// Constants for the 911 slide bar (calculated outside the component function)
-const PADDING = 16 * 2; // Horizontal padding in the ScrollView/Container
-const BUTTON_SIZE = 50; // Width/Height of the draggable button
-const BAR_WIDTH = SCREEN_WIDTH - PADDING; // Actual trackable width
-// Max drag distance: Track width - Button size - slight offset (10) for visual spacing
-const MAX_DRAG = BAR_WIDTH - BUTTON_SIZE - 10; 
-
-type IoniconsProps = {
-  name: string;
-  size: number;
-  color: string;
+// ====== Design system copied from your ProfilePage concept ======
+const COLORS = {
+  bg: "#F6F7FB",
+  card: "#FFFFFF",
+  text: "#111827",
+  muted: "#6B7280",
+  border: "#E5E7EB",
+  primary: "#4F46E5",
+  primaryDark: "#4338CA",
+  danger: "#EF4444",
+  success: "#10B981",
+  warning: "#F59E0B",
 };
 
-// Emoji-based icons (can replace with @expo/vector-icons)
-const Ionicons = ({ name, size, color }: IoniconsProps) => {
-  const iconMap: Record<string, string> = {
-    "arrow-back": "←",
-    "alert-circle": "🚨",
-    "call": "📞",
-    "location": "📍",
-    "time": "🕐",
-    "megaphone": "📢",
+// ===== Slider constants (your logic kept) =====
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const SLIDE_THRESHOLD = SCREEN_WIDTH * 0.55;
+const PADDING = 16 * 2;
+const BUTTON_SIZE = 50;
+const BAR_WIDTH = SCREEN_WIDTH - PADDING;
+const MAX_DRAG = BAR_WIDTH - BUTTON_SIZE - 10;
+
+// ===== Premium 911 Slide Button (design updated) =====
+const Emergency911Button = () => {
+  const NATIONAL_EMERGENCY_NUMBER = "911";
+  const translateX = useRef(new Animated.Value(0)).current;
+  const [busy, setBusy] = useState(false);
+
+  const handleCall911 = () => {
+    Animated.timing(translateX, {
+      toValue: 0,
+      duration: 100,
+      useNativeDriver: false,
+    }).start();
+
+    Alert.alert(
+      "Confirm Emergency Call",
+      `Do you want to immediately call the National Emergency Hotline (${NATIONAL_EMERGENCY_NUMBER})?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Call 911",
+          style: "destructive",
+          onPress: () => Linking.openURL(`tel:${NATIONAL_EMERGENCY_NUMBER}`),
+        },
+      ]
+    );
   };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: Animated.event([null, { dx: translateX }], {
+        useNativeDriver: false,
+      }),
+      onPanResponderRelease: (e, gestureState) => {
+        if (gestureState.dx > SLIDE_THRESHOLD) {
+          setBusy(true);
+          Animated.timing(translateX, {
+            toValue: MAX_DRAG,
+            duration: 150,
+            useNativeDriver: false,
+          }).start(() => {
+            setBusy(false);
+            handleCall911();
+          });
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const panStyle = {
+    transform: [
+      {
+        translateX: translateX.interpolate({
+          inputRange: [0, MAX_DRAG],
+          outputRange: [0, MAX_DRAG],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+  };
+
   return (
-    <Text style={{ fontSize: size, color, lineHeight: size }}>{iconMap[name] || "•"}</Text>
+    <View style={styles.card}>
+      <View style={styles.cardTitleRow}>
+        <Text style={styles.sectionTitle2}>Emergency Hotline</Text>
+        <View style={styles.pillDanger}>
+          <Text style={styles.pillDangerText}>National</Text>
+        </View>
+      </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.slideTrack}>
+        <Text style={styles.slideText}>SLIDE TO CALL 911</Text>
+
+        <Animated.View
+          style={[styles.slideKnob, panStyle]}
+          {...panResponder.panHandlers}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color={COLORS.danger} />
+          ) : (
+            <Ionicons name="call" size={22} color={COLORS.danger} />
+          )}
+        </Animated.View>
+      </View>
+
+      <Text style={styles.helperText}>
+        Use only for real emergencies. False calls may delay response for others.
+      </Text>
+    </View>
   );
 };
 
-// --- New Component for 911 Slide-to-Call Feature (PanResponder Implemented) ---
-const Emergency911Button = () => {
-    const NATIONAL_EMERGENCY_NUMBER = "911";
-    
-    // Animated value to track the x-position of the slider
-    const translateX = useRef(new Animated.Value(0)).current;
-    
-    const handleCall911 = () => {
-        // Since the actual animation is handled in onPanResponderRelease,
-        // this function focuses on the user feedback (Alert) and the call action.
-        
-        // Reset the button immediately for visual feedback
-        Animated.timing(translateX, {
-            toValue: 0,
-            duration: 100,
-            useNativeDriver: false, // Must be consistent
-        }).start();
-
-        Alert.alert(
-            "Confirm Emergency Call",
-            `Do you want to immediately call the National Emergency Hotline (${NATIONAL_EMERGENCY_NUMBER})?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Call 911", 
-                    style: "destructive", 
-                    onPress: () => {
-                        Linking.openURL(`tel:${NATIONAL_EMERGENCY_NUMBER}`);
-                    } 
-                },
-            ]
-        );
-    };
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
-
-            onPanResponderMove: Animated.event(
-                [
-                    null, 
-                    { dx: translateX } // Bind the gesture delta X to the animated value
-                ],
-                { useNativeDriver: false } // CRITICAL: Must be false for position binding
-            ),
-
-            onPanResponderRelease: (e, gestureState) => {
-                // Check if the user dragged far enough
-                if (gestureState.dx > SLIDE_THRESHOLD) {
-                    // Slide completed, finalize the animation to the end
-                    Animated.timing(translateX, {
-                        toValue: MAX_DRAG, // Use the constant MAX_DRAG
-                        duration: 150,
-                        useNativeDriver: false, // CRITICAL: Must be consistent
-                    }).start(handleCall911); // Trigger the call function on completion
-                } else {
-                    // Slide not completed, snap back to the start
-                    Animated.spring(translateX, {
-                        toValue: 0,
-                        useNativeDriver: false, // CRITICAL: Must be consistent
-                    }).start();
-                }
-            },
-        })
-    ).current;
-
-    // Constrain the horizontal movement to be only rightward and not off-screen
-    const panStyle = {
-        transform: [{
-            translateX: translateX.interpolate({
-                // Input and Output ranges use the MAX_DRAG constant
-                inputRange: [0, MAX_DRAG], 
-                outputRange: [0, MAX_DRAG],
-                extrapolate: 'clamp',
-            })
-        }]
-    };
-    
-    return (
-        <View style={nineOneOneStyles.container}>
-            <View style={nineOneOneStyles.buttonTrack}>
-                <Text style={nineOneOneStyles.textBackground}>SLIDE TO CALL 911</Text>
-                
-                {/* The actual draggable element, binds to panHandlers */}
-                <Animated.View
-                    style={[nineOneOneStyles.slideIndicator, panStyle]}
-                    {...panResponder.panHandlers}
-                >
-                    <Ionicons name="call" size={24} color="#E74C3C" />
-                </Animated.View>
-            </View>
-        </View>
-    );
+type EmergencyService = {
+  id: number;
+  name: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  number: string;
+  color: string;
+  description: string;
 };
-// --- End New Component ---
-
 
 export default function EmergencyPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedEmergency, setSelectedEmergency] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-
-  const emergencyTypes = [
-    { id: 1, name: "Police", icon: "🛡️", number: "09353581020 ", color: "#4A90E2", description: "Crime, security threats" },
-    { id: 2, name: "Fire", icon: "🔥", number: "0997 298 5204", color: "#FF6B35", description: "Fire incidents, rescue" },
-    { id: 3, name: "Ambulance", icon: "🏥", number: "0926 532 6524", color: "#50C878", description: "Medical emergencies" },
+  const emergencyTypes: EmergencyService[] = [
+    { id: 1, name: "Police", icon: "shield-outline", number: "09353581020", color: "#4A90E2", description: "Crime, security threats" },
+    { id: 2, name: "Fire", icon: "flame-outline", number: "0997 298 5204", color: "#FF6B35", description: "Fire incidents, rescue" },
+    { id: 3, name: "Ambulance", icon: "medical-outline", number: "0926 532 6524", color: "#50C878", description: "Medical emergencies" },
   ];
 
   const safetyTips = [
@@ -165,91 +169,119 @@ export default function EmergencyPage() {
     { id: 3, title: "Follow Instructions", description: "Listen carefully to emergency responders." },
   ];
 
-  type EmergencyService = {
-    id: number;
-    name: string;
-    icon: string;
-    number: string;
-    color: string;
-    description: string;
+  const handleEmergencyCall = (service: EmergencyService) => {
+    Alert.alert("Call Emergency", `Call ${service.name} at ${service.number}?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Call", onPress: () => Linking.openURL(`tel:${service.number}`) },
+    ]);
   };
 
-  const handleEmergencyCall = (service: EmergencyService) => {
-    Alert.alert(
-      "Call Emergency",
-      `Call ${service.name} at ${service.number}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Call", onPress: () => Linking.openURL(`tel:${service.number}`) },
-      ]
-    );
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // You can add any future fetch here
+    setTimeout(() => setRefreshing(false), 400);
   };
+
+  const quickDialCards = useMemo(() => emergencyTypes, []);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerText}>Emergency Services</Text>
-      </View>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
-        {/* Alert Banner */}
-        <View style={styles.alertBanner}>
-          <Ionicons name="alert-circle" size={32} color="#E74C3C" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.alertTitle}>In case of emergency</Text>
-            <Text style={styles.alertText}>
-              Call immediately or use quick dial buttons below. Help is available 24/7.
-            </Text>
-          </View>
+      {/* Gradient Header like ProfilePage */}
+      <LinearGradient
+        colors={[COLORS.primary, "#7C3AED"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.topHeader}
+      >
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.headerIconBtn}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </Pressable>
+
+          <Text style={styles.headerTitle}>Emergency Services</Text>
+
+          {/* spacer to balance layout */}
+          <View style={styles.headerIconBtn} />
         </View>
 
-        {/* 🚨 NEW: 911 Slide-to-Call Component */}
-        <Emergency911Button />
-        {/* ---------------------------------- */}
-        
+        <View style={styles.headerSub}>
+          <Text style={styles.headerHeadline}>Quick help, 24/7</Text>
+          <Text style={styles.headerCaption}>
+            Call immediately or use the quick dial cards below.
+          </Text>
+        </View>
+      </LinearGradient>
 
-        {/* Emergency Buttons */}
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Notice box style (replacing old alert banner) */}
+        <View style={styles.noticeBox}>
+          <View style={styles.noticeIcon}>
+            <Ionicons name="alert-circle-outline" size={18} color={COLORS.primary} />
+          </View>
+          <Text style={styles.noticeText}>
+            If this is a life-threatening emergency, use the 911 slider below.
+          </Text>
+        </View>
+
+        {/* 911 Slider */}
+        <Emergency911Button />
+
+        {/* Quick Dial */}
         <Text style={styles.sectionTitle}>Quick Emergency Dial</Text>
+
         <View style={styles.grid}>
-          {emergencyTypes.map((service) => (
-            <TouchableOpacity
-              key={service.id}
-              style={[
-                styles.emergencyCard,
-                {
-                  borderColor: selectedEmergency === service.id ? service.color : "#E0E0E0",
-                  backgroundColor: selectedEmergency === service.id ? `${service.color}20` : "white",
-                },
-              ]}
-              onPressIn={() => setSelectedEmergency(service.id)}
-              onPressOut={() => setSelectedEmergency(null)}
-              onPress={() => handleEmergencyCall(service)}
-            >
-              <Text style={[styles.icon, { color: service.color }]}>{service.icon}</Text>
-              <Text style={styles.emergencyName}>{service.name}</Text>
-              <Text style={styles.emergencyNumber}>{service.number}</Text>
-              <Text style={styles.emergencyDesc}>{service.description}</Text>
-              <TouchableOpacity
+          {quickDialCards.map((service) => {
+            const selected = selectedEmergency === service.id;
+            return (
+              <Pressable
+                key={service.id}
+                onPressIn={() => setSelectedEmergency(service.id)}
+                onPressOut={() => setSelectedEmergency(null)}
                 onPress={() => handleEmergencyCall(service)}
-                style={[styles.callButton, { backgroundColor: service.color }]}
+                style={[
+                  styles.emergencyCard,
+                  selected && { borderColor: service.color, backgroundColor: `${service.color}14` },
+                ]}
               >
-                <Ionicons name="call" size={18} color="#fff" />
-                <Text style={styles.callButtonText}>Call Now</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
+                <Ionicons name={service.icon} size={40} color={service.color} style={styles.iconBig} />
+                <Text style={styles.emergencyName}>{service.name}</Text>
+                <Text style={styles.emergencyNumber}>{service.number}</Text>
+                <Text style={styles.emergencyDesc}>{service.description}</Text>
+
+                <Pressable
+                  onPress={() => handleEmergencyCall(service)}
+                  style={({ pressed }) => [
+                    styles.primaryBtnSmall,
+                    { backgroundColor: service.color },
+                    pressed && { opacity: 0.9 },
+                  ]}
+                >
+                  <Ionicons name="call" size={16} color="#fff" />
+                  <Text style={styles.primaryBtnSmallText}>Call Now</Text>
+                </Pressable>
+              </Pressable>
+            );
+          })}
         </View>
 
         {/* Safety Tips */}
         <Text style={styles.sectionTitle}>Safety Tips</Text>
         {safetyTips.map((tip) => (
           <View key={tip.id} style={styles.tipCard}>
-            <View style={styles.tipNumber}>
-              <Text style={{ color: "white", fontWeight: "bold" }}>{tip.id}</Text>
+            <View style={styles.tipDot}>
+              <Text style={styles.tipDotText}>{tip.id}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.tipTitle}>{tip.title}</Text>
@@ -259,178 +291,214 @@ export default function EmergencyPage() {
         ))}
 
         {/* Important Note */}
-        <View style={styles.noteCard}>
-          <Text style={styles.noteIcon}>⚠️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.noteTitle}>Important Reminder</Text>
-            <Text style={styles.noteText}>
-              Only call emergency services for genuine emergencies. False reports may result in penalties and delay help for others.
-            </Text>
+        <View style={styles.card}>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.sectionTitle2}>Important Reminder</Text>
+            <View style={styles.pillWarn}>
+              <Ionicons name="warning-outline" size={16} color={COLORS.warning} />
+            </View>
           </View>
+          <View style={styles.divider} />
+          <Text style={styles.noteText}>
+            Only call emergency services for genuine emergencies. False reports may
+            result in penalties and delay help for others.
+          </Text>
         </View>
+
+        <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const nineOneOneStyles = StyleSheet.create({
-    container: {
-        width: '100%',
-        marginBottom: 20,
-    },
-    buttonTrack: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#E74C3C', // Bright Red Background
-        borderRadius: 16,
-        paddingVertical: 18,
-        paddingHorizontal: 16,
-        height: 70, // Fixed height for track
-        justifyContent: 'center',
-        overflow: 'hidden', // Important for containing the slider
-    },
-    slideIndicator: {
-        backgroundColor: '#FFFFFF', // White Slider Button
-        borderRadius: 25,
-        width: BUTTON_SIZE, // Use constant
-        height: BUTTON_SIZE, // Use constant
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'absolute',
-        left: 10,
-        // Shadow for the draggable button
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-        zIndex: 10,
-    },
-    textBackground: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 18,
-        fontWeight: '900',
-        letterSpacing: 1.5,
-        textAlign: 'center',
-        position: 'absolute',
-    }
-});
-
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F5F7FA",
+  safeArea: { flex: 1, backgroundColor: COLORS.bg },
+
+  // ===== Header =====
+  topHeader: {
+    paddingBottom: 18,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
   },
-  header: {
+  headerRow: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#F5F6FA",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  backButton: { marginRight: 12, padding: 8 },
-  headerText: { fontSize: 22, fontWeight: "700", color: "#333" },
-  scrollContent: { padding: 16, paddingBottom: 40 },
-  alertBanner: {
-    flexDirection: "row",
-    backgroundColor: "#FFEBEE",
-    borderColor: "#FF5252",
-    borderWidth: 2,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  alertTitle: { fontSize: 16, fontWeight: "700", color: "#C62828", marginBottom: 4 },
-  alertText: { color: "#D32F2F", fontSize: 13, lineHeight: 18 },
-  sectionTitle: { fontSize: 20, fontWeight: "700", color: "#1A1A1A", marginVertical: 12 },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 10,
   },
-  emergencyCard: {
-    width: "48%",
-    borderWidth: 2,
-    borderRadius: 16,
+  headerIconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "800" },
+  headerSub: { paddingHorizontal: 18, paddingTop: 10 },
+  headerHeadline: { color: "#fff", fontSize: 20, fontWeight: "900" },
+  headerCaption: { marginTop: 4, color: "rgba(255,255,255,0.85)", fontSize: 12 },
+
+  scroll: { padding: 18, paddingTop: 16 },
+
+  // ===== Cards =====
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
     padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "rgba(229,231,235,0.65)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 10 },
+  sectionTitle2: { fontSize: 16, fontWeight: "800", color: COLORS.text },
+  divider: { height: 1, backgroundColor: "rgba(229,231,235,0.7)", marginVertical: 12 },
+
+  // ===== Notice box (like profile's notice) =====
+  noticeBox: {
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+    padding: 12,
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 10,
     alignItems: "center",
     marginBottom: 14,
   },
-  icon: { fontSize: 42, marginBottom: 8 },
-  emergencyName: { fontWeight: "700", fontSize: 16, color: "#1A1A1A" },
-  emergencyNumber: { fontWeight: "800", fontSize: 20, color: "#333" },
-  emergencyDesc: { color: "#666", fontSize: 12, textAlign: "center", marginVertical: 6 },
-  callButton: {
+  noticeIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noticeText: { flex: 1, color: "#374151", lineHeight: 18, fontWeight: "600" },
+
+  // ===== Pills =====
+  pillDanger: {
+    backgroundColor: "rgba(239,68,68,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.22)",
+  },
+  pillDangerText: { color: COLORS.danger, fontWeight: "900", fontSize: 12 },
+
+  pillWarn: {
+    backgroundColor: "rgba(245,158,11,0.14)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+
+  // ===== 911 slider =====
+  slideTrack: {
+    height: 70,
+    borderRadius: 16,
+    backgroundColor: "rgba(239,68,68,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.25)",
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  slideText: {
+    alignSelf: "center",
+    color: "rgba(239,68,68,0.8)",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+  slideKnob: {
+    position: "absolute",
+    left: 10,
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(239,68,68,0.15)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 10,
+  },
+  helperText: { marginTop: 10, color: COLORS.muted, fontWeight: "600", lineHeight: 18 },
+
+  // ===== Quick dial grid/cards =====
+  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 10 },
+  emergencyCard: {
+    width: "48%",
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: "rgba(229,231,235,0.75)",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+    alignItems: "center",
+  },
+  iconBig: { marginBottom: 8 },
+  emergencyName: { fontWeight: "800", fontSize: 15, color: COLORS.text },
+  emergencyNumber: { fontWeight: "900", fontSize: 17, color: "#374151", marginTop: 2 },
+  emergencyDesc: { color: COLORS.muted, fontSize: 12, textAlign: "center", marginVertical: 8, lineHeight: 16 },
+
+  primaryBtnSmall: {
+    marginTop: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginTop: 4,
+    justifyContent: "center",
+    gap: 8,
   },
-  callButtonText: { color: "white", fontWeight: "700", marginLeft: 6 },
+  primaryBtnSmallText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+
+  // ===== Tips =====
   tipCard: {
     flexDirection: "row",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "rgba(229,231,235,0.75)",
     padding: 14,
     marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 1,
   },
-  tipNumber: {
+  tipDot: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#667eea",
+    backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
   },
-  tipTitle: { fontWeight: "700", fontSize: 15, color: "#1A1A1A" },
-  tipDesc: { color: "#666", fontSize: 13 },
-  recentItem: {
-    flexDirection: "row",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 14,
-    marginBottom: 10,
-  },
-  recentIcon: {
-    width: 36,
-    height: 36,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  recentHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  recentType: { fontWeight: "700", color: "#1A1A1A", fontSize: 15 },
-  recentDetails: { flexDirection: "row", gap: 12 },
-  recentText: { color: "#666", fontSize: 13 },
-  statusBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-  noteCard: {
-    flexDirection: "row",
-    backgroundColor: "#FFF9E6",
-    borderColor: "#FFE082",
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 20,
-  },
-  noteIcon: { fontSize: 28, marginRight: 10 },
-  noteTitle: { fontWeight: "700", fontSize: 15, color: "#F57C00" },
-  noteText: { color: "#E65100", fontSize: 13, lineHeight: 18 },
-  
+  tipDotText: { color: "#fff", fontWeight: "900" },
+  tipTitle: { fontWeight: "800", fontSize: 15, color: COLORS.text },
+  tipDesc: { color: COLORS.muted, fontSize: 13, lineHeight: 18, marginTop: 2 },
+
+  noteText: { color: COLORS.muted, fontWeight: "600", lineHeight: 19 },
 });

@@ -56,7 +56,6 @@ const COLORS = {
 export default function ProfilePage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  
 
   const [refreshing, setRefreshing] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -67,7 +66,6 @@ export default function ProfilePage() {
 
   const [isEditing, setIsEditing] = useState<EditingField>(null);
   const [editValue, setEditValue] = useState("");
-  const editText = String(editValue ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
   const [userData, setUserData] = useState<UserData>({
@@ -294,7 +292,7 @@ export default function ProfilePage() {
 
   const handleSaveEdit = async () => {
     if (!auth.currentUser || isSaving) return;
-    const value = editText.trim()
+    const value = editValue.trim();
     setIsSaving(true);
 
     try {
@@ -640,10 +638,10 @@ export default function ProfilePage() {
                   styles.modalBtn,
                   styles.modalConfirm,
                   pressed && { opacity: 0.9 },
-                  (!editText.trim() || isSaving) && { opacity: 0.6 },
+                  (!editValue.trim() || isSaving) && { opacity: 0.6 },
                 ]}
                 onPress={handleSaveEdit}
-                disabled={isSaving || !String(editValue ?? "").trim()}
+                disabled={isSaving || !editValue.trim()}
               >
                 {isSaving ? (
                   <ActivityIndicator size="small" color="#fff" />
