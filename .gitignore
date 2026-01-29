@@ -41,3 +41,24 @@ app-example
 # generated native folders
 /ios
 /android
+
+# -------------------------
+# Python / Flask Additions
+# -------------------------
+
+# The most important one: Ignore the actual env file
+.env
+.env.*
+
+# Ignore Python cache (compiled files)
+__pycache__/
+*.py[cod]
+
+# Ignore the virtual environment folder (where pip installs libraries)
+venv/
+.venv/
+env/
+
+# Ignore your trained Machine Learning models (usually too big for Git)
+*.pkl
+*.joblib

@@ -145,7 +145,7 @@ export default function HomePage() {
           <View style={styles.overlay} />
           <View style={styles.headerContent}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Municipal Services</Text>
+              <Text style={styles.badgeText}>Barangay Services</Text>
             </View>
             <Text style={[styles.headerText, { fontSize: headerTitleSize }]}>
               Hello, {userName ? userName : <ActivityIndicator color="#fff" />}

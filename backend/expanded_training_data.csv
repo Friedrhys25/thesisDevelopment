@@ -3417,9 +3417,9 @@ May sirang sidewalk at delikado po sa mga naglalakad.,non-urgent,infrastructure
 Barado po ang kanal kaya bumabaha agad kapag umuulan.,non-urgent,flooding/drainage
 "Hindi po umaagos ang imburnal, mabaho at nag-iipon ng tubig.",non-urgent,flooding/drainage
 May tumatagas na tubig sa gilid ng kalsada at lumilikha ng baha.,non-urgent,flooding/drainage
-Hindi po kinukuha ang basura sa amin simula pa noong isang linggo.,non-urgent,waste management
-"May tambak ng basura sa bakanteng lote, sobrang baho po.",non-urgent,waste management
-Kulang po ang basurahan at nagkakalat ang basura sa daan.,non-urgent,waste management
+Hindi po kinukuha ang basura sa amin simula pa noong isang linggo.,non-urgent,waste
+"May tambak ng basura sa bakanteng lote, sobrang baho po.",non-urgent,waste
+Kulang po ang basurahan at nagkakalat ang basura sa daan.,non-urgent,waste
 Maingay po ang videoke ng kapitbahay gabi-gabi hanggang madaling araw.,non-urgent,noise complaint
 "May malakas na tugtog at inuman tuwing gabi, hindi po makatulog.",non-urgent,noise complaint
 "Maingay po ang tambay sa kanto, sigawan at murahan po.",non-urgent,noise complaint
@@ -3435,9 +3435,9 @@ May grupo ng kabataan na nag-iingay sa labas kahit curfew na.,non-urgent,curfew 
 "May nanghahalay po sa isang babae ngayon, tulong po agad.",urgent,sexual assault
 "May lalaki pong nanghihipo sa babae sa may kanto, pakiresponde po.",urgent,sexual assault
 "May batang nagsumbong na hinahawakan siya ng masama, tulong po.",urgent,sexual assault
-asdfghjkl,spam,non sense
-qwertyuiop,spam,non sense
-...???!!!,spam,non sense
+asdfghjkl,spam,off-topic
+qwertyuiop,spam,off-topic
+...???!!!,spam,off-topic
 Anong oras po bukas ang barangay hall?,spam,off-topic
 Pwede po ba kumuha ng barangay clearance bukas?,spam,off-topic
 "Kumusta po kayo admin, pa-like naman.",spam,off-topic
@@ -3591,56 +3591,56 @@ Umaapaw ang imburnal sa Zone #47.,non-urgent,flooding/drainage
 Binabaha ang daan tuwing ulan sa Area #48.,non-urgent,flooding/drainage
 Binabaha ang daan tuwing ulan sa Area #49.,non-urgent,flooding/drainage
 Barado ang kanal sa Street #50.,non-urgent,flooding/drainage
-May tambak ng basura sa bakanteng lote #1.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #2.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #3.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #4.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #5.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #6.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #7.,non-urgent,waste management
-Kulang ang basurahan sa lugar #8.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #9.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #10.,non-urgent,waste management
-Kulang ang basurahan sa lugar #11.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #12.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #13.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #14.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #15.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #16.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #17.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #18.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #19.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #20.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #21.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #22.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #23.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #24.,non-urgent,waste management
-Kulang ang basurahan sa lugar #25.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #26.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #27.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #28.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #29.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #30.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #31.,non-urgent,waste management
-Kulang ang basurahan sa lugar #32.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #33.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #34.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #35.,non-urgent,waste management
-Kulang ang basurahan sa lugar #36.,non-urgent,waste management
-Kulang ang basurahan sa lugar #37.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #38.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #39.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #40.,non-urgent,waste management
-May tambak ng basura sa bakanteng lote #41.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #42.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #43.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #44.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #45.,non-urgent,waste management
-Kulang ang basurahan sa lugar #46.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #47.,non-urgent,waste management
-Hindi pa rin kinukuha ang basura sa Purok #48.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #49.,non-urgent,waste management
-Mabaho ang paligid dahil sa basura #50.,non-urgent,waste management
+May tambak ng basura sa bakanteng lote #1.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #2.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #3.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #4.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #5.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #6.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #7.,non-urgent,waste
+Kulang ang basurahan sa lugar #8.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #9.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #10.,non-urgent,waste
+Kulang ang basurahan sa lugar #11.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #12.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #13.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #14.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #15.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #16.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #17.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #18.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #19.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #20.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #21.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #22.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #23.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #24.,non-urgent,waste
+Kulang ang basurahan sa lugar #25.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #26.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #27.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #28.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #29.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #30.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #31.,non-urgent,waste
+Kulang ang basurahan sa lugar #32.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #33.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #34.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #35.,non-urgent,waste
+Kulang ang basurahan sa lugar #36.,non-urgent,waste
+Kulang ang basurahan sa lugar #37.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #38.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #39.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #40.,non-urgent,waste
+May tambak ng basura sa bakanteng lote #41.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #42.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #43.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #44.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #45.,non-urgent,waste
+Kulang ang basurahan sa lugar #46.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #47.,non-urgent,waste
+Hindi pa rin kinukuha ang basura sa Purok #48.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #49.,non-urgent,waste
+Mabaho ang paligid dahil sa basura #50.,non-urgent,waste
 Malakas ang tugtog hanggang madaling araw #1.,non-urgent,noise complaint
 Malakas ang tugtog hanggang madaling araw #2.,non-urgent,noise complaint
 Paulit-ulit ang sigawan sa bahay #3.,non-urgent,noise complaint
@@ -3891,56 +3891,56 @@ May reklamo ng pambabastos sa kanto #47.,urgent,sexual assault
 May reklamo ng pambabastos sa kanto #48.,urgent,sexual assault
 May lalaking nanghihipo sa babae sa Area #49.,urgent,sexual assault
 May babae na humihingi ng tulong dahil sa pang-aabuso #50.,urgent,sexual assault
-randomtext1,spam,non sense
-asdfghjkl2,spam,non sense
-asdfghjkl3,spam,non sense
-!!!???4,spam,non sense
-randomtext5,spam,non sense
-randomtext6,spam,non sense
-qwerty7,spam,non sense
-!!!???8,spam,non sense
-!!!???9,spam,non sense
-!!!???10,spam,non sense
-asdfghjkl11,spam,non sense
-!!!???12,spam,non sense
-randomtext13,spam,non sense
-asdfghjkl14,spam,non sense
-asdfghjkl15,spam,non sense
-qwerty16,spam,non sense
-randomtext17,spam,non sense
-asdfghjkl18,spam,non sense
-asdfghjkl19,spam,non sense
-asdfghjkl20,spam,non sense
-asdfghjkl21,spam,non sense
-randomtext22,spam,non sense
-qwerty23,spam,non sense
-!!!???24,spam,non sense
-randomtext25,spam,non sense
-asdfghjkl26,spam,non sense
-qwerty27,spam,non sense
-randomtext28,spam,non sense
-!!!???29,spam,non sense
-asdfghjkl30,spam,non sense
-qwerty31,spam,non sense
-qwerty32,spam,non sense
-qwerty33,spam,non sense
-asdfghjkl34,spam,non sense
-qwerty35,spam,non sense
-asdfghjkl36,spam,non sense
-qwerty37,spam,non sense
-asdfghjkl38,spam,non sense
-!!!???39,spam,non sense
-qwerty40,spam,non sense
-qwerty41,spam,non sense
-!!!???42,spam,non sense
-asdfghjkl43,spam,non sense
-qwerty44,spam,non sense
-randomtext45,spam,non sense
-asdfghjkl46,spam,non sense
-qwerty47,spam,non sense
-qwerty48,spam,non sense
-qwerty49,spam,non sense
-qwerty50,spam,non sense
+randomtext1,spam,off-topic
+asdfghjkl2,spam,off-topic
+asdfghjkl3,spam,off-topic
+!!!???4,spam,off-topic
+randomtext5,spam,off-topic
+randomtext6,spam,off-topic
+qwerty7,spam,off-topic
+!!!???8,spam,off-topic
+!!!???9,spam,off-topic
+!!!???10,spam,off-topic
+asdfghjkl11,spam,off-topic
+!!!???12,spam,off-topic
+randomtext13,spam,off-topic
+asdfghjkl14,spam,off-topic
+asdfghjkl15,spam,off-topic
+qwerty16,spam,off-topic
+randomtext17,spam,off-topic
+asdfghjkl18,spam,off-topic
+asdfghjkl19,spam,off-topic
+asdfghjkl20,spam,off-topic
+asdfghjkl21,spam,off-topic
+randomtext22,spam,off-topic
+qwerty23,spam,off-topic
+!!!???24,spam,off-topic
+randomtext25,spam,off-topic
+asdfghjkl26,spam,off-topic
+qwerty27,spam,off-topic
+randomtext28,spam,off-topic
+!!!???29,spam,off-topic
+asdfghjkl30,spam,off-topic
+qwerty31,spam,off-topic
+qwerty32,spam,off-topic
+qwerty33,spam,off-topic
+asdfghjkl34,spam,off-topic
+qwerty35,spam,off-topic
+asdfghjkl36,spam,off-topic
+qwerty37,spam,off-topic
+asdfghjkl38,spam,off-topic
+!!!???39,spam,off-topic
+qwerty40,spam,off-topic
+qwerty41,spam,off-topic
+!!!???42,spam,off-topic
+asdfghjkl43,spam,off-topic
+qwerty44,spam,off-topic
+randomtext45,spam,off-topic
+asdfghjkl46,spam,off-topic
+qwerty47,spam,off-topic
+qwerty48,spam,off-topic
+qwerty49,spam,off-topic
+qwerty50,spam,off-topic
 Saan po ang opisina ng barangay #1?,spam,off-topic
 Saan po ang opisina ng barangay #2?,spam,off-topic
 May meeting po ba bukas #3?,spam,off-topic
@@ -3991,3 +3991,503 @@ Anong oras bukas ang barangay hall #47?,spam,off-topic
 Pwede po ba kumuha ng clearance #48?,spam,off-topic
 May meeting po ba bukas #49?,spam,off-topic
 May meeting po ba bukas #50?,spam,off-topic
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+Someone was assaulted in the street.,,violence
+There was a physical fight reported near the barangay hall.,,violence
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+A neighbor refuses to pay the debt.,,civil/financial
+There is a dispute over unpaid rent.,,civil/financial
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+A motorcycle was stolen last night.,,crime
+Someone broke into a store.,,crime
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+The street is flooded after heavy rain.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Drainage is clogged causing water overflow.,,flooding/drainage
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+A dog is constantly barking and disturbing neighbors.,,animal complaint
+Stray cats are damaging property.,,animal complaint
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Illegal gambling is happening in the area.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Someone is selling illegal substances.,,illegal activities
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Teenagers are outside past curfew.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+People are roaming during restricted hours.,,curfew violation
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+A woman reported inappropriate touching.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Someone experienced harassment.,,sexual assault
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Random unrelated message.,,off-topic
+Random unrelated message.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Random unrelated message.,,off-topic
+Random unrelated message.,,off-topic
+Just testing the system.,,off-topic
+Just testing the system.,,off-topic
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Trash is piling up in the street.,,waste
+Trash is piling up in the street.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste
+Garbage is not collected on time.,,waste

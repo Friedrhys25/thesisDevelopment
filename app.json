@@ -1,6 +1,5 @@
 {
   "expo": {
-    
     "name": "talk2us",
     "slug": "talk2us",
     "version": "1.0.0",
@@ -40,7 +39,8 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

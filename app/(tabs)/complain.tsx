@@ -390,7 +390,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const API_URL = "http://192.168.68.115:5000";
+      const API_URL = "http://192.168.1.49:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",
@@ -1539,21 +1539,28 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 8,
+  fontSize: 15,
+  fontWeight: "700",
+  color: "#111827",
+  marginBottom: 6,
+  letterSpacing: 0.3,
   },
   textArea: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    minHeight: 100,
-    backgroundColor: "#fff",
-    marginBottom: 20,
+  borderWidth: 2,
+  borderColor: "#6366F1",       // highlight color
+  backgroundColor: "#EEF2FF",  // soft highlight
+  borderRadius: 14,
+  padding: 14,
+  fontSize: 15,
+  color: "#1F2933",
+  minHeight: 130,
+  marginBottom: 18,
+  shadowColor: "#6366F1",
+  shadowOpacity: 0.2,
+  shadowRadius: 6,
+  elevation: 3,
   },
+
   
   // Image Preview
   imagePreviewContainer: {
@@ -1640,10 +1647,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+  fontSize: 16,
+  fontWeight: "700",
+  letterSpacing: 0.4,
+  color: "#FFFFFF",
   },
+
 
   // Success Modal
   modalBox: {
@@ -1672,25 +1681,29 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   pickerContainer: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginBottom: 12,
-    backgroundColor: "#fff",
-    overflow: "hidden",
+  borderWidth: 1,
+  borderColor: "#D1D5DB",
+  borderRadius: 10,
+  backgroundColor: "#F9FAFB",
+  marginBottom: 14,
   },
   picker: {
-    width: "100%",
+  fontSize: 14,
+  color: "#374151",
   },
+
   input: {
-    width: "100%",
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginBottom: 12,
-    backgroundColor: "#fff",
+  borderWidth: 1,
+  borderColor: "#D1D5DB",
+  borderRadius: 10,
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  fontSize: 14,
+  color: "#374151",
+  backgroundColor: "#FFFFFF",
+  marginBottom: 14,
   },
+
   disabledMessage: {
     color: "#ef4444",
     fontSize: 14,
