@@ -6,19 +6,26 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
-  Image,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import * as Location from "expo-location";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
-import { auth, db } from "../backend/firebaseConfig";
+import { auth, firestore } from "../backend/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { ref, set } from "firebase/database";
+import {
+  collection,
+  doc,
+  getDocs,
+  limit,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function RegisterPage() {
@@ -27,6 +34,8 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
+
+  const [suffix, setSuffix] = useState(""); // NEW
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,14 +46,42 @@ export default function RegisterPage() {
 
   const [address, setAddress] = useState("");
   const [purok, setPurok] = useState("1");
+
   const [birthday, setBirthday] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [number, setNumber] = useState("");
+
+  // NEW: Tenant / Residency
+  const [residencyStatus, setResidencyStatus] = useState<"resident" | "tenant">("resident");
+
+  // NEW: Employee toggle + role
+  const [isEmployee, setIsEmployee] = useState(false);
+  const [employeeRole, setEmployeeRole] = useState("all categories");
+
   const [modalVisible, setModalVisible] = useState(false);
+
+  const ROLE_OPTIONS = [
+    "all categories",
+    "day care services",
+    "vawc",
+    "bns",
+    "bhw",
+    "chief bantay bayan",
+    "bantay bayan",
+    "bantay bayan/utility",
+    "bantay bayan/driver",
+    "lupon tagapamayapa",
+  ];
 
   // BLOCK NUMBERS ON NAME FIELDS
   const allowOnlyLetters = (text: string) => text.replace(/[^A-Za-z\s]/g, "");
+
+  // PASSWORD STRENGTH
+  const isPasswordStrong = (pw: string) => {
+    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+    return regex.test(pw);
+  };
 
   // AGE CALCULATION
   const calculateAge = (birthdate: string) => {
@@ -61,11 +98,25 @@ export default function RegisterPage() {
     return age;
   };
 
-  // FETCH LOCATION
-  
+  // Unique key helper for duplicate blocking
+  const normalize = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const buildUniqueKey = () => `${normalize(firstName)}_${normalize(lastName)}_${normalize(number)}`;
 
-  // REGISTER FUNCTION
+  const checkDuplicateUser = async () => {
+    const uniqueKey = buildUniqueKey();
+
+    const q = query(
+      collection(firestore, "users"),
+      where("uniqueKey", "==", uniqueKey),
+      limit(1)
+    );
+
+    const snap = await getDocs(q);
+    return { exists: !snap.empty, uniqueKey };
+  };
+
   const handleRegister = async () => {
+    // Required fields
     if (!email || !password || !confirmPassword || !firstName || !lastName || !birthday) {
       Alert.alert("Missing Fields", "Please fill in all required fields marked with *");
       return;
@@ -76,38 +127,63 @@ export default function RegisterPage() {
       return;
     }
 
-    // PASSWORD STRENGTH VALIDATION
-  if (!isPasswordStrong(password)) {
-    Alert.alert(
-      "Weak Password",
-      "Password must include:\n• At least 1 uppercase letter\n• At least 1 lowercase letter\n• At least 1 digit\n• Minimum 6 characters"
-    );
-    return;
-  }
+    if (!isPasswordStrong(password)) {
+      Alert.alert(
+        "Weak Password",
+        "Password must include:\n• At least 1 uppercase letter\n• At least 1 lowercase letter\n• At least 1 digit\n• Minimum 6 characters"
+      );
+      return;
+    }
 
-
-    // MOBILE NUMBER VALIDATION (11 digits only)
+    // Contact number validation
     if (number.length !== 11 || !/^\d+$/.test(number)) {
       Alert.alert("Incorrect Mobile Format", "Contact number must be exactly 11 digits.");
       return;
     }
 
+    // If employee is ON, role must be selected (safety check)
+    if (isEmployee && !employeeRole) {
+      Alert.alert("Missing Role", "Please select an employee role.");
+      return;
+    }
+
     try {
+      // 1) Duplicate check BEFORE creating Auth account
+      const { exists, uniqueKey } = await checkDuplicateUser();
+      if (exists) {
+        Alert.alert(
+          "Duplicate Account",
+          "A user with the same first name, last name, and contact number is already registered."
+        );
+        return;
+      }
+
+      // 2) Create Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      await set(ref(db, `users/${user.uid}`), {
+      // 3) Save profile to Firestore
+      await setDoc(doc(firestore, "users", user.uid), {
         firstName,
         middleName: middleName || null,
         lastName,
+        suffix: suffix || null,
+
         email,
-        address,
+        address: address || null,
         purok,
         birthday,
         age: calculateAge(birthday),
         number,
+
+        residencyStatus, // "resident" | "tenant"
+
+        isEmployee,
+        employeeRole: isEmployee ? employeeRole : null,
+
         idImage: null,
-        createdAt: new Date().toISOString(),
+        uniqueKey,
+        createdAt: serverTimestamp(),
       });
 
       setModalVisible(true);
@@ -135,19 +211,11 @@ export default function RegisterPage() {
     }
   };
 
-  // SUCCESS MODAL CLOSE
   const handleSuccessClose = () => {
     setModalVisible(false);
     router.push("/");
   };
 
-  const isPasswordStrong = (password: string) => {
-  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
-  return regex.test(password);
-};
-
-
-  // LIMIT DATE PICKER TO TODAY ONLY
   const today = new Date();
 
   return (
@@ -193,12 +261,30 @@ export default function RegisterPage() {
               />
             </View>
 
+            {/* NEW: Suffix */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Suffix</Text>
+              <View style={styles.pickerContainer}>
+                <Picker selectedValue={suffix} onValueChange={setSuffix}>
+                  <Picker.Item label="None" value="" />
+                  <Picker.Item label="Jr." value="Jr." />
+                  <Picker.Item label="Sr." value="Sr." />
+                  <Picker.Item label="II" value="II" />
+                  <Picker.Item label="III" value="III" />
+                  <Picker.Item label="IV" value="IV" />
+                  <Picker.Item label="V" value="V" />
+                </Picker>
+              </View>
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Birthday *</Text>
 
               <TouchableOpacity onPress={() => setShowDatePicker(true)}>
                 <View style={styles.input}>
-                  <Text style={{ color: birthday ? "#333" : "#999" }}>{birthday || "Select your birthday"}</Text>
+                  <Text style={{ color: birthday ? "#333" : "#999" }}>
+                    {birthday || "Select your birthday"}
+                  </Text>
                 </View>
               </TouchableOpacity>
 
@@ -206,7 +292,7 @@ export default function RegisterPage() {
                 <DateTimePicker
                   value={birthday ? new Date(birthday) : new Date()}
                   mode="date"
-                  maximumDate={today} // CANNOT PICK FUTURE DATE
+                  maximumDate={today}
                   display="default"
                   onChange={(event, selectedDate) => {
                     setShowDatePicker(false);
@@ -239,7 +325,6 @@ export default function RegisterPage() {
               />
             </View>
 
-            {/* PASSWORD WITH EYE BUTTON */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Password *</Text>
               <View style={styles.passwordContainer}>
@@ -256,7 +341,6 @@ export default function RegisterPage() {
               </View>
             </View>
 
-            {/* CONFIRM PASSWORD */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Confirm Password *</Text>
               <View style={styles.passwordContainer}>
@@ -284,15 +368,12 @@ export default function RegisterPage() {
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Address</Text>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder="lot / block / street"
-                  value={address} 
-                  onChangeText={setAddress}
-                />
-                
-              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="lot / block / street"
+                value={address}
+                onChangeText={setAddress}
+              />
             </View>
 
             <View style={styles.inputGroup}>
@@ -309,7 +390,6 @@ export default function RegisterPage() {
               </View>
             </View>
 
-            {/* CONTACT NUMBER VALIDATION */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Contact Number</Text>
               <TextInput
@@ -318,11 +398,64 @@ export default function RegisterPage() {
                 keyboardType="numeric"
                 maxLength={11}
                 value={number}
-                onChangeText={(t) => setNumber(t.replace(/[^0-9]/g, ""))} // only digits
+                onChangeText={(t) => setNumber(t.replace(/[^0-9]/g, ""))}
               />
 
               {number.length > 0 && number.length !== 11 && (
                 <Text style={styles.errorText}>Incorrect mobile format (must be 11 digits)</Text>
+              )}
+            </View>
+
+            {/* NEW: Residency status */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Tenant in Barangay?</Text>
+              <View style={styles.rowBtns}>
+                <TouchableOpacity
+                  style={[styles.smallBtn, residencyStatus === "resident" && styles.smallBtnActive]}
+                  onPress={() => setResidencyStatus("resident")}
+                >
+                  <Text style={styles.smallBtnText}>NO (Resident)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.smallBtn, residencyStatus === "tenant" && styles.smallBtnActive]}
+                  onPress={() => setResidencyStatus("tenant")}
+                >
+                  <Text style={styles.smallBtnText}>YES (Tenant)</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* NEW: Employee switch + role dropdown */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Employee Account?</Text>
+              <View style={styles.rowBtns}>
+                <TouchableOpacity
+                  style={[styles.smallBtn, !isEmployee && styles.smallBtnActive]}
+                  onPress={() => setIsEmployee(false)}
+                >
+                  <Text style={styles.smallBtnText}>OFF</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.smallBtn, isEmployee && styles.smallBtnActive]}
+                  onPress={() => setIsEmployee(true)}
+                >
+                  <Text style={styles.smallBtnText}>ON</Text>
+                </TouchableOpacity>
+              </View>
+
+              {isEmployee && (
+                <>
+                  <Text style={[styles.inputLabel, { marginTop: 12 }]}>Employee Role</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker selectedValue={employeeRole} onValueChange={setEmployeeRole}>
+                      {ROLE_OPTIONS.map((r) => (
+                        <Picker.Item key={r} label={r} value={r} />
+                      ))}
+                    </Picker>
+                  </View>
+                </>
               )}
             </View>
           </View>
@@ -397,7 +530,6 @@ const styles = StyleSheet.create({
   },
 
   inputGroup: { marginBottom: 16 },
-
   inputLabel: { fontSize: 14, fontWeight: "600", color: "#555", marginBottom: 8 },
 
   input: {
@@ -420,7 +552,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fafafa",
     paddingHorizontal: 12,
   },
-
   passwordInput: { flex: 1, padding: 12, fontSize: 16 },
 
   errorText: { color: "#e74c3c", fontSize: 12, marginTop: 4 },
@@ -431,7 +562,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#fafafa",
   },
-  
+
+  rowBtns: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  smallBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#e0e0e0",
+    backgroundColor: "#fafafa",
+    alignItems: "center",
+  },
+  smallBtnActive: {
+    borderColor: "#4a90e2",
+    backgroundColor: "#e6f4fe",
+  },
+  smallBtnText: { fontWeight: "700", color: "#2c3e50" },
+
   registerButton: {
     padding: 18,
     borderRadius: 12,
@@ -450,7 +600,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.6)",
   },
-
   modalBox: {
     width: 320,
     padding: 30,
@@ -458,7 +607,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
   },
-
   successIcon: {
     width: 70,
     height: 70,
@@ -468,7 +616,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-
   successIconText: { fontSize: 40, color: "#fff" },
 
   modalText: { fontSize: 22, fontWeight: "bold", marginBottom: 12 },
