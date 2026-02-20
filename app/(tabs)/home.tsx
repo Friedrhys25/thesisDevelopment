@@ -1,20 +1,21 @@
-﻿import { LinearGradient } from "expo-linear-gradient";
+﻿import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useRef, useState, useEffect, useMemo } from "react";
-import { Ionicons } from "@expo/vector-icons";
+import { get, ref } from "firebase/database";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
+  RefreshControl,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  StatusBar,
   useWindowDimensions,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../../backend/firebaseConfig";
-import { get, ref } from "firebase/database";
 
 const COLORS = {
   bg: "#F6F7FB",
@@ -41,20 +42,34 @@ export default function HomePage() {
   const { width } = useWindowDimensions();
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
+  const fetchUserName = async () => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     const userRef = ref(db, `users/${uid}/firstName`);
-    get(userRef).then((snapshot) => {
+    try {
+      const snapshot = await get(userRef);
       if (snapshot.exists()) {
         setUserName(snapshot.val());
       } else {
         setUserName("User");
       }
-    });
+    } catch (error) {
+      console.error("Error fetching user name:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserName();
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchUserName();
+    setRefreshing(false);
+  };
 
   const services: Service[] = useMemo(
     () => [
@@ -127,6 +142,14 @@ export default function HomePage() {
         )}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#fff"
+            colors={[COLORS.primary]}
+          />
+        }
       >
         <View style={styles.parallaxContainer}>
           <Animated.View

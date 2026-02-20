@@ -1,9 +1,10 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
-import { get, ref, update } from "firebase/database";
+import { ref as dbRef, get } from "firebase/database";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,7 +22,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth, db } from "../../backend/firebaseConfig";
+import { auth, db, firestore } from "../../backend/firebaseConfig";
 
 type UserData = {
   firstName: string;
@@ -89,7 +90,7 @@ export default function ProfilePage() {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
 
-      const complaintsRef = ref(db, `users/${currentUser.uid}/userComplaints`);
+      const complaintsRef = dbRef(db, `users/${currentUser.uid}/userComplaints`);
       const snapshot = await get(complaintsRef);
       if (snapshot.exists()) {
         const complaints = snapshot.val();
@@ -115,12 +116,13 @@ export default function ProfilePage() {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
-    const userRef = ref(db, `users/${currentUser.uid}`);
-    const snapshot = await get(userRef);
+    const userDocRef = doc(firestore, "users", currentUser.uid);
+    const snapshot = await getDoc(userDocRef);
 
     if (snapshot.exists()) {
-      const data = snapshot.val();
-      const createdDate = data.createdAt ? new Date(data.createdAt) : new Date();
+      const data = snapshot.data();
+      // Handle Firestore Timestamp or ISO string
+      const createdDate = data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date());
       const memberSince = createdDate.toLocaleDateString("en-US", {
         month: "long",
         year: "numeric",
@@ -136,7 +138,7 @@ export default function ProfilePage() {
         purok: data.purok || "",
         age: data.age || "",
         memberSince,
-        id_verification: data.id_verification || "",
+        id_verification: data.idImage || "", // In register.tsx it's idImage
         avatar: data.avatar || "",
         idstatus: data.idstatus || "Pending",
       });
@@ -182,7 +184,7 @@ export default function ProfilePage() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
+        quality: 0.2, // Aggressive compression to stay under 1MB Firestore limit
         base64: true,
       });
 
@@ -197,10 +199,9 @@ export default function ProfilePage() {
       }
 
       setUploading(true);
-      const userRef = ref(db, `users/${currentUser.uid}`);
-      await update(userRef, {
+      const userDocRef = doc(firestore, "users", currentUser.uid);
+      await updateDoc(userDocRef, {
         avatar: `data:image/jpeg;base64,${base64String}`,
-        avatar_uploaded_at: new Date().toISOString(),
       });
 
       setUserData((prev) => ({
@@ -230,7 +231,7 @@ export default function ProfilePage() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.5,
+        quality: 0.2, // Aggressive compression to stay under 1MB Firestore limit
         base64: true,
       });
 
@@ -245,9 +246,9 @@ export default function ProfilePage() {
       }
 
       setUploading(true);
-      const userRef = ref(db, `users/${currentUser.uid}`);
-      await update(userRef, {
-        id_verification: `data:image/jpeg;base64,${base64String}`,
+      const userDocRef = doc(firestore, "users", currentUser.uid);
+      await updateDoc(userDocRef, {
+        idImage: `data:image/jpeg;base64,${base64String}`,
         id_verification_uploaded_at: new Date().toISOString(),
         idstatus: "Pending",
       });
@@ -319,8 +320,8 @@ export default function ProfilePage() {
       }
 
       if (Object.keys(updateData).length > 0) {
-        const userRef = ref(db, `users/${auth.currentUser.uid}`);
-        await update(userRef, updateData);
+        const userDocRef = doc(firestore, "users", auth.currentUser.uid);
+        await updateDoc(userDocRef, updateData);
 
         setUserData((prev) => ({
           ...prev,

@@ -5,13 +5,14 @@ import {
   KeyboardAvoidingView,
   LayoutAnimation,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput, 
+  TextInput,
   TouchableOpacity,
   UIManager,
-  View
+  View,
 } from "react-native";
 // Import the Google Gen AI SDK
 import { GoogleGenAI } from '@google/genai';
@@ -24,7 +25,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 
 // --- Configuration ---
 // !!! IMPORTANT: REPLACE THIS WITH YOUR ACTUAL GEMINI API KEY !!!
-const GEMINI_API_KEY = "AIzaSyDg_EbxqAGrgiAAOBN1jZIoPVzjeeJaXvk"; 
+const GEMINI_API_KEY = "AIzaSyDg_EbxqAGrgiAAOBN1jZIoPVzjeeJaXvk";
 
 // Initialize the GoogleGenAI client
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
@@ -54,36 +55,36 @@ const faqs = [
  * @returns A promise that resolves to the bot's response string.
  */
 const fetchChatbotResponse = async (userQuestion: string): Promise<string> => {
-    // 1. Format the FAQs into a single reference text
-    const faqContext = faqs.map(item => `Q: ${item.q}\nA: ${item.a}`).join('\n---\n');
+  // 1. Format the FAQs into a single reference text
+  const faqContext = faqs.map(item => `Q: ${item.q}\nA: ${item.a}`).join('\n---\n');
 
-    // 2. Define the System Instruction for strict constraint
-    const systemInstruction = `You are a helpful and constrained FAQ chatbot for the Barangay Feedback System. Your SOLE source of information is the following list of Frequently Asked Questions (FAQs). You MUST only answer questions based on the content of these FAQs. If the user asks a question that is not covered in the FAQs, you MUST respond with the following exact sentence: "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below."
+  // 2. Define the System Instruction for strict constraint
+  const systemInstruction = `You are a helpful and constrained FAQ chatbot for the Barangay Feedback System. Your SOLE source of information is the following list of Frequently Asked Questions (FAQs). You MUST only answer questions based on the content of these FAQs. If the user asks a question that is not covered in the FAQs, you MUST respond with the following exact sentence: "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below."
 
     Available FAQs:
     ---
     ${faqContext}
     ---`;
-    
-    // 3. Construct the API call
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash", 
-            contents: userQuestion,
-            config: {
-                systemInstruction: systemInstruction,
-                // Optional: Reduce randomness to make responses more factual/lookup-based
-                temperature: 0.1, 
-            }
-        });
 
-        // 4. Return the model's text response
-            return response.text || "Unable to generate a response. Please try again.";
-    } catch (error) {
-        console.error("Gemini API Error:", error);
-        // Fallback response for API errors
-        return "Sorry, I ran into an error while connecting to the help service. Please check your API key or network connection and try again.";
-    }
+  // 3. Construct the API call
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: userQuestion,
+      config: {
+        systemInstruction: systemInstruction,
+        // Optional: Reduce randomness to make responses more factual/lookup-based
+        temperature: 0.1,
+      }
+    });
+
+    // 4. Return the model's text response
+    return response.text || "Unable to generate a response. Please try again.";
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    // Fallback response for API errors
+    return "Sorry, I ran into an error while connecting to the help service. Please check your API key or network connection and try again.";
+  }
 };
 
 
@@ -95,8 +96,9 @@ export default function FAQPage() {
   const [messages, setMessages] = useState<Array<{ text: string; isUser: boolean }>>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
-  
+
   // Initialize chatbot message
   useEffect(() => {
     if (showChatbot && messages.length === 0) {
@@ -113,7 +115,7 @@ export default function FAQPage() {
     if (!inputText.trim() || isLoading) return;
 
     const userMessage = inputText.trim();
-    
+
     // 1. Add user message
     setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
     setInputText("");
@@ -121,20 +123,20 @@ export default function FAQPage() {
 
     // 2. Fetch bot response (Live Gemini API Call)
     try {
-        // Pass the user question and the FAQs list to the API wrapper
-        const botResponse = await fetchChatbotResponse(userMessage);
-        setMessages(prev => [
-            ...prev, 
-            { text: botResponse, isUser: false }
-        ]);
+      // Pass the user question and the FAQs list to the API wrapper
+      const botResponse = await fetchChatbotResponse(userMessage);
+      setMessages(prev => [
+        ...prev,
+        { text: botResponse, isUser: false }
+      ]);
     } catch (error) {
-        console.error("Chatbot API Error:", error);
-        setMessages(prev => [
-            ...prev, 
-            { text: "Sorry, I encountered an issue. Please ensure your API key is correct and retry.", isUser: false }
-        ]);
+      console.error("Chatbot API Error:", error);
+      setMessages(prev => [
+        ...prev,
+        { text: "Sorry, I encountered an issue. Please ensure your API key is correct and retry.", isUser: false }
+      ]);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -142,7 +144,7 @@ export default function FAQPage() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowChatbot(show);
     if (!show) {
-        setMessages([]); // Clear chat history when exiting chatbot
+      setMessages([]); // Clear chat history when exiting chatbot
     }
   };
 
@@ -163,8 +165,15 @@ export default function FAQPage() {
       { text: faq.a, isUser: false }
     ]);
     if (!showChatbot) {
-        toggleChatbot(true); // Switch to chat view if selecting from FAQ list
+      toggleChatbot(true); // Switch to chat view if selecting from FAQ list
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // FAQs are currently static, so we just simulate a refresh.
+    // In the future, this could re-fetch FAQs from a database.
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   // Auto-scroll to bottom of chat
@@ -184,22 +193,22 @@ export default function FAQPage() {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerText}>Help & Support</Text>
-        
+
         {/* Chat/FAQ Toggle Button (Swapped Logic) */}
-        <TouchableOpacity 
-            style={styles.toggleButton} 
-            onPress={() => toggleChatbot(!showChatbot)}
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => toggleChatbot(!showChatbot)}
         >
-            <Ionicons 
-                // Icon shows the view the user will switch to
-                name={showChatbot ? "list-outline" : "chatbubble-ellipses"} 
-                size={22} 
-                color="#3B82F6" 
-            />
-            <Text style={styles.toggleButtonText}>
-                {/* Text shows the view the user will switch to */}
-                {showChatbot ? "View All FAQs" : "Start Chat"}
-            </Text>
+          <Ionicons
+            // Icon shows the view the user will switch to
+            name={showChatbot ? "list-outline" : "chatbubble-ellipses"}
+            size={22}
+            color="#3B82F6"
+          />
+          <Text style={styles.toggleButtonText}>
+            {/* Text shows the view the user will switch to */}
+            {showChatbot ? "View All FAQs" : "Start Chat"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -214,11 +223,21 @@ export default function FAQPage() {
           </View>
 
           {/* FAQ List */}
-          <ScrollView style={styles.faqList} contentContainerStyle={styles.faqContainer}>
+          <ScrollView
+            style={styles.faqList}
+            contentContainerStyle={styles.faqContainer}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#3B82F6"
+              />
+            }
+          >
             <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
             {faqs.map((item, index) => (
               <View key={index} style={styles.faqItem}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => toggleFaq(index)}
                   style={styles.faqQuestionContainer}
                 >
@@ -226,10 +245,10 @@ export default function FAQPage() {
                     <Ionicons name="help-circle" size={20} color="#3B82F6" />
                   </View>
                   <Text style={styles.faqQuestion}>{item.q}</Text>
-                  <Ionicons 
-                    name={expandedFaqs.includes(index) ? "chevron-up" : "chevron-down"} 
-                    size={20} 
-                    color="#64748B" 
+                  <Ionicons
+                    name={expandedFaqs.includes(index) ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color="#64748B"
                   />
                 </TouchableOpacity>
                 {expandedFaqs.includes(index) && (
@@ -251,8 +270,8 @@ export default function FAQPage() {
           </ScrollView>
         </>
       ) : (
-        <KeyboardAvoidingView 
-          style={styles.chatContainer} 
+        <KeyboardAvoidingView
+          style={styles.chatContainer}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
         >
@@ -270,15 +289,15 @@ export default function FAQPage() {
           </View>
 
           {/* Messages */}
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           >
             {messages.map((msg, index) => (
-              <View 
-                key={index} 
+              <View
+                key={index}
                 style={[
                   styles.messageBubble,
                   msg.isUser ? styles.userMessage : styles.botMessage
@@ -304,46 +323,46 @@ export default function FAQPage() {
             ))}
             {/* Typing Indicator */}
             {isLoading && (
-                <View style={[styles.messageBubble, styles.botMessage]}>
-                    <View style={styles.botAvatarSmall}>
-                        <Ionicons name="chatbox" size={16} color="#fff" />
-                    </View>
-                    <View style={[styles.messageContent, styles.botMessageContent]}>
-                        <Text style={styles.botMessageText}>...</Text> 
-                    </View>
+              <View style={[styles.messageBubble, styles.botMessage]}>
+                <View style={styles.botAvatarSmall}>
+                  <Ionicons name="chatbox" size={16} color="#fff" />
                 </View>
+                <View style={[styles.messageContent, styles.botMessageContent]}>
+                  <Text style={styles.botMessageText}>...</Text>
+                </View>
+              </View>
             )}
           </ScrollView>
 
           {/* Input Area */}
           <View style={styles.inputArea}>
             <TextInput
-                style={styles.textInput}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Ask a question..."
-                returnKeyType="send"
-                onSubmitEditing={handleSend}
-                editable={!isLoading}
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Ask a question..."
+              returnKeyType="send"
+              onSubmitEditing={handleSend}
+              editable={!isLoading}
             />
-            <TouchableOpacity 
-                style={[styles.sendButton, sendButtonDisabled && styles.sendButtonDisabled]} 
-                onPress={handleSend}
-                disabled={sendButtonDisabled}
+            <TouchableOpacity
+              style={[styles.sendButton, sendButtonDisabled && styles.sendButtonDisabled]}
+              onPress={handleSend}
+              disabled={sendButtonDisabled}
             >
-                <Ionicons name="send" size={20} color="#fff" />
+              <Ionicons name="send" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
 
           {/* FAQ Buttons (Quick Picks) */}
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.faqButtonsContainer}
             contentContainerStyle={styles.faqButtonsContent}
           >
             {faqs.map((faq, index) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={index}
                 style={styles.faqButton}
                 onPress={() => selectFaq(faq)}
@@ -355,7 +374,7 @@ export default function FAQPage() {
         </KeyboardAvoidingView>
       )}
 
-    
+
     </SafeAreaView>
   );
 }
@@ -375,9 +394,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   backButton: { padding: 4 },
-  headerText: { 
-    fontSize: 20, 
-    fontWeight: "700", 
+  headerText: {
+    fontSize: 20,
+    fontWeight: "700",
     color: "#fff",
     flex: 1,
     marginLeft: 12,
@@ -615,7 +634,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-  
+
   // Input Styles
   inputArea: {
     flexDirection: 'row',

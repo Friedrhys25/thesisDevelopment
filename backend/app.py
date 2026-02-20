@@ -1,12 +1,12 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import joblib
+from flask import Flask, request, jsonify  # type: ignore
+from flask_cors import CORS  # type: ignore
+import joblib  # type: ignore
 import json
 import os
 import re
 from pathlib import Path
-from dotenv import load_dotenv
-import google.generativeai as genai
+from dotenv import load_dotenv  # type: ignore
+import google.generativeai as genai  # type: ignore
 
 # ============================================================
 # Load .env from the SAME folder as this app.py (bulletproof)
@@ -26,9 +26,15 @@ type_model = joblib.load("type_model.pkl")
 # ---------------------------
 # Gemini config (use env var)
 # ---------------------------
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
 print("Gemini key loaded:", "YES" if GEMINI_API_KEY else "NO")
-print("Gemini key prefix:", GEMINI_API_KEY[:6] if GEMINI_API_KEY else "NONE")
+
+if GEMINI_API_KEY:
+    # Print first few chars for confirmation (masking the rest)
+    prefix = str(GEMINI_API_KEY)[:6]  # type: ignore
+    print(f"Gemini key prefix: {prefix}...")
+else:
+    print("Gemini key prefix: NONE")
 
 if not GEMINI_API_KEY:
     print("WARNING: GEMINI_API_KEY not found. Gemini features will be disabled.")
@@ -132,7 +138,7 @@ Message:
 """.strip()
 
     try:
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         resp = model.generate_content(prompt)
         translated = (resp.text or "").strip()
         return translated if translated else None
@@ -193,7 +199,7 @@ Return ONLY JSON (no markdown), exactly:
 """.strip()
 
     try:
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         resp = model.generate_content(prompt)
         cleaned = (resp.text or "").strip()
 

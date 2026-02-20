@@ -1,19 +1,20 @@
-import { useState, useEffect } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { get, ref, update } from "firebase/database";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { db } from "../../backend/firebaseConfig";
-import { ref, get, update } from "firebase/database";
 
 type PersonType = "official" | "employee";
 
@@ -30,16 +31,17 @@ export default function FeedbackPage() {
   const [employees, setEmployees] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<PersonType>("official");
-  
+
   // ✅ Added search state
-  const [searchQuery, setSearchQuery] = useState(""); 
-  
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [selectedPosition, setSelectedPosition] = useState<string>("all categories");
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [generalFeedback, setGeneralFeedback] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const officialPositions = [
     "all categories",
@@ -72,46 +74,52 @@ export default function FeedbackPage() {
 
   // Fetch officials and employees from Firebase
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch Officials
-        const officialsRef = ref(db, "officials");
-        const officialsSnapshot = await get(officialsRef);
-        
-        if (officialsSnapshot.exists()) {
-          const data = officialsSnapshot.val();
-          const officialsArray = Object.keys(data).map((key) => ({
-            id: key,
-            name: data[key].name,
-            position: data[key].position,
-            type: "official" as PersonType,
-          }));
-          setOfficials(officialsArray);
-        }
-
-        // Fetch Employees
-        const employeesRef = ref(db, "employees");
-        const employeesSnapshot = await get(employeesRef);
-        
-        if (employeesSnapshot.exists()) {
-          const data = employeesSnapshot.val();
-          const employeesArray = Object.keys(data).map((key) => ({
-            id: key,
-            name: data[key].name,
-            position: data[key].position,
-            type: "employee" as PersonType,
-          }));
-          setEmployees(employeesArray);
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
+
+  const fetchData = async () => {
+    try {
+      // Fetch Officials
+      const officialsRef = ref(db, "officials");
+      const officialsSnapshot = await get(officialsRef);
+
+      if (officialsSnapshot.exists()) {
+        const data = officialsSnapshot.val();
+        const officialsArray = Object.keys(data).map((key) => ({
+          id: key,
+          name: data[key].name,
+          position: data[key].position,
+          type: "official" as PersonType,
+        }));
+        setOfficials(officialsArray);
+      }
+
+      // Fetch Employees
+      const employeesRef = ref(db, "employees");
+      const employeesSnapshot = await get(employeesRef);
+
+      if (employeesSnapshot.exists()) {
+        const data = employeesSnapshot.val();
+        const employeesArray = Object.keys(data).map((key) => ({
+          id: key,
+          name: data[key].name,
+          position: data[key].position,
+          type: "employee" as PersonType,
+        }));
+        setEmployees(employeesArray);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRating = (id: string, rating: number) => {
     setRatings((prev) => ({ ...prev, [id]: rating }));
@@ -135,9 +143,9 @@ export default function FeedbackPage() {
         timestamp: Date.now(),
       };
       await update(feedbackRef, feedbackData);
-      
+
       Alert.alert("Success", `Feedback for ${personName} submitted successfully!`);
-      
+
       // Clear this person's feedback after submission
       setRatings(prev => {
         const newRatings = { ...prev };
@@ -162,7 +170,7 @@ export default function FeedbackPage() {
     }
 
     setSubmitting(true);
-    
+
     try {
       const generalFeedbackRef = ref(db, `generalFeedback/${Date.now()}`);
       const feedbackData = {
@@ -170,11 +178,11 @@ export default function FeedbackPage() {
         timestamp: Date.now(),
       };
       await update(generalFeedbackRef, feedbackData);
-      
+
       Alert.alert("Success", "General feedback submitted successfully!");
       setGeneralFeedback("");
       setSubmitted(true);
-      
+
       setTimeout(() => {
         setSubmitted(false);
       }, 3000);
@@ -195,15 +203,15 @@ export default function FeedbackPage() {
   }) => (
     <View style={styles.starsContainer}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <TouchableOpacity 
-          key={star} 
+        <TouchableOpacity
+          key={star}
           onPress={() => handleRating(id, star)}
           style={styles.starButton}
         >
-          <Ionicons 
-            name={star <= currentRating ? "star" : "star-outline"} 
-            size={32} 
-            color={star <= currentRating ? "#FFB800" : "#D1D5DB"} 
+          <Ionicons
+            name={star <= currentRating ? "star" : "star-outline"}
+            size={32}
+            color={star <= currentRating ? "#FFB800" : "#D1D5DB"}
           />
         </TouchableOpacity>
       ))}
@@ -229,13 +237,13 @@ export default function FeedbackPage() {
 
   const currentList = activeTab === "official" ? officials : employees;
   const currentPositions = activeTab === "official" ? officialPositions : employeePositions;
-  
+
   // ✅ Updated Filter Logic: Checks Position AND Search Query
   const filteredList = currentList.filter(person => {
-    const matchesPosition = selectedPosition === "all categories" 
-      ? true 
+    const matchesPosition = selectedPosition === "all categories"
+      ? true
       : person.position.toLowerCase() === selectedPosition.toLowerCase();
-    
+
     const matchesSearch = person.name.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesPosition && matchesSearch;
@@ -264,9 +272,16 @@ export default function FeedbackPage() {
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
         ) : (
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#4A90E2"
+              />
+            }
           >
             {/* ✅ Search Bar */}
             <View style={styles.searchContainer}>
@@ -294,10 +309,10 @@ export default function FeedbackPage() {
                 ]}
                 onPress={() => setActiveTab("official")}
               >
-                <Ionicons 
-                  name="briefcase" 
-                  size={20} 
-                  color={activeTab === "official" ? "#4A90E2" : "#6B7280"} 
+                <Ionicons
+                  name="briefcase"
+                  size={20}
+                  color={activeTab === "official" ? "#4A90E2" : "#6B7280"}
                 />
                 <Text
                   style={[
@@ -319,10 +334,10 @@ export default function FeedbackPage() {
                 ]}
                 onPress={() => setActiveTab("employee")}
               >
-                <Ionicons 
-                  name="people" 
-                  size={20} 
-                  color={activeTab === "employee" ? "#4A90E2" : "#6B7280"} 
+                <Ionicons
+                  name="people"
+                  size={20}
+                  color={activeTab === "employee" ? "#4A90E2" : "#6B7280"}
                 />
                 <Text
                   style={[
@@ -341,8 +356,8 @@ export default function FeedbackPage() {
             {/* Position Filter */}
             <View style={styles.filterContainer}>
               <Text style={styles.filterLabel}>Filter by Position:</Text>
-              <ScrollView 
-                horizontal 
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.filterScrollView}
               >
@@ -379,7 +394,7 @@ export default function FeedbackPage() {
               <View style={styles.emptyState}>
                 <Ionicons name="search-outline" size={64} color="#D1D5DB" />
                 <Text style={styles.emptyText}>
-                  {searchQuery 
+                  {searchQuery
                     ? `No matches found for "${searchQuery}"`
                     : `No ${activeTab === "official" ? "officials" : "employees"} found for this position`
                   }
@@ -391,10 +406,10 @@ export default function FeedbackPage() {
                   {/* Person Header */}
                   <View style={styles.personHeader}>
                     <View style={styles.avatarContainer}>
-                      <Ionicons 
-                        name={activeTab === "official" ? "shield" : "person"} 
-                        size={28} 
-                        color="#4A90E2" 
+                      <Ionicons
+                        name={activeTab === "official" ? "shield" : "person"}
+                        size={28}
+                        color="#4A90E2"
                       />
                     </View>
                     <View style={styles.personInfo}>
@@ -430,9 +445,9 @@ export default function FeedbackPage() {
                       numberOfLines={3}
                       textAlignVertical="top"
                     />
-                    
+
                     {/* Individual Submit Button */}
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.individualSubmitButton}
                       onPress={() => handleSubmitIndividual(person.id, person.name, person.type)}
                     >
@@ -463,10 +478,10 @@ export default function FeedbackPage() {
                 onChangeText={setGeneralFeedback}
                 textAlignVertical="top"
               />
-              
+
               {/* General Feedback Submit Button */}
-              <TouchableOpacity 
-                style={[styles.submitButton, submitting && styles.submitButtonDisabled]} 
+              <TouchableOpacity
+                style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
                 onPress={handleSubmitGeneral}
                 disabled={submitting}
               >

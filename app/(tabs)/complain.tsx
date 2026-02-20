@@ -17,8 +17,21 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { get, onValue, push, ref, remove, set } from "firebase/database";
-import { auth, db } from "../../backend/firebaseConfig";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc
+} from "firebase/firestore";
+import { auth, firestore } from "../../backend/firebaseConfig";
 
 interface NotificationItem {
   firebaseKey?: string;
@@ -50,7 +63,7 @@ export default function App() {
   const [incidentPurok, setIncidentPurok] = useState("1");
   const [incidentLocation, setIncidentLocation] = useState("");
   const [userPurok, setUserPurok] = useState<string>("");
-  const [idStatus, setIdStatus] = useState<string>("pending");
+  const [idStatus, setIdStatus] = useState<string>("Pending");
   const [refreshing, setRefreshing] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ read: boolean; id: string; senderId: string; message: string; timestamp: string; }[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -65,9 +78,11 @@ export default function App() {
   const [viewingFeedback, setViewingFeedback] = useState<string>("");
   const [feedbackComplaintKey, setFeedbackComplaintKey] = useState<string>("");
   const [complaintFeedbacks, setComplaintFeedbacks] = useState<Record<string, string>>({});
-  
-  
-  
+
+  const isIdApproved = idStatus?.toLowerCase() === "verified" || idStatus?.toLowerCase() === "approved";
+
+
+
   const chatScrollViewRef = useRef<ScrollView>(null);
 
   // Helper to determine if a chat message should be considered "unread" for the current user.
@@ -95,50 +110,56 @@ export default function App() {
   };
 
   // ===========================
-  // Fetch User's Purok from Database
+  // Fetch User's Purok and idStatus from Firestore
   // ===========================
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+  const fetchUserData = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-      try {
-        const userRef = ref(db, `users/${user.uid}`);
-        const snapshot = await get(userRef);
+    try {
+      const userDocRef = doc(firestore, "users", user.uid);
+      const snapshot = await getDoc(userDocRef);
 
-        if (snapshot.exists()) {
-          const userData = snapshot.val();
-          setUserPurok(userData.purok || "");
-          setIdStatus(userData.idstatus || "pending");
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
+      if (snapshot.exists()) {
+        const userData = snapshot.data();
+        setUserPurok(userData.purok || "");
+        setIdStatus(userData.idstatus || "Pending");
       }
-    };
+    } catch (error) {
+      console.error("Error fetching user data from Firestore:", error);
+    }
+  };
 
+  useEffect(() => {
     fetchUserData();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchUserData();
+    // Re-triggering other fetches if necessary, 
+    // though onSnapshot handles real-time updates for complaints and feedback
+    setRefreshing(false);
+  };
+
   // ===========================
-// Fetch Feedbacks from Firebase
-// ===========================
+  // Fetch Feedbacks from Firebase
+  // ===========================
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const feedbackRef = ref(db, "complaintFeedback");
-    
-    const unsubscribe = onValue(feedbackRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const feedbacks: Record<string, string> = {};
-        Object.entries(data).forEach(([complaintKey, feedbackData]: [string, any]) => {
-          if (feedbackData.feedbackMessage) {
-            feedbacks[complaintKey] = feedbackData.feedbackMessage;
-          }
-        });
-        setComplaintFeedbacks(feedbacks);
-      }
+    const feedbackRef = collection(firestore, "complaintFeedback");
+
+    const unsubscribe = onSnapshot(feedbackRef, (snapshot) => {
+      const feedbacks: Record<string, string> = {};
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.feedbackMessage) {
+          feedbacks[doc.id] = data.feedbackMessage;
+        }
+      });
+      setComplaintFeedbacks(feedbacks);
     });
 
     return () => unsubscribe();
@@ -243,61 +264,51 @@ export default function App() {
       return;
     }
 
-    const complaintsRef = ref(db, `users/${user.uid}/userComplaints`);
-    
-    const unsubscribe = onValue(complaintsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const complaintsArray = Object.entries(data).map(([key, value]: [string, any]) => {
-          const chat = value.chat || {};
-          // Determine unread admin messages robustly
-          const hasUnreadMsg = Object.values(chat).some((msg: any) => isUnread(msg, auth.currentUser?.uid));
+    const complaintsRef = collection(firestore, "users", user.uid, "userComplaints");
+    const q = query(complaintsRef, orderBy("timestamp", "desc"));
 
-          return {
-            firebaseKey: key,
-            id: value.id || Date.now(),
-            message: value.message,
-            label: value.label,
-            type: value.type,
-            timestamp: value.timestamp,
-            purok: value.purok,
-            status: value.status,
-            incidentPurok: value.incidentPurok,
-            incidentLocation: value.incidentLocation,
-            evidencePhoto: value.evidencePhoto,
-            hasUpdate: hasUnreadMsg,
-          };
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const complaintsArray: NotificationItem[] = [];
+
+      snapshot.forEach((docSnap) => {
+        const value = docSnap.data();
+        complaintsArray.push({
+          firebaseKey: docSnap.id,
+          id: value.id || Date.now(),
+          message: value.message,
+          label: value.label,
+          type: value.type,
+          timestamp: value.timestamp instanceof Timestamp ? value.timestamp.toDate().toLocaleString() : value.timestamp,
+          purok: value.purok,
+          status: value.status,
+          incidentPurok: value.incidentPurok,
+          incidentLocation: value.incidentLocation,
+          evidencePhoto: value.evidencePhoto,
+          hasUpdate: value.hasUpdate || false,
+        });
+      });
+
+      setNotifications((prevNotifs) => {
+        const prevMap = new Map<string, NotificationItem>();
+        prevNotifs.forEach((p) => { if (p.firebaseKey) prevMap.set(p.firebaseKey, p); });
+
+        complaintsArray.forEach((c) => {
+          const fk = c.firebaseKey;
+          const statusKey = (c.status || "").toLowerCase().replace(" ", "") as "pending" | "inprogress" | "resolved";
+
+          const prev = fk ? prevMap.get(fk) : undefined;
+          if (prev && prev.status !== c.status && fk) {
+            addStatusUpdateKey(statusKey, fk);
+          }
+
+          if (c.hasUpdate && fk) {
+            addStatusUpdateKey(statusKey, fk);
+          }
         });
 
-        // Use functional update so we can compare previous notifications to detect status changes
-        setNotifications((prevNotifs) => {
-          const reversed = complaintsArray.reverse();
+        return complaintsArray;
+      });
 
-          // Build a map of previous notifications by firebaseKey for quick lookup
-          const prevMap = new Map<string, NotificationItem>();
-          prevNotifs.forEach((p) => { if (p.firebaseKey) prevMap.set(p.firebaseKey, p); });
-
-          // For each complaint, detect status change and unread messages and mark statusUpdates
-          reversed.forEach((c) => {
-            const fk = c.firebaseKey;
-            const statusKey = (c.status || "").toLowerCase().replace(" ", "") as "pending" | "inprogress" | "resolved";
-
-            const prev = fk ? prevMap.get(fk) : undefined;
-            if (prev && prev.status !== c.status && fk) {
-              addStatusUpdateKey(statusKey, fk);
-            }
-
-            // If there are unread admin messages, add to status updates for that status key
-            if (c.hasUpdate && fk) {
-              addStatusUpdateKey(statusKey, fk);
-            }
-          });
-
-          return reversed;
-        });
-      } else {
-        setNotifications([]);
-      }
       setFetchingComplaints(false);
     });
 
@@ -309,68 +320,6 @@ export default function App() {
     if (!complaint.firebaseKey) return false;
     const statusKey = (complaint.status || "").toLowerCase().replace(" ", "") as "pending" | "inprogress" | "resolved";
     return statusUpdates[statusKey]?.has(complaint.firebaseKey) || false;
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const complaintsRef = ref(db, `users/${user.uid}/userComplaints`);
-      const snapshot = await get(complaintsRef);
-
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const complaintsArray = Object.entries(data).map(([key, value]: [string, any]) => {
-          const chat = value.chat || {};
-          const hasUpdate = Object.values(chat).some((msg: any) => isUnread(msg, auth.currentUser?.uid));
-
-          return {
-            firebaseKey: key,
-            id: value.id || Date.now(),
-            message: value.message,
-            label: value.label,
-            type: value.type,
-            timestamp: value.timestamp,
-            purok: value.purok,
-            status: value.status,
-            incidentPurok: value.incidentPurok,
-            incidentLocation: value.incidentLocation,
-            evidencePhoto: value.evidencePhoto,
-            hasUpdate,
-          };
-        });
-        // Compare with previous notifications to detect status changes and add status update markers
-        setNotifications((prevNotifs) => {
-          const reversed = complaintsArray.reverse();
-          const prevMap = new Map<string, NotificationItem>();
-          prevNotifs.forEach((p) => { if (p.firebaseKey) prevMap.set(p.firebaseKey, p); });
-
-          reversed.forEach((c) => {
-            const fk = c.firebaseKey;
-            const statusKey = (c.status || "").toLowerCase().replace(" ", "") as "pending" | "inprogress" | "resolved";
-            const prev = fk ? prevMap.get(fk) : undefined;
-            if (prev && prev.status !== c.status && fk) {
-              addStatusUpdateKey(statusKey, fk);
-            }
-            if (c.hasUpdate && fk) {
-              addStatusUpdateKey(statusKey, fk);
-            }
-          });
-
-          return reversed;
-        });
-      } else {
-        setNotifications([]);
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Failed to refresh");
-    }
-
-    setRefreshing(false);
   };
 
   // ===========================
@@ -426,8 +375,13 @@ export default function App() {
         return;
       }
 
-      const complaintRef = push(ref(db, `users/${user.uid}/userComplaints`));
-      await set(complaintRef, newItem);
+      const complaintsRef = collection(firestore, "users", user.uid, "userComplaints");
+      const itemToSave = {
+        ...newItem,
+        timestamp: serverTimestamp(), // Use Firestore serverTimestamp
+      };
+
+      await addDoc(complaintsRef, itemToSave);
 
       setMessage("");
       setIncidentLocation("");
@@ -438,7 +392,7 @@ export default function App() {
       Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
-    } 
+    }
   };
 
   const openDetailModal = (complaint: NotificationItem) => {
@@ -453,34 +407,34 @@ export default function App() {
     const user = auth.currentUser;
     if (!user) return;
 
-    const chatRef = ref(db, `users/${user.uid}/userComplaints/${complaint.firebaseKey}/chat`);
+    const chatRef = collection(firestore, "users", user.uid, "userComplaints", complaint.firebaseKey, "chat");
+    const chatQuery = query(chatRef, orderBy("timestamp", "asc"));
 
-    onValue(chatRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const messagesArray = Object.entries(data).map(([key, value]: [string, any]) => ({
-          id: key,
+    const unsubscribe = onSnapshot(chatQuery, (snapshot) => {
+      const messagesArray: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const value = docSnap.data();
+        messagesArray.push({
+          id: docSnap.id,
           senderId: value.senderId,
           message: value.message,
-          timestamp: value.timestamp,
+          timestamp: value.timestamp instanceof Timestamp ? value.timestamp.toDate().toLocaleString() : value.timestamp,
           read: value.read === true || value.read === "true" ? true : false,
-        }));
-        setChatMessages(messagesArray);
-
-        // Mark all admin messages as read (use isUnread so we handle boolean/string/missing formats)
-        Object.entries(data).forEach(async ([key, value]: [string, any]) => {
-          if (value.senderId !== user.uid && isUnread(value, user.uid)) {
-            await set(ref(db, `users/${user.uid}/userComplaints/${complaint.firebaseKey}/chat/${key}/read`), true);
-          }
         });
 
-        // Auto-scroll to bottom when messages update
-        setTimeout(() => {
-          chatScrollViewRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      } else {
-        setChatMessages([]);
-      }
+        // Mark all admin messages as read
+        if (value.senderId !== user.uid && isUnread(value, user.uid)) {
+          updateDoc(doc(firestore, "users", user.uid, "userComplaints", complaint.firebaseKey!, "chat", docSnap.id), {
+            read: true
+          });
+        }
+      });
+      setChatMessages(messagesArray);
+
+      // Auto-scroll to bottom when messages update
+      setTimeout(() => {
+        chatScrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     });
 
     // Remove red notification badge for this complaint
@@ -491,6 +445,13 @@ export default function App() {
           : c
       )
     );
+
+    // Clear hasUpdate badge in Firestore
+    if (complaint.firebaseKey) {
+      updateDoc(doc(firestore, "users", user.uid, "userComplaints", complaint.firebaseKey), {
+        hasUpdate: false
+      });
+    }
 
     // Remove this complaint from statusUpdates sets (clear notification dot for its status)
     if (complaint.firebaseKey) {
@@ -523,8 +484,8 @@ export default function App() {
               const user = auth.currentUser;
               if (!user) return;
 
-              const complaintRef = ref(db, `users/${user.uid}/userComplaints/${complaint.firebaseKey}`);
-              await remove(complaintRef);
+              const complaintRef = doc(firestore, "users", user.uid, "userComplaints", complaint.firebaseKey!);
+              await deleteDoc(complaintRef);
 
               // Close modal and clear selected complaint
               setDetailModalVisible(false);
@@ -560,25 +521,18 @@ export default function App() {
     const user = auth.currentUser;
     if (!user) return;
 
-    const chatRef = push(ref(db, `users/${user.uid}/userComplaints/${selectedComplaint.firebaseKey}/chat`));
+    const chatRef = collection(firestore, "users", user.uid, "userComplaints", selectedComplaint.firebaseKey, "chat");
 
     const newMessage = {
       senderId: user.uid,
       message: text,
-      timestamp: new Date().toLocaleString(),
-      read: false, // ensure boolean false is written to Firebase
-    } as const;
+      timestamp: serverTimestamp(),
+      read: false,
+    };
 
     try {
-      // Optimistic UI update: show the message immediately
-      setChatMessages((prev) => [
-        ...prev,
-        { id: chatRef.key || String(Date.now()), senderId: newMessage.senderId, message: newMessage.message, timestamp: newMessage.timestamp, read: false },
-      ]);
-
       setChatInput("");
-
-      await set(chatRef, newMessage);
+      await addDoc(chatRef, newMessage);
 
       // Auto-scroll to bottom after sending
       setTimeout(() => {
@@ -587,12 +541,10 @@ export default function App() {
     } catch (err: any) {
       console.error("Failed to send message:", err);
       Alert.alert("Error", "Failed to send message. Please try again.");
-      // Revert optimistic update on failure
-      setChatMessages((prev) => prev.filter((m) => m.id !== (chatRef.key || "")));
     }
   };
 
-// Submit Feedback
+  // Submit Feedback
   const submitFeedback = async () => {
     if (!feedbackMessage.trim()) {
       Alert.alert("Error", "Please enter your feedback");
@@ -602,10 +554,10 @@ export default function App() {
     if (!feedbackComplaintKey) return;
 
     try {
-      const feedbackRef = ref(db, `complaintFeedback/${feedbackComplaintKey}`);
-      await set(feedbackRef, {
+      const feedbackRef = doc(firestore, "complaintFeedback", feedbackComplaintKey);
+      await setDoc(feedbackRef, {
         feedbackMessage: feedbackMessage.trim(),
-        timestamp: new Date().toLocaleString(),
+        timestamp: serverTimestamp(),
       });
 
       setFeedbackMessage("");
@@ -619,7 +571,7 @@ export default function App() {
   // Open feedback modal for sending or viewing
   const handleFeedbackAction = (complaintKey: string) => {
     setFeedbackComplaintKey(complaintKey);
-    
+
     if (complaintFeedbacks[complaintKey]) {
       // View existing feedback
       setViewingFeedback(complaintFeedbacks[complaintKey]);
@@ -657,7 +609,7 @@ export default function App() {
       // Check if any status category has updates
       return Object.values(statusUpdates).some(set => set.size > 0);
     }
-    
+
     const statusKey = status.toLowerCase().replace(" ", "") as "pending" | "inprogress" | "resolved";
     return statusUpdates[statusKey] && statusUpdates[statusKey].size > 0;
   };
@@ -666,11 +618,11 @@ export default function App() {
   // UI
   // ===========================
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}> 
-      
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+
       {/* Header */}
       <Text style={styles.header}>Complaints</Text>
-      
+
       {/* FILTER HEADER */}
       <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: 10 }}>
         {["all", "pending", "in progress", "resolved"].map((status) => {
@@ -747,93 +699,93 @@ export default function App() {
             {notifications
               .filter((n) => {
                 if (filterStatus === "all") return true;
-                
+
                 // Normalize both strings by removing ALL spaces and converting to lowercase
                 const status = (n.status || "").toLowerCase().replace(/\s+/g, "").trim();
                 const filterKey = filterStatus.toLowerCase().replace(/\s+/g, "").trim();
-                
+
                 // Handle various "in progress" formats
                 if (filterKey === "inprogress") {
-                  return status === "inprogress" || 
-                        status === "in-progress" || 
-                        status === "in_progress" ||
-                        status === "inprocess" ||
-                        status === "processing";
+                  return status === "inprogress" ||
+                    status === "in-progress" ||
+                    status === "in_progress" ||
+                    status === "inprocess" ||
+                    status === "processing";
                 }
-                
+
                 return status === filterKey;
               })
               .map((n) => (
-  <TouchableOpacity
-    key={n.id}
-    style={[
-      styles.complaintCard,
-      n.status?.toLowerCase() === "resolved" && styles.resolvedCard
-    ]}
-    onPress={() => n.status?.toLowerCase() !== "resolved" && openDetailModal(n)}
-    activeOpacity={n.status?.toLowerCase() === "resolved" ? 1 : 0.7}
-    disabled={n.status?.toLowerCase() === "resolved"}
-  >
-    {(n.hasUpdate || hasStatusUpdate(n)) && (
-      <View style={styles.updateBadge}>
-        <Text style={styles.updateText}>!</Text>
-      </View>
-    )}
+                <TouchableOpacity
+                  key={n.id}
+                  style={[
+                    styles.complaintCard,
+                    n.status?.toLowerCase() === "resolved" && styles.resolvedCard
+                  ]}
+                  onPress={() => n.status?.toLowerCase() !== "resolved" && openDetailModal(n)}
+                  activeOpacity={n.status?.toLowerCase() === "resolved" ? 1 : 0.7}
+                  disabled={n.status?.toLowerCase() === "resolved"}
+                >
+                  {(n.hasUpdate || hasStatusUpdate(n)) && (
+                    <View style={styles.updateBadge}>
+                      <Text style={styles.updateText}>!</Text>
+                    </View>
+                  )}
 
-    {/* Evidence Photo */}
-    {n.evidencePhoto && (
-      <Image 
-        source={{ uri: n.evidencePhoto }} 
-        style={[
-          styles.cardImage,
-          n.status?.toLowerCase() === "resolved" && styles.blurredImage
-        ]} 
-      />
-    )}
+                  {/* Evidence Photo */}
+                  {n.evidencePhoto && (
+                    <Image
+                      source={{ uri: n.evidencePhoto }}
+                      style={[
+                        styles.cardImage,
+                        n.status?.toLowerCase() === "resolved" && styles.blurredImage
+                      ]}
+                    />
+                  )}
 
-    {/* Header Row */}
-    <View style={styles.cardHeader}>
-      <View style={[styles.labelBadge, { backgroundColor: getLabelColor(n.label) }]}>
-        <Text style={styles.labelText}>{n.label.toUpperCase()}</Text>
-      </View>
-      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(n.status) }]}>
-        <Text style={styles.statusText}>{n.status.toUpperCase()}</Text>
-      </View>
-    </View>
+                  {/* Header Row */}
+                  <View style={styles.cardHeader}>
+                    <View style={[styles.labelBadge, { backgroundColor: getLabelColor(n.label) }]}>
+                      <Text style={styles.labelText}>{n.label.toUpperCase()}</Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(n.status) }]}>
+                      <Text style={styles.statusText}>{n.status.toUpperCase()}</Text>
+                    </View>
+                  </View>
 
-    {/* Message Preview */}
-    <Text 
-      style={[
-        styles.messagePreview,
-        n.status?.toLowerCase() === "resolved" && styles.blurredText
-      ]} 
-      numberOfLines={2}
-    >
-      {n.message}
-    </Text>
+                  {/* Message Preview */}
+                  <Text
+                    style={[
+                      styles.messagePreview,
+                      n.status?.toLowerCase() === "resolved" && styles.blurredText
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {n.message}
+                  </Text>
 
-    {/* Footer Row */}
-    <View style={styles.cardFooter}>
-      <Text style={styles.footerText}>🕒 {n.timestamp}</Text>
-    </View>
+                  {/* Footer Row */}
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.footerText}>🕒 {n.timestamp}</Text>
+                  </View>
 
-    {/* Feedback Button Overlay for Resolved Complaints */}
-    {n.status?.toLowerCase() === "resolved" && (
-      <View style={styles.feedbackOverlay}>
-        <TouchableOpacity
-          style={styles.feedbackButton}
-          onPress={() => n.firebaseKey && handleFeedbackAction(n.firebaseKey)}
-        >
-          <Text style={styles.feedbackButtonText}>
-            {n.firebaseKey && complaintFeedbacks[n.firebaseKey] 
-              ? "📝 View Feedback" 
-              : "✍️ Send Feedback"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    )}
-  </TouchableOpacity>
-))}
+                  {/* Feedback Button Overlay for Resolved Complaints */}
+                  {n.status?.toLowerCase() === "resolved" && (
+                    <View style={styles.feedbackOverlay}>
+                      <TouchableOpacity
+                        style={styles.feedbackButton}
+                        onPress={() => n.firebaseKey && handleFeedbackAction(n.firebaseKey)}
+                      >
+                        <Text style={styles.feedbackButtonText}>
+                          {n.firebaseKey && complaintFeedbacks[n.firebaseKey]
+                            ? "📝 View Feedback"
+                            : "✍️ Send Feedback"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
           </ScrollView>
         </>
       )}
@@ -842,16 +794,16 @@ export default function App() {
       <TouchableOpacity
         style={[
           styles.addButton,
-          idStatus !== "approved" && { backgroundColor: "#d1d5db" }
+          !isIdApproved && { backgroundColor: "#d1d5db" }
         ]}
-        onPress={() => idStatus === "approved" && setComplaintModalVisible(true)}
-        disabled={idStatus !== "approved"}
+        onPress={() => isIdApproved && setComplaintModalVisible(true)}
+        disabled={!isIdApproved}
       >
         <Text style={styles.addButtonText}>+ New Complaint</Text>
       </TouchableOpacity>
-      {idStatus !== "approved" && (
+      {!isIdApproved && (
         <Text style={styles.disabledMessage}>
-          You cannot submit a complaint until your ID is approved.
+          You cannot submit a complaint until your ID is verified.
         </Text>
       )}
 
@@ -864,7 +816,7 @@ export default function App() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.detailModalBox}>
-            
+
             {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Complaint Details</Text>
@@ -895,7 +847,7 @@ export default function App() {
                   <View style={{ flex: 1, marginBottom: 20 }}>
                     <Text style={styles.chatTitle}>Chat</Text>
 
-                    <ScrollView 
+                    <ScrollView
                       ref={chatScrollViewRef}
                       style={styles.chatScrollView}
                       nestedScrollEnabled={true}
@@ -1003,7 +955,7 @@ export default function App() {
                   <Text style={styles.detailValue}>🕒 {selectedComplaint.timestamp}</Text>
                 </View>
 
-                
+
 
               </ScrollView>
             )}
@@ -1086,12 +1038,12 @@ export default function App() {
               {/* Image Preview */}
               {selectedImage && (
                 <View style={styles.imagePreviewContainer}>
-                  <Image 
-                    source={{ uri: selectedImage }} 
+                  <Image
+                    source={{ uri: selectedImage }}
                     style={styles.imagePreview}
                     resizeMode="cover"
                   />
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.removeImageButton}
                     onPress={removeImage}
                   >
@@ -1101,7 +1053,7 @@ export default function App() {
               )}
 
               {/* Upload Section */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.uploadSection}
                 onPress={showImageOptions}
                 disabled={uploading}
@@ -1154,57 +1106,57 @@ export default function App() {
       </Modal>
 
       {/* FEEDBACK MODAL */}
-<Modal visible={feedbackModalVisible} transparent animationType="slide">
-  <View style={styles.modalOverlay}>
-    <View style={styles.complaintModalBox}>
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>
-          {viewingFeedback ? "Your Feedback" : "Send Feedback"}
-        </Text>
-        <TouchableOpacity
-          onPress={() => {
-            setFeedbackModalVisible(false);
-            setFeedbackMessage("");
-            setViewingFeedback("");
-          }}
-          style={styles.closeButton}
-        >
-          <Text style={styles.closeButtonText}>✕</Text>
-        </TouchableOpacity>
-      </View>
+      <Modal visible={feedbackModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.complaintModalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {viewingFeedback ? "Your Feedback" : "Send Feedback"}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setFeedbackModalVisible(false);
+                  setFeedbackMessage("");
+                  setViewingFeedback("");
+                }}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {viewingFeedback ? (
-          // View existing feedback
-          <View style={styles.feedbackViewContainer}>
-            <Text style={styles.feedbackViewText}>{viewingFeedback}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {viewingFeedback ? (
+                // View existing feedback
+                <View style={styles.feedbackViewContainer}>
+                  <Text style={styles.feedbackViewText}>{viewingFeedback}</Text>
+                </View>
+              ) : (
+                // Send new feedback
+                <>
+                  <Text style={styles.label}>Your Feedback *</Text>
+                  <TextInput
+                    style={styles.textArea}
+                    placeholder="Please share your feedback about how this complaint was handled..."
+                    value={feedbackMessage}
+                    onChangeText={setFeedbackMessage}
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                  />
+
+                  <TouchableOpacity
+                    style={styles.submitButton}
+                    onPress={submitFeedback}
+                  >
+                    <Text style={styles.submitButtonText}>Submit Feedback ➔</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </ScrollView>
           </View>
-        ) : (
-          // Send new feedback
-          <>
-            <Text style={styles.label}>Your Feedback *</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Please share your feedback about how this complaint was handled..."
-              value={feedbackMessage}
-              onChangeText={setFeedbackMessage}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={submitFeedback}
-            >
-              <Text style={styles.submitButtonText}>Submit Feedback ➔</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </ScrollView>
-    </View>
-  </View>
-</Modal>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -1539,29 +1491,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   label: {
-  fontSize: 15,
-  fontWeight: "700",
-  color: "#111827",
-  marginBottom: 6,
-  letterSpacing: 0.3,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 6,
+    letterSpacing: 0.3,
   },
   textArea: {
-  borderWidth: 2,
-  borderColor: "#6366F1",       // highlight color
-  backgroundColor: "#EEF2FF",  // soft highlight
-  borderRadius: 14,
-  padding: 14,
-  fontSize: 15,
-  color: "#1F2933",
-  minHeight: 130,
-  marginBottom: 18,
-  shadowColor: "#6366F1",
-  shadowOpacity: 0.2,
-  shadowRadius: 6,
-  elevation: 3,
+    borderWidth: 2,
+    borderColor: "#6366F1",       // highlight color
+    backgroundColor: "#EEF2FF",  // soft highlight
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    color: "#1F2933",
+    minHeight: 130,
+    marginBottom: 18,
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
 
-  
+
   // Image Preview
   imagePreviewContainer: {
     position: "relative",
@@ -1647,10 +1599,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitButtonText: {
-  fontSize: 16,
-  fontWeight: "700",
-  letterSpacing: 0.4,
-  color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    color: "#FFFFFF",
   },
 
 
@@ -1667,9 +1619,9 @@ const styles = StyleSheet.create({
     color: "#10b981",
     marginBottom: 15,
   },
-  modalText: { 
-    fontSize: 16, 
-    fontWeight: "600", 
+  modalText: {
+    fontSize: 16,
+    fontWeight: "600",
     marginBottom: 20,
     textAlign: "center",
     color: "#1f2937",
@@ -1681,27 +1633,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   pickerContainer: {
-  borderWidth: 1,
-  borderColor: "#D1D5DB",
-  borderRadius: 10,
-  backgroundColor: "#F9FAFB",
-  marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    backgroundColor: "#F9FAFB",
+    marginBottom: 14,
   },
   picker: {
-  fontSize: 14,
-  color: "#374151",
+    fontSize: 14,
+    color: "#374151",
   },
 
   input: {
-  borderWidth: 1,
-  borderColor: "#D1D5DB",
-  borderRadius: 10,
-  paddingHorizontal: 14,
-  paddingVertical: 10,
-  fontSize: 14,
-  color: "#374151",
-  backgroundColor: "#FFFFFF",
-  marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#374151",
+    backgroundColor: "#FFFFFF",
+    marginBottom: 14,
   },
 
   disabledMessage: {
@@ -1733,52 +1685,52 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   resolvedCard: {
-  opacity: 0.85,
-},
-blurredImage: {
-  opacity: 0.3,
-},
-blurredText: {
-  opacity: 0.3,
-},
-feedbackOverlay: {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: "center",
-  alignItems: "center",
-  backgroundColor: "rgba(255, 255, 255, 0.5)",
-  borderRadius: 12,
-},
-feedbackButton: {
-  backgroundColor: "#6366f1",
-  paddingHorizontal: 24,
-  paddingVertical: 12,
-  borderRadius: 10,
-  shadowColor: "#6366f1",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.3,
-  shadowRadius: 8,
-  elevation: 5,
-},
-feedbackButtonText: {
-  color: "#fff",
-  fontSize: 16,
-  fontWeight: "bold",
-},
-feedbackViewContainer: {
-  backgroundColor: "#f9fafb",
-  padding: 16,
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: "#e5e7eb",
-  minHeight: 150,
-},
-feedbackViewText: {
-  fontSize: 15,
-  color: "#1f2937",
-  lineHeight: 22,
-},
+    opacity: 0.85,
+  },
+  blurredImage: {
+    opacity: 0.3,
+  },
+  blurredText: {
+    opacity: 0.3,
+  },
+  feedbackOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    borderRadius: 12,
+  },
+  feedbackButton: {
+    backgroundColor: "#6366f1",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+    shadowColor: "#6366f1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  feedbackButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  feedbackViewContainer: {
+    backgroundColor: "#f9fafb",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    minHeight: 150,
+  },
+  feedbackViewText: {
+    fontSize: 15,
+    color: "#1f2937",
+    lineHeight: 22,
+  },
 });
