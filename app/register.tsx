@@ -1,20 +1,7 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
-import { auth, firestore } from "../backend/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   collection,
@@ -26,7 +13,20 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { auth, firestore } from "../backend/firebaseConfig";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -149,7 +149,26 @@ export default function RegisterPage() {
 
     try {
       // 1) Duplicate check BEFORE creating Auth account
-      const { exists, uniqueKey } = await checkDuplicateUser();
+      let exists = false;
+      let uniqueKey = "";
+
+      try {
+        const result = await checkDuplicateUser();
+        exists = result.exists;
+        uniqueKey = result.uniqueKey;
+      } catch (dupError: any) {
+        console.error("Duplicate Check Error:", dupError);
+        if (dupError.code === "permission-denied") {
+          Alert.alert(
+            "Permission Error",
+            "Unable to check for existing accounts. Please ensure Firestore rules allow public queries or contact support."
+          );
+        } else {
+          Alert.alert("Registration Error", "Failed to verify account uniqueness: " + dupError.message);
+        }
+        return;
+      }
+
       if (exists) {
         Alert.alert(
           "Duplicate Account",
@@ -163,31 +182,41 @@ export default function RegisterPage() {
       const user = userCredential.user;
 
       // 3) Save profile to Firestore
-      await setDoc(doc(firestore, "users", user.uid), {
-        firstName,
-        middleName: middleName || null,
-        lastName,
-        suffix: suffix || null,
+      try {
+        await setDoc(doc(firestore, "users", user.uid), {
+          firstName,
+          middleName: middleName || null,
+          lastName,
+          suffix: suffix || null,
 
-        email,
-        address: address || null,
-        purok,
-        birthday,
-        age: calculateAge(birthday),
-        number,
+          email,
+          address: address || null,
+          purok,
+          birthday,
+          age: calculateAge(birthday),
+          number,
 
-        residencyStatus, // "resident" | "tenant"
+          residencyStatus, // "resident" | "tenant"
 
-        isEmployee,
-        employeeRole: isEmployee ? employeeRole : null,
+          isEmployee,
+          employeeRole: isEmployee ? employeeRole : null,
 
-        idImage: null,
-        uniqueKey,
-        createdAt: serverTimestamp(),
-      });
+          idImage: null,
+          uniqueKey,
+          createdAt: serverTimestamp(),
+        });
+      } catch (saveError: any) {
+        console.error("Profile Save Error:", saveError);
+        Alert.alert(
+          "Profile Save Error",
+          "Auth account created, but failed to save profile data. Please contact support. Error: " + saveError.message
+        );
+        return;
+      }
 
       setModalVisible(true);
     } catch (error: any) {
+      console.error("Registration caught error:", error);
       let errorMessage = "Something went wrong";
 
       switch (error.code) {
