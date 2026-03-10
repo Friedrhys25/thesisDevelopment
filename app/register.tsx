@@ -55,27 +55,66 @@ export default function RegisterPage() {
   // NEW: Tenant / Residency
   const [residencyStatus, setResidencyStatus] = useState<"resident" | "tenant">("resident");
 
-  // NEW: Employee toggle + role
+  // NEW: Employee toggle
   const [isEmployee, setIsEmployee] = useState(false);
-  const [employeeRole, setEmployeeRole] = useState("all categories");
 
   const [modalVisible, setModalVisible] = useState(false);
-
-  const ROLE_OPTIONS = [
-    "all categories",
-    "day care services",
-    "vawc",
-    "bns",
-    "bhw",
-    "chief bantay bayan",
-    "bantay bayan",
-    "bantay bayan/utility",
-    "bantay bayan/driver",
-    "lupon tagapamayapa",
-  ];
+  const [currentStep, setCurrentStep] = useState(1); // Step tracking: 1-4
 
   // BLOCK NUMBERS ON NAME FIELDS
   const allowOnlyLetters = (text: string) => text.replace(/[^A-Za-z\s]/g, "");
+
+  // STEP VALIDATION
+  const validateStep1 = () => {
+    if (!firstName.trim() || !lastName.trim() || !birthday) {
+      Alert.alert("Missing Fields", "Please fill in First Name, Last Name, and Birthday");
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep2 = () => {
+    if (number.length !== 11 || !/^\d+$/.test(number)) {
+      Alert.alert("Invalid Contact", "Contact number must be exactly 11 digits.");
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep3 = () => {
+    if (!email || !password || !confirmPassword) {
+      Alert.alert("Missing Fields", "Please fill in Email, Password, and Confirm Password");
+      return false;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Password Mismatch", "Passwords do not match.");
+      return false;
+    }
+    if (!isPasswordStrong(password)) {
+      Alert.alert(
+        "Weak Password",
+        "Password must include:\n• At least 1 uppercase letter\n• At least 1 lowercase letter\n• At least 1 digit\n• Minimum 6 characters"
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (currentStep === 1 && validateStep1()) {
+      setCurrentStep(2);
+    } else if (currentStep === 2 && validateStep2()) {
+      setCurrentStep(3);
+    } else if (currentStep === 3 && validateStep3()) {
+      setCurrentStep(4);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
 
   // PASSWORD STRENGTH
   const isPasswordStrong = (pw: string) => {
@@ -141,12 +180,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // If employee is ON, role must be selected (safety check)
-    if (isEmployee && !employeeRole) {
-      Alert.alert("Missing Role", "Please select an employee role.");
-      return;
-    }
-
     try {
       // 1) Duplicate check BEFORE creating Auth account
       let exists = false;
@@ -199,7 +232,6 @@ export default function RegisterPage() {
           residencyStatus, // "resident" | "tenant"
 
           isEmployee,
-          employeeRole: isEmployee ? employeeRole : null,
 
           idImage: null,
           uniqueKey,
@@ -250,252 +282,340 @@ export default function RegisterPage() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join us today</Text>
+        {/* Top Banner Section */}
+        <View style={styles.bannerSection}>
+          <View style={styles.banner}>
+            <Text style={styles.appName}>Talk2Kap</Text>
+            <Text style={styles.bannerGreeting}>Create Account</Text>
+            <Text style={styles.bannerSubtitle}>Join us and start making a difference</Text>
+          </View>
+
+          {/* Tab Navigation - Inside Banner Section */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity onPress={() => router.push("/")} style={styles.tabInactive}>
+              <Text style={styles.tabInactiveText}>Log In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabActive}>
+              <Text style={styles.tabActiveText}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.formContainer}>
-          {/* PERSONAL INFO */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>First Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your first name"
-                value={firstName}
-                onChangeText={(t) => setFirstName(allowOnlyLetters(t))}
+        {/* Form Card */}
+        <View style={styles.formCard}>
+          {/* Step Counter */}
+          <View style={styles.stepCounter}>
+            <Text style={styles.stepLabel}>Step {currentStep} of 4</Text>
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  { width: `${(currentStep / 4) * 100}%` }
+                ]} 
               />
             </View>
+          </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Middle Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Optional"
-                value={middleName}
-                onChangeText={(t) => setMiddleName(allowOnlyLetters(t))}
-              />
-            </View>
+          {/* STEP 1: PERSONAL INFORMATION */}
+          {currentStep === 1 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Personal Information</Text>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Last Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your last name"
-                value={lastName}
-                onChangeText={(t) => setLastName(allowOnlyLetters(t))}
-              />
-            </View>
-
-            {/* NEW: Suffix */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Suffix</Text>
-              <View style={styles.pickerContainer}>
-                <Picker selectedValue={suffix} onValueChange={setSuffix}>
-                  <Picker.Item label="None" value="" />
-                  <Picker.Item label="Jr." value="Jr." />
-                  <Picker.Item label="Sr." value="Sr." />
-                  <Picker.Item label="II" value="II" />
-                  <Picker.Item label="III" value="III" />
-                  <Picker.Item label="IV" value="IV" />
-                  <Picker.Item label="V" value="V" />
-                </Picker>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>First Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your first name"
+                  value={firstName}
+                  onChangeText={(t) => setFirstName(allowOnlyLetters(t))}
+                />
               </View>
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Birthday *</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Middle Name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Optional"
+                  value={middleName}
+                  onChangeText={(t) => setMiddleName(allowOnlyLetters(t))}
+                />
+              </View>
 
-              <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-                <View style={styles.input}>
-                  <Text style={{ color: birthday ? "#333" : "#999" }}>
-                    {birthday || "Select your birthday"}
-                  </Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Last Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your last name"
+                  value={lastName}
+                  onChangeText={(t) => setLastName(allowOnlyLetters(t))}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Suffix</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker selectedValue={suffix} onValueChange={setSuffix}>
+                    <Picker.Item label="None" value="" />
+                    <Picker.Item label="Jr." value="Jr." />
+                    <Picker.Item label="Sr." value="Sr." />
+                    <Picker.Item label="II" value="II" />
+                    <Picker.Item label="III" value="III" />
+                    <Picker.Item label="IV" value="IV" />
+                    <Picker.Item label="V" value="V" />
+                  </Picker>
                 </View>
-              </TouchableOpacity>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={birthday ? new Date(birthday) : new Date()}
-                  mode="date"
-                  maximumDate={today}
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(false);
-
-                    if (selectedDate) {
-                      const y = selectedDate.getFullYear();
-                      const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-                      const d = String(selectedDate.getDate()).padStart(2, "0");
-                      setBirthday(`${y}-${m}-${d}`);
-                    }
-                  }}
-                />
-              )}
-            </View>
-          </View>
-
-          {/* ACCOUNT INFO */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Account Information</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Password *</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Min. 6 characters"
-                  secureTextEntry={!passwordVisible}
-                  value={password}
-                  onChangeText={setPassword}
-                />
-                <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-                  <Ionicons name={passwordVisible ? "eye-off" : "eye"} size={22} color="#555" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Confirm Password *</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Re-enter password"
-                  secureTextEntry={!confirmPasswordVisible}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                />
-                <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
-                  <Ionicons name={confirmPasswordVisible ? "eye-off" : "eye"} size={22} color="#555" />
-                </TouchableOpacity>
               </View>
 
-              {confirmPassword && password !== confirmPassword && (
-                <Text style={styles.errorText}>Passwords do not match</Text>
-              )}
-            </View>
-          </View>
-
-          {/* CONTACT INFO */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact Information</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Address</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="lot / block / street"
-                value={address}
-                onChangeText={setAddress}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Purok</Text>
-              <View style={styles.pickerContainer}>
-                <Picker selectedValue={purok} onValueChange={setPurok}>
-                  <Picker.Item label="Purok 1" value="1" />
-                  <Picker.Item label="Purok 2" value="2" />
-                  <Picker.Item label="Purok 3" value="3" />
-                  <Picker.Item label="Purok 4" value="4" />
-                  <Picker.Item label="Purok 5" value="5" />
-                  <Picker.Item label="Purok 6" value="6" />
-                </Picker>
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Contact Number</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="11-digit number"
-                keyboardType="numeric"
-                maxLength={11}
-                value={number}
-                onChangeText={(t) => setNumber(t.replace(/[^0-9]/g, ""))}
-              />
-
-              {number.length > 0 && number.length !== 11 && (
-                <Text style={styles.errorText}>Incorrect mobile format (must be 11 digits)</Text>
-              )}
-            </View>
-
-            {/* NEW: Residency status */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Tenant in Barangay?</Text>
-              <View style={styles.rowBtns}>
-                <TouchableOpacity
-                  style={[styles.smallBtn, residencyStatus === "resident" && styles.smallBtnActive]}
-                  onPress={() => setResidencyStatus("resident")}
-                >
-                  <Text style={styles.smallBtnText}>NO (Resident)</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.smallBtn, residencyStatus === "tenant" && styles.smallBtnActive]}
-                  onPress={() => setResidencyStatus("tenant")}
-                >
-                  <Text style={styles.smallBtnText}>YES (Tenant)</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* NEW: Employee switch + role dropdown */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Employee Account?</Text>
-              <View style={styles.rowBtns}>
-                <TouchableOpacity
-                  style={[styles.smallBtn, !isEmployee && styles.smallBtnActive]}
-                  onPress={() => setIsEmployee(false)}
-                >
-                  <Text style={styles.smallBtnText}>OFF</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.smallBtn, isEmployee && styles.smallBtnActive]}
-                  onPress={() => setIsEmployee(true)}
-                >
-                  <Text style={styles.smallBtnText}>ON</Text>
-                </TouchableOpacity>
-              </View>
-
-              {isEmployee && (
-                <>
-                  <Text style={[styles.inputLabel, { marginTop: 12 }]}>Employee Role</Text>
-                  <View style={styles.pickerContainer}>
-                    <Picker selectedValue={employeeRole} onValueChange={setEmployeeRole}>
-                      {ROLE_OPTIONS.map((r) => (
-                        <Picker.Item key={r} label={r} value={r} />
-                      ))}
-                    </Picker>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Birthday *</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                  <View style={styles.input}>
+                    <Text style={{ color: birthday ? "#333" : "#999" }}>
+                      {birthday || "Select your birthday"}
+                    </Text>
                   </View>
-                </>
-              )}
-            </View>
-          </View>
+                </TouchableOpacity>
 
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-            <Text style={styles.registerButtonText}>Create Account</Text>
-          </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={birthday ? new Date(birthday) : new Date()}
+                    mode="date"
+                    maximumDate={today}
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(false);
+                      if (selectedDate) {
+                        const y = selectedDate.getFullYear();
+                        const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                        const d = String(selectedDate.getDate()).padStart(2, "0");
+                        setBirthday(`${y}-${m}-${d}`);
+                      }
+                    }}
+                  />
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* STEP 2: CONTACT INFORMATION */}
+          {currentStep === 2 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Contact Information</Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Address</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="lot / block / street"
+                  value={address}
+                  onChangeText={setAddress}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Purok</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker selectedValue={purok} onValueChange={setPurok}>
+                    <Picker.Item label="Purok 1" value="1" />
+                    <Picker.Item label="Purok 2" value="2" />
+                    <Picker.Item label="Purok 3" value="3" />
+                    <Picker.Item label="Purok 4" value="4" />
+                    <Picker.Item label="Purok 5" value="5" />
+                    <Picker.Item label="Purok 6" value="6" />
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Contact Number *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="11-digit number"
+                  keyboardType="numeric"
+                  maxLength={11}
+                  value={number}
+                  onChangeText={(t) => setNumber(t.replace(/[^0-9]/g, ""))}
+                />
+                {number.length > 0 && number.length !== 11 && (
+                  <Text style={styles.errorText}>Incorrect mobile format (must be 11 digits)</Text>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Tenant in Barangay?</Text>
+                <View style={styles.rowBtns}>
+                  <TouchableOpacity
+                    style={[styles.smallBtn, residencyStatus === "resident" && styles.smallBtnActive]}
+                    onPress={() => setResidencyStatus("resident")}
+                  >
+                    <Text style={styles.smallBtnText}>NO (Resident)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.smallBtn, residencyStatus === "tenant" && styles.smallBtnActive]}
+                    onPress={() => setResidencyStatus("tenant")}
+                  >
+                    <Text style={styles.smallBtnText}>YES (Tenant)</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* STEP 3: ACCOUNT INFORMATION */}
+          {currentStep === 3 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Account Information</Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Password *</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Min. 6 characters"
+                    secureTextEntry={!passwordVisible}
+                    value={password}
+                    onChangeText={setPassword}
+                  />
+                  <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+                    <Ionicons name={passwordVisible ? "eye-off" : "eye"} size={22} color="#555" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Confirm Password *</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Re-enter password"
+                    secureTextEntry={!confirmPasswordVisible}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                  />
+                  <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
+                    <Ionicons name={confirmPasswordVisible ? "eye-off" : "eye"} size={22} color="#555" />
+                  </TouchableOpacity>
+                </View>
+
+                {confirmPassword && password !== confirmPassword && (
+                  <Text style={styles.errorText}>Passwords do not match</Text>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Employee Account?</Text>
+                <View style={styles.rowBtns}>
+                  <TouchableOpacity
+                    style={[styles.smallBtn, !isEmployee && styles.smallBtnActive]}
+                    onPress={() => setIsEmployee(false)}
+                  >
+                    <Text style={styles.smallBtnText}>OFF</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.smallBtn, isEmployee && styles.smallBtnActive]}
+                    onPress={() => setIsEmployee(true)}
+                  >
+                    <Text style={styles.smallBtnText}>ON</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* STEP 4: REVIEW & SUBMIT */}
+          {currentStep === 4 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Review Your Information</Text>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Name</Text>
+                <Text style={styles.reviewValue}>
+                  {firstName} {middleName ? middleName + " " : ""}{lastName}{suffix ? " " + suffix : ""}
+                </Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Birthday</Text>
+                <Text style={styles.reviewValue}>{birthday}</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Email</Text>
+                <Text style={styles.reviewValue}>{email}</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Address</Text>
+                <Text style={styles.reviewValue}>{address || "Not provided"}</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Contact Number</Text>
+                <Text style={styles.reviewValue}>{number}</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Purok</Text>
+                <Text style={styles.reviewValue}>Purok {purok}</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Residency Status</Text>
+                <Text style={styles.reviewValue}>
+                  {residencyStatus === "resident" ? "Resident" : "Tenant"}
+                </Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Employee Account</Text>
+                <Text style={styles.reviewValue}>{isEmployee ? "Yes" : "No"}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* NAVIGATION BUTTONS */}
+          <View style={styles.buttonRow}>
+            {currentStep > 1 && (
+              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                <Ionicons name="arrow-back" size={18} color="#4a90e2" />
+                <Text style={styles.backButtonText}>Back</Text>
+              </TouchableOpacity>
+            )}
+
+            {currentStep < 4 ? (
+              <TouchableOpacity 
+                style={[styles.nextButton, currentStep === 1 && { marginLeft: "auto" }]}
+                onPress={handleNext}
+              >
+                <Text style={styles.nextButtonText}>Next</Text>
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.submitButton, { marginLeft: "auto" }]}
+                onPress={handleRegister}
+              >
+                <Text style={styles.submitButtonText}>Create Account</Text>
+                <Ionicons name="checkmark" size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
 
           <TouchableOpacity onPress={() => router.push("/")}>
-            <Text style={styles.loginText}>
-              Already have an account? <Text style={styles.loginLink}>Log in</Text>
+            <Text style={styles.switchText}>
+              Already have an account? <Text style={styles.switchLink}>Log in</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -528,38 +648,128 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f7fa",
     paddingBottom: 40,
   },
-  header: {
+
+  // Banner Section with Tabs
+  bannerSection: {
     backgroundColor: "#4a90e2",
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    elevation: 5,
   },
-  title: { fontSize: 36, fontWeight: "bold", color: "#fff" },
-  subtitle: { fontSize: 18, color: "#e3f2fd" },
-  formContainer: { padding: 20 },
+
+  // Banner Header
+  banner: {
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 24,
+  },
+  appName: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 16,
+    opacity: 0.95,
+  },
+  bannerGreeting: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 8,
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    color: "#e3f2fd",
+    fontWeight: "500",
+  },
+
+  // Tab Navigation - Inside Banner Section
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+  },
+  tabActive: {
+    flex: 1,
+    paddingVertical: 16,
+    borderBottomWidth: 3,
+    borderBottomColor: "#4a90e2",
+    alignItems: "center",
+  },
+  tabActiveText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#333",
+  },
+  tabInactive: {
+    flex: 1,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    alignItems: "center",
+  },
+  tabInactiveText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#999",
+  },
+
+  // Form Card
+  formCard: {
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 40,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+
+  // Step Counter
+  stepCounter: {
+    marginBottom: 24,
+  },
+  stepLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4a90e2",
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: 6,
+    backgroundColor: "#4a90e2",
+    borderRadius: 3,
+  },
 
   section: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 20,
-    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
-    color: "#2c3e50",
+    color: "#333",
     marginBottom: 16,
     borderLeftWidth: 4,
     borderLeftColor: "#4a90e2",
     paddingLeft: 12,
   },
 
-  inputGroup: { marginBottom: 16 },
-  inputLabel: { fontSize: 14, fontWeight: "600", color: "#555", marginBottom: 8 },
+  inputGroup: { 
+    marginBottom: 16 
+  },
+  inputLabel: { 
+    fontSize: 13, 
+    fontWeight: "600", 
+    color: "#555", 
+    marginBottom: 8 
+  },
 
   input: {
     width: "100%",
@@ -567,8 +777,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#e0e0e0",
     borderRadius: 12,
-    backgroundColor: "#fafafa",
-    fontSize: 16,
+    backgroundColor: "#f9f9f9",
+    fontSize: 15,
     color: "#333",
   },
 
@@ -578,23 +788,32 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#e0e0e0",
     borderRadius: 12,
-    backgroundColor: "#fafafa",
+    backgroundColor: "#f9f9f9",
     paddingHorizontal: 12,
   },
-  passwordInput: { flex: 1, padding: 12, fontSize: 16 },
+  passwordInput: { 
+    flex: 1, 
+    padding: 12, 
+    fontSize: 15 
+  },
 
-  errorText: { color: "#e74c3c", fontSize: 12, marginTop: 4 },
+  errorText: { 
+    color: "#e74c3c", 
+    fontSize: 12, 
+    marginTop: 4,
+    fontWeight: "500"
+  },
 
   pickerContainer: {
     borderWidth: 1.5,
     borderColor: "#e0e0e0",
     borderRadius: 12,
-    backgroundColor: "#fafafa",
+    backgroundColor: "#f9f9f9",
   },
 
   rowBtns: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
   },
   smallBtn: {
     flex: 1,
@@ -602,26 +821,127 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: "#e0e0e0",
-    backgroundColor: "#fafafa",
+    backgroundColor: "#f9f9f9",
     alignItems: "center",
   },
   smallBtnActive: {
     borderColor: "#4a90e2",
     backgroundColor: "#e6f4fe",
   },
-  smallBtnText: { fontWeight: "700", color: "#2c3e50" },
+  smallBtnText: { 
+    fontWeight: "700", 
+    color: "#333",
+    fontSize: 13
+  },
 
-  registerButton: {
-    padding: 18,
+  // Review Section
+  reviewItem: {
+    backgroundColor: "#f9f9f9",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4a90e2",
+  },
+  reviewLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#999",
+    marginBottom: 4,
+  },
+  reviewValue: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+  },
+
+  // Button Row (Navigation)
+  buttonRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 28,
+  },
+  backButton: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#4a90e2",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  backButtonText: {
+    color: "#4a90e2",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  nextButton: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: "#4a90e2",
     alignItems: "center",
-    marginTop: 10,
+    justifyContent: "center",
+    gap: 6,
+    elevation: 3,
   },
-  registerButtonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  nextButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  submitButton: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#4caf50",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    elevation: 3,
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
 
-  loginText: { textAlign: "center", color: "#666", marginTop: 10 },
-  loginLink: { color: "#4a90e2", fontWeight: "bold" },
+  // Action Button (kept for backward compatibility)
+  actionButton: {
+    flexDirection: "row",
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "#4a90e2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 24,
+    elevation: 3,
+  },
+  actionButtonText: { 
+    color: "#fff", 
+    fontSize: 16, 
+    fontWeight: "700" 
+  },
+
+  switchText: { 
+    textAlign: "center", 
+    color: "#666", 
+    marginTop: 16,
+    fontSize: 14
+  },
+  switchLink: { 
+    color: "#4a90e2", 
+    fontWeight: "700" 
+  },
 
   modalBackground: {
     flex: 1,
@@ -645,10 +965,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  successIconText: { fontSize: 40, color: "#fff" },
+  successIconText: { 
+    fontSize: 40, 
+    color: "#fff" 
+  },
 
-  modalText: { fontSize: 22, fontWeight: "bold", marginBottom: 12 },
-  modalSubText: { textAlign: "center", color: "#666", marginBottom: 20 },
+  modalText: { 
+    fontSize: 22, 
+    fontWeight: "700", 
+    marginBottom: 12,
+    color: "#333"
+  },
+  modalSubText: { 
+    textAlign: "center", 
+    color: "#666", 
+    marginBottom: 20,
+    fontSize: 14
+  },
 
   closeButton: {
     backgroundColor: "#4a90e2",
@@ -656,5 +989,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
   },
-  closeButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  closeButtonText: { 
+    color: "#fff", 
+    fontSize: 16, 
+    fontWeight: "700" 
+  },
 });
