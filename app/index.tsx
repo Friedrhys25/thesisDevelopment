@@ -1,21 +1,21 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
-  StyleSheet,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth, firestore } from "../backend/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
