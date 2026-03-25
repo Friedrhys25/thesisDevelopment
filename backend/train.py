@@ -43,12 +43,12 @@ X_train, X_test, y_label_train, y_label_test, y_type_train, y_type_test = train_
 # === 5. Build models ===
 label_clf = Pipeline([
     ('tfidf', TfidfVectorizer(ngram_range=(1,2), min_df=2, sublinear_tf=True)),
-    ('clf', LogisticRegression(max_iter=3000, class_weight="balanced", solver="liblinear"))
+    ('clf', LogisticRegression(max_iter=3000, class_weight="balanced", solver="lbfgs"))
 ])
 
 type_clf = Pipeline([
     ('tfidf', TfidfVectorizer(ngram_range=(1,2), min_df=2, sublinear_tf=True)),
-    ('clf', LogisticRegression(max_iter=3000, class_weight="balanced", solver="liblinear"))
+    ('clf', LogisticRegression(max_iter=3000, class_weight="balanced", solver="lbfgs"))
 ])
 
 # === 6. Train models ===

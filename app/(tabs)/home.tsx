@@ -1,11 +1,12 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { get, ref } from "firebase/database";
+import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Platform,
   RefreshControl,
   StatusBar,
   StyleSheet,
@@ -15,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth, db } from "../../backend/firebaseConfig";
+import { auth, firestore } from "../../backend/firebaseConfig";
 
 const COLORS = {
   bg: "#F6F7FB",
@@ -32,7 +33,7 @@ interface Service {
   id: number;
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
-  gradient: readonly [string, string];
+  color: string;
   route: string;
   description?: string;
 }
@@ -48,11 +49,11 @@ export default function HomePage() {
   const fetchUserName = async () => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const userRef = ref(db, `users/${uid}/firstName`);
     try {
-      const snapshot = await get(userRef);
-      if (snapshot.exists()) {
-        setUserName(snapshot.val());
+      const userDocRef = doc(firestore, "users", uid);
+      const snapshot = await getDoc(userDocRef);
+      if (snapshot.exists() && snapshot.data().firstName) {
+        setUserName(snapshot.data().firstName);
       } else {
         setUserName("User");
       }
@@ -76,42 +77,42 @@ export default function HomePage() {
       {
         id: 1,
         name: "Complaints",
-        icon: "alert-circle-outline",
-        gradient: [COLORS.primary, "#7C3AED"] as const,
+        icon: "alert-circle",
+        color: "#EF4444",
         route: "/complain",
-        description: "Report issues in your barangay.",
+        description: "Report issues in the barangay",
       },
       {
         id: 2,
         name: "Emergency",
-        icon: "medical-outline",
-        gradient: ["#F97316", "#FB7185"] as const,
+        icon: "medical",
+        color: "#F97316",
         route: "/emergency",
-        description: "Get urgent help fast.",
+        description: "Get urgent help fast",
       },
       {
         id: 3,
         name: "Feedback",
-        icon: "mail-outline",
-        gradient: [COLORS.accent, "#22D3EE"] as const,
+        icon: "chatbubbles",
+        color: "#06B6D4",
         route: "/feedback",
-        description: "Share suggestions or ideas.",
+        description: "Share suggestions or ideas",
       },
       {
         id: 4,
         name: "Profile",
-        icon: "people-outline",
-        gradient: [COLORS.primaryDark, "#6366F1"] as const,
+        icon: "person",
+        color: "#6366F1",
         route: "/profile",
-        description: "View your account details.",
+        description: "View your account details",
       },
       {
         id: 5,
         name: "FAQS",
-        icon: "help-circle-outline",
-        gradient: ["#10B981", "#34D399"] as const,
+        icon: "help-circle",
+        color: "#10B981",
         route: "/FAQS",
-        description: "Find quick answers.",
+        description: "Find quick answers",
       },
     ],
     []
@@ -124,8 +125,8 @@ export default function HomePage() {
   };
 
   const parallaxTranslate = scrollY.interpolate({
-    inputRange: [0, 300],
-    outputRange: [0, 150],
+    inputRange: [-100, 0, 300],
+    outputRange: [-50, 0, 120],
     extrapolate: "clamp",
   });
 
@@ -138,7 +139,7 @@ export default function HomePage() {
       <Animated.ScrollView
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: Platform.OS !== "web" }
         )}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -163,7 +164,10 @@ export default function HomePage() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.gradientFill}
-            />
+            >
+              <View style={styles.circleOne} />
+              <View style={styles.circleTwo} />
+            </LinearGradient>
           </Animated.View>
           <View style={styles.overlay} />
           <View style={styles.headerContent}>
@@ -171,10 +175,10 @@ export default function HomePage() {
               <Text style={styles.badgeText}>Barangay Services</Text>
             </View>
             <Text style={[styles.headerText, { fontSize: headerTitleSize }]}>
-              Hello, {userName ? userName : <ActivityIndicator color="#fff" />}
+              Hello, {userName ? userName : <ActivityIndicator color="#fff" size="small" />}
             </Text>
             <Text style={styles.subtitle}>
-              Your voice matters. Connect with us anytime.
+              Your voice matters. Connect with us anytime!
             </Text>
           </View>
         </View>
@@ -193,26 +197,21 @@ export default function HomePage() {
                 ]}
                 onPressIn={() => setActiveCard(service.id)}
                 onPressOut={() => setActiveCard(null)}
+                onPress={() => handleServiceClick(service.id)}
                 activeOpacity={0.9}
               >
-                <LinearGradient
-                  colors={service.gradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.gradientCard}
-                >
-                  <Ionicons name={service.icon} size={48} color="#fff" />
-                  <Text style={styles.cardLabel}>{service.name}</Text>
+                <View style={styles.cardHeader}>
+                  <View style={[styles.iconBox, { backgroundColor: `${service.color}1A` }]}>
+                    <Ionicons name={service.icon} size={26} color={service.color} />
+                  </View>
+                  <Ionicons name="arrow-forward" size={20} color="#D1D5DB" />
+                </View>
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle}>{service.name}</Text>
                   {service.description && (
                     <Text style={styles.cardDesc}>{service.description}</Text>
                   )}
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() => handleServiceClick(service.id)}
-                  >
-                    <Text style={styles.buttonText}>Open</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -244,12 +243,30 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 26,
   },
   parallaxBackground: { ...StyleSheet.absoluteFillObject },
-  gradientFill: { flex: 1 },
+  gradientFill: { flex: 1, position: "relative", overflow: "hidden" },
+  circleOne: {
+    position: "absolute",
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    top: -60,
+    right: -60,
+  },
+  circleTwo: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    bottom: -40,
+    left: -20,
+  },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.18)" },
   headerContent: { paddingHorizontal: 18, paddingBottom: 18, paddingTop: 10 },
   badge: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.25)",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -282,39 +299,41 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    aspectRatio: 1.05,
-    borderRadius: 18,
-    overflow: "hidden",
-    marginBottom: 10,
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(229,231,235,0.6)",
     shadowColor: "#000",
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
+    justifyContent: "space-between",
+    minHeight: 140,
   },
-  gradientCard: {
-    flex: 1,
+  activeCard: { transform: [{ scale: 0.96 }] },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  iconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 18,
-    padding: 14,
   },
-  activeCard: { transform: [{ scale: 0.97 }] },
-  cardLabel: { color: "#fff", fontSize: 17, fontWeight: "800", marginTop: 8 },
+  cardBody: { marginTop: 16 },
+  cardTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 4 },
   cardDesc: {
-    color: "rgba(255,255,255,0.9)",
+    color: COLORS.muted,
     fontSize: 11,
-    textAlign: "center",
-    marginTop: 4,
+    lineHeight: 16,
+    fontWeight: "500",
   },
-  button: {
-    marginTop: 12,
-    backgroundColor: "rgba(255,255,255,0.28)",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-  },
-  buttonText: { color: "#fff", fontWeight: "800", fontSize: 13 },
 
   featureCard: {
     backgroundColor: "#EEF2FF",

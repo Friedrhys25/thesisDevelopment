@@ -6,7 +6,7 @@ import os
 import re
 from pathlib import Path
 from dotenv import load_dotenv  # type: ignore
-import google.generativeai as genai  # type: ignore
+import google.genai as genai  # type: ignore
 
 # ============================================================
 # Load .env from the SAME folder as this app.py (bulletproof)
@@ -38,8 +38,6 @@ else:
 
 if not GEMINI_API_KEY:
     print("WARNING: GEMINI_API_KEY not found. Gemini features will be disabled.")
-else:
-    genai.configure(api_key=GEMINI_API_KEY)
 
 
 # ---------------------------
@@ -138,8 +136,11 @@ Message:
 """.strip()
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resp = model.generate_content(prompt)
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        resp = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
         translated = (resp.text or "").strip()
         return translated if translated else None
     except Exception as e:
@@ -199,8 +200,11 @@ Return ONLY JSON (no markdown), exactly:
 """.strip()
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resp = model.generate_content(prompt)
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        resp = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
         cleaned = (resp.text or "").strip()
 
         if cleaned.startswith("```"):
