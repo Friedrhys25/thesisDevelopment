@@ -339,7 +339,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const API_URL = "http://192.168.233.116:5000";
+      const API_URL = "http://192.168.224.3:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",

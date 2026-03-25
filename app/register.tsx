@@ -16,6 +16,7 @@ import {
 import React, { useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -285,6 +286,11 @@ export default function RegisterPage() {
         {/* Top Banner Section */}
         <View style={styles.bannerSection}>
           <View style={styles.banner}>
+            <Image 
+              source={require("../assets/images/sanroquelogoo.png")} 
+              style={styles.logo} 
+              resizeMode="contain" 
+            />
             <Text style={styles.appName}>Talk2Kap</Text>
             <Text style={styles.bannerGreeting}>Create Account</Text>
             <Text style={styles.bannerSubtitle}>Join us and start making a difference</Text>
@@ -336,6 +342,7 @@ export default function RegisterPage() {
                 <TextInput
                   style={styles.input}
                   placeholder="Optional"
+                  placeholderTextColor="#9CA3AF"
                   value={middleName}
                   onChangeText={(t) => setMiddleName(allowOnlyLetters(t))}
                 />
@@ -370,7 +377,7 @@ export default function RegisterPage() {
                 <Text style={styles.inputLabel}>Birthday *</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(true)}>
                   <View style={styles.input}>
-                    <Text style={{ color: birthday ? "#333" : "#999" }}>
+                    <Text style={{ color: birthday ? "#1F2937" : "#9CA3AF", fontSize: 15 }}>
                       {birthday || "Select your birthday"}
                     </Text>
                   </View>
@@ -407,6 +414,7 @@ export default function RegisterPage() {
                 <TextInput
                   style={styles.input}
                   placeholder="lot / block / street"
+                  placeholderTextColor="#9CA3AF"
                   value={address}
                   onChangeText={setAddress}
                 />
@@ -431,6 +439,7 @@ export default function RegisterPage() {
                 <TextInput
                   style={styles.input}
                   placeholder="11-digit number"
+                  placeholderTextColor="#9CA3AF"
                   keyboardType="numeric"
                   maxLength={11}
                   value={number}
@@ -471,6 +480,7 @@ export default function RegisterPage() {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter your email"
+                  placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -484,12 +494,13 @@ export default function RegisterPage() {
                   <TextInput
                     style={styles.passwordInput}
                     placeholder="Min. 6 characters"
+                    placeholderTextColor="#9CA3AF"
                     secureTextEntry={!passwordVisible}
                     value={password}
                     onChangeText={setPassword}
                   />
                   <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-                    <Ionicons name={passwordVisible ? "eye-off" : "eye"} size={22} color="#555" />
+                    <Ionicons name={passwordVisible ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -500,12 +511,13 @@ export default function RegisterPage() {
                   <TextInput
                     style={styles.passwordInput}
                     placeholder="Re-enter password"
+                    placeholderTextColor="#9CA3AF"
                     secureTextEntry={!confirmPasswordVisible}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                   />
                   <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
-                    <Ionicons name={confirmPasswordVisible ? "eye-off" : "eye"} size={22} color="#555" />
+                    <Ionicons name={confirmPasswordVisible ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
                   </TouchableOpacity>
                 </View>
 
@@ -589,7 +601,7 @@ export default function RegisterPage() {
           <View style={styles.buttonRow}>
             {currentStep > 1 && (
               <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                <Ionicons name="arrow-back" size={18} color="#4a90e2" />
+                <Ionicons name="arrow-back" size={18} color="#4F46E5" />
                 <Text style={styles.backButtonText}>Back</Text>
               </TouchableOpacity>
             )}
@@ -645,106 +657,114 @@ export default function RegisterPage() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: "#f5f7fa",
+    backgroundColor: "#F3F4F6",
     paddingBottom: 40,
   },
 
-  // Banner Section with Tabs
   bannerSection: {
-    backgroundColor: "#4a90e2",
+    backgroundColor: "#4F46E5",
   },
 
-  // Banner Header
   banner: {
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 24,
+    alignItems: "center",
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
   },
   appName: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
     color: "#fff",
     marginBottom: 16,
     opacity: 0.95,
   },
   bannerGreeting: {
-    fontSize: 32,
-    fontWeight: "700",
+    fontSize: 30,
+    fontWeight: "800",
     color: "#fff",
     marginBottom: 8,
   },
   bannerSubtitle: {
     fontSize: 14,
-    color: "#e3f2fd",
+    color: "#E0E7FF",
     fontWeight: "500",
+    textAlign: "center",
+    paddingHorizontal: 20,
   },
 
-  // Tab Navigation - Inside Banner Section
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
   },
   tabActive: {
     flex: 1,
     paddingVertical: 16,
     borderBottomWidth: 3,
-    borderBottomColor: "#4a90e2",
+    borderBottomColor: "#4F46E5",
     alignItems: "center",
   },
   tabActiveText: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#333",
+    fontWeight: "800",
+    color: "#1F2937",
   },
   tabInactive: {
     flex: 1,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: "#E5E7EB",
     alignItems: "center",
   },
   tabInactiveText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#999",
+    color: "#9CA3AF",
   },
 
-  // Form Card
   formCard: {
     marginHorizontal: 16,
     marginTop: 20,
-    marginBottom: 20,
+    marginBottom: 40,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 20,
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 32,
     paddingBottom: 40,
-    elevation: 3,
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
   },
 
-  // Step Counter
   stepCounter: {
     marginBottom: 24,
   },
   stepLabel: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#4a90e2",
+    fontWeight: "800",
+    color: "#4F46E5",
     marginBottom: 8,
   },
   progressBar: {
     height: 6,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#E5E7EB",
     borderRadius: 3,
     overflow: "hidden",
   },
   progressFill: {
     height: 6,
-    backgroundColor: "#4a90e2",
+    backgroundColor: "#4F46E5",
     borderRadius: 3,
   },
 
@@ -753,11 +773,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#333",
+    fontWeight: "800",
+    color: "#1F2937",
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: "#4a90e2",
+    borderLeftColor: "#4F46E5",
     paddingLeft: 12,
   },
 
@@ -766,49 +786,55 @@ const styles = StyleSheet.create({
   },
   inputLabel: { 
     fontSize: 13, 
-    fontWeight: "600", 
-    color: "#555", 
-    marginBottom: 8 
+    fontWeight: "700", 
+    color: "#374151", 
+    marginBottom: 8,
+    marginLeft: 4,
   },
 
   input: {
     width: "100%",
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    borderRadius: 12,
-    backgroundColor: "#f9f9f9",
+    paddingHorizontal: 16,
+    height: 56,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    backgroundColor: "#F9FAFB",
     fontSize: 15,
-    color: "#333",
+    color: "#1F2937",
+    justifyContent: "center",
   },
 
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    borderRadius: 12,
-    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    backgroundColor: "#F9FAFB",
     paddingHorizontal: 12,
+    height: 56,
   },
   passwordInput: { 
     flex: 1, 
-    padding: 12, 
-    fontSize: 15 
+    fontSize: 15,
+    color: "#1F2937",
   },
 
   errorText: { 
-    color: "#e74c3c", 
+    color: "#EF4444", 
     fontSize: 12, 
     marginTop: 4,
-    fontWeight: "500"
+    fontWeight: "600",
+    marginLeft: 4,
   },
 
   pickerContainer: {
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    borderRadius: 12,
-    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    backgroundColor: "#F9FAFB",
+    overflow: "hidden",
   },
 
   rowBtns: {
@@ -817,46 +843,44 @@ const styles = StyleSheet.create({
   },
   smallBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    backgroundColor: "#f9f9f9",
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
     alignItems: "center",
   },
   smallBtnActive: {
-    borderColor: "#4a90e2",
-    backgroundColor: "#e6f4fe",
+    borderColor: "#4F46E5",
+    backgroundColor: "#EEF2FF",
   },
   smallBtnText: { 
     fontWeight: "700", 
-    color: "#333",
+    color: "#374151",
     fontSize: 13
   },
 
-  // Review Section
   reviewItem: {
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#F9FAFB",
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     borderLeftWidth: 4,
-    borderLeftColor: "#4a90e2",
+    borderLeftColor: "#4F46E5",
   },
   reviewLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#999",
+    color: "#9CA3AF",
     marginBottom: 4,
   },
   reviewValue: {
     fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
+    fontWeight: "700",
+    color: "#1F2937",
   },
 
-  // Button Row (Navigation)
   buttonRow: {
     flexDirection: "row",
     gap: 12,
@@ -865,133 +889,131 @@ const styles = StyleSheet.create({
   backButton: {
     flex: 1,
     flexDirection: "row",
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 2,
-    borderColor: "#4a90e2",
+    borderColor: "#4F46E5",
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
   backButtonText: {
-    color: "#4a90e2",
+    color: "#4F46E5",
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   nextButton: {
     flex: 1,
     flexDirection: "row",
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#4a90e2",
+    borderRadius: 16,
+    backgroundColor: "#4F46E5",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    elevation: 3,
+    shadowColor: "#4F46E5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   nextButtonText: {
     color: "#fff",
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   submitButton: {
     flex: 1,
     flexDirection: "row",
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#4caf50",
+    borderRadius: 16,
+    backgroundColor: "#10B981",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    elevation: 3,
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitButtonText: {
     color: "#fff",
     fontSize: 15,
-    fontWeight: "700",
-  },
-
-  // Action Button (kept for backward compatibility)
-  actionButton: {
-    flexDirection: "row",
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: "#4a90e2",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 24,
-    elevation: 3,
-  },
-  actionButtonText: { 
-    color: "#fff", 
-    fontSize: 16, 
-    fontWeight: "700" 
+    fontWeight: "800",
   },
 
   switchText: { 
     textAlign: "center", 
-    color: "#666", 
-    marginTop: 16,
-    fontSize: 14
+    color: "#6B7280", 
+    marginTop: 20,
+    fontSize: 14,
+    fontWeight: "500",
   },
   switchLink: { 
-    color: "#4a90e2", 
-    fontWeight: "700" 
+    color: "#4F46E5", 
+    fontWeight: "800" 
   },
 
   modalBackground: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    padding: 18,
   },
   modalBox: {
-    width: 320,
+    width: "100%",
+    maxWidth: 420,
     padding: 30,
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 22,
     alignItems: "center",
   },
   successIcon: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: "#4caf50",
+    backgroundColor: "#10B981",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
   },
   successIconText: { 
     fontSize: 40, 
-    color: "#fff" 
+    color: "#fff",
+    fontWeight: "bold",
   },
 
   modalText: { 
     fontSize: 22, 
-    fontWeight: "700", 
+    fontWeight: "800", 
     marginBottom: 12,
-    color: "#333"
+    color: "#1F2937"
   },
   modalSubText: { 
     textAlign: "center", 
-    color: "#666", 
-    marginBottom: 20,
-    fontSize: 14
+    color: "#6B7280", 
+    marginBottom: 24,
+    fontSize: 15,
+    lineHeight: 22,
   },
 
   closeButton: {
-    backgroundColor: "#4a90e2",
+    backgroundColor: "#4F46E5",
     paddingHorizontal: 40,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
+    width: "100%",
+    alignItems: "center",
   },
   closeButtonText: { 
     color: "#fff", 
     fontSize: 16, 
-    fontWeight: "700" 
+    fontWeight: "800" 
   },
 });

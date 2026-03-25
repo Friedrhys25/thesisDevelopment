@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -22,6 +23,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
 
 const handleLogin = async () => {
@@ -152,6 +154,11 @@ const handleLogin = async () => {
         {/* Top Banner Section */}
         <View style={styles.bannerSection}>
           <View style={styles.banner}>
+            <Image 
+              source={require("../assets/images/sanroquelogoo.png")} 
+              style={styles.logo} 
+              resizeMode="contain" 
+            />
             <Text style={styles.appName}>Talk2Kap</Text>
             <Text style={styles.bannerGreeting}>Hi! Welcome Back</Text>
             <Text style={styles.bannerSubtitle}>Sign in to continue enjoying your favorite features</Text>
@@ -175,7 +182,7 @@ const handleLogin = async () => {
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail" size={20} color="#4a90e2" style={styles.inputIcon} />
+              <Ionicons name="mail" size={20} color="#4F46E5" style={styles.inputIcon} />
               <TextInput
                 placeholder="Enter your email"
                 value={email}
@@ -194,7 +201,7 @@ const handleLogin = async () => {
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed" size={20} color="#4a90e2" style={styles.inputIcon} />
+              <Ionicons name="lock-closed" size={20} color="#4F46E5" style={styles.inputIcon} />
               <TextInput
                 placeholder="Enter your password"
                 value={password}
@@ -222,8 +229,12 @@ const handleLogin = async () => {
           {/* Remember Me & Forgot Password */}
           <View style={styles.bottomOptionsRow}>
             <View style={styles.rememberContainer}>
-              <TouchableOpacity style={styles.checkbox}>
-                <Ionicons name="checkbox" size={18} color="#4a90e2" />
+              <TouchableOpacity 
+                style={[styles.checkbox, rememberMe && styles.checkboxActive]}
+                onPress={() => setRememberMe(!rememberMe)}
+                activeOpacity={0.8}
+              >
+                {rememberMe && <Ionicons name="checkmark" size={16} color="#fff" />}
               </TouchableOpacity>
               <Text style={styles.rememberText}>Remember me</Text>
             </View>
@@ -238,13 +249,13 @@ const handleLogin = async () => {
             disabled={loading}
             style={[styles.actionButton, loading && styles.actionButtonDisabled]}
           >
-            <Text style={styles.actionButtonText}>
-              {loading ? "" : "Swipe to Login"}
-            </Text>
             {loading ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
+              <>
+                <Text style={styles.actionButtonText}>Log In</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </>
             )}
           </TouchableOpacity>
 
@@ -264,126 +275,133 @@ const handleLogin = async () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f7fa",
+    backgroundColor: "#F3F4F6",
   },
   scrollContent: {
     flexGrow: 1,
   },
   
-  // Banner Section with Tabs
   bannerSection: {
-    backgroundColor: "#4a90e2",
+    backgroundColor: "#4F46E5",
   },
 
-  // Banner Header
   banner: {
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 24,
+    alignItems: "center",
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
   },
   appName: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
     color: "#fff",
     marginBottom: 16,
     opacity: 0.95,
   },
   bannerGreeting: {
-    fontSize: 32,
-    fontWeight: "700",
+    fontSize: 30,
+    fontWeight: "800",
     color: "#fff",
     marginBottom: 8,
   },
   bannerSubtitle: {
     fontSize: 14,
-    color: "#e3f2fd",
+    color: "#E0E7FF",
     fontWeight: "500",
+    textAlign: "center",
+    paddingHorizontal: 20,
   },
 
-  // Tab Navigation - Inside Banner Section
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
   },
   tabActive: {
     flex: 1,
     paddingVertical: 16,
     borderBottomWidth: 3,
-    borderBottomColor: "#4a90e2",
+    borderBottomColor: "#4F46E5",
     alignItems: "center",
   },
   tabActiveText: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#333",
+    fontWeight: "800",
+    color: "#1F2937",
   },
   tabInactive: {
     flex: 1,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: "#E5E7EB",
     alignItems: "center",
   },
   tabInactiveText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#999",
+    color: "#9CA3AF",
   },
 
-  // Form Card
   formCard: {
     marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 40,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 20,
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 32,
     paddingBottom: 40,
-    elevation: 3,
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
   },
 
-  // Input Section
   inputSection: {
     marginBottom: 20,
   },
   inputLabel: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#2c3e50",
-    marginBottom: 10,
-    marginLeft: 2,
+    color: "#374151",
+    marginBottom: 8,
+    marginLeft: 4,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f9f9f9",
-    borderWidth: 1.5,
-    borderColor: "#e8e8e8",
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 52,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 56,
   },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    fontSize: 14,
-    color: "#333",
+    fontSize: 15,
+    color: "#1F2937",
     paddingVertical: 0,
   },
 
-  // Options Row (Remember Me & Forgot)
   bottomOptionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 32,
   },
   rememberContainer: {
     flexDirection: "row",
@@ -391,70 +409,71 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: "#4a90e2",
+    borderColor: "#4F46E5",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  checkboxActive: {
+    backgroundColor: "#4F46E5",
   },
   rememberText: {
     fontSize: 13,
-    color: "#555",
+    color: "#4B5563",
     fontWeight: "500",
   },
   forgotLink: {
     fontSize: 13,
-    color: "#4a90e2",
-    fontWeight: "600",
-  },
-
-  // Action Button
-  actionButton: {
-    backgroundColor: "#4a90e2",
-    borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-    shadowColor: "#4a90e2",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  actionButtonDisabled: {
-    backgroundColor: "#a8c9e8",
-    shadowOpacity: 0.15,
-  },
-  actionButtonText: {
-    flex: 1,
-    textAlign: "center",
-    color: "#fff",
-    fontSize: 15,
+    color: "#4F46E5",
     fontWeight: "700",
   },
 
-  // Sign Up Section
+  actionButton: {
+    backgroundColor: "#4F46E5",
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+    shadowColor: "#4F46E5",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  actionButtonDisabled: {
+    backgroundColor: "#A5B4FC",
+    shadowOpacity: 0.1,
+  },
+  actionButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+    marginRight: 8,
+  },
+
   signupContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 12,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    borderTopColor: "#F3F4F6",
   },
   signupBaseText: {
-    fontSize: 13,
-    color: "#666",
+    fontSize: 14,
+    color: "#6B7280",
     fontWeight: "500",
   },
   signupLinkText: {
-    fontSize: 13,
-    color: "#4a90e2",
-    fontWeight: "700",
+    fontSize: 14,
+    color: "#4F46E5",
+    fontWeight: "800",
   },
 });

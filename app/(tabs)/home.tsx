@@ -1,11 +1,11 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Platform,
   RefreshControl,
   StatusBar,
@@ -15,18 +15,19 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
 
 const COLORS = {
-  bg: "#F6F7FB",
+  bg: "#FFFFFF",
   card: "#FFFFFF",
   text: "#111827",
   muted: "#6B7280",
   border: "#E5E7EB",
-  primary: "#4F46E5",
-  primaryDark: "#4338CA",
-  accent: "#06B6D4",
+  primary: "#F16F24",
+  primaryDark: "#F16F24",
+  accent: "#FBE451",
+  danger: "#EF4444",
 };
 
 interface Service {
@@ -41,6 +42,7 @@ interface Service {
 export default function HomePage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,7 +80,7 @@ export default function HomePage() {
         id: 1,
         name: "Complaints",
         icon: "alert-circle",
-        color: "#EF4444",
+        color: COLORS.primary,
         route: "/complain",
         description: "Report issues in the barangay",
       },
@@ -86,7 +88,7 @@ export default function HomePage() {
         id: 2,
         name: "Emergency",
         icon: "medical",
-        color: "#F97316",
+        color: COLORS.danger, // Keep emergency distinct for quick recognition
         route: "/emergency",
         description: "Get urgent help fast",
       },
@@ -94,7 +96,7 @@ export default function HomePage() {
         id: 3,
         name: "Feedback",
         icon: "chatbubbles",
-        color: "#06B6D4",
+        color: COLORS.primary,
         route: "/feedback",
         description: "Share suggestions or ideas",
       },
@@ -102,7 +104,7 @@ export default function HomePage() {
         id: 4,
         name: "Profile",
         icon: "person",
-        color: "#6366F1",
+        color: COLORS.primary,
         route: "/profile",
         description: "View your account details",
       },
@@ -110,7 +112,7 @@ export default function HomePage() {
         id: 5,
         name: "FAQS",
         icon: "help-circle",
-        color: "#10B981",
+        color: COLORS.primary,
         route: "/FAQS",
         description: "Find quick answers",
       },
@@ -143,6 +145,7 @@ export default function HomePage() {
         )}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -159,15 +162,11 @@ export default function HomePage() {
               { transform: [{ translateY: parallaxTranslate }] },
             ]}
           >
-            <LinearGradient
-              colors={[COLORS.primary, "#7C3AED"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.gradientFill}
-            >
-              <View style={styles.circleOne} />
-              <View style={styles.circleTwo} />
-            </LinearGradient>
+            <Image
+              source={require("../../assets/images/sanroquelogoo.png")}
+              style={styles.parallaxLogo}
+              resizeMode="contain"
+            />
           </Animated.View>
           <View style={styles.overlay} />
           <View style={styles.headerContent}>
@@ -217,7 +216,7 @@ export default function HomePage() {
           </View>
         </View>
 
-        <View style={[styles.content, { marginTop: 20, marginBottom: 60 }]}>
+        <View style={[styles.content, { marginTop: 20 }]}>
           <View style={styles.featureCard}>
             <Text style={styles.featureIcon}>TIP</Text>
             <Text style={styles.featureTitle}>Did you know?</Text>
@@ -242,37 +241,27 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 26,
     borderBottomRightRadius: 26,
   },
-  parallaxBackground: { ...StyleSheet.absoluteFillObject },
-  gradientFill: { flex: 1, position: "relative", overflow: "hidden" },
-  circleOne: {
-    position: "absolute",
+  parallaxBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  parallaxLogo: {
     width: 250,
     height: 250,
-    borderRadius: 125,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    top: -60,
-    right: -60,
-  },
-  circleTwo: {
-    position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    bottom: -40,
-    left: -20,
   },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.18)" },
   headerContent: { paddingHorizontal: 18, paddingBottom: 18, paddingTop: 10 },
   badge: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.25)",
+    backgroundColor: COLORS.accent,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginBottom: 10,
   },
-  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+  badgeText: { color: COLORS.text, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   headerText: { color: "#fff", fontWeight: "800" },
   subtitle: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "600" },
 
@@ -336,14 +325,20 @@ const styles = StyleSheet.create({
   },
 
   featureCard: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "rgba(251, 228, 81, 0.15)",
     borderRadius: 18,
     padding: 22,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: COLORS.accent,
   },
-  featureIcon: { fontSize: 14, marginBottom: 8, letterSpacing: 2 },
+  featureIcon: {
+    fontSize: 14,
+    marginBottom: 8,
+    letterSpacing: 2,
+    color: COLORS.primary,
+    fontWeight: "800",
+  },
   featureTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text },
   featureText: {
     fontSize: 12,
