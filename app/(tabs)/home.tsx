@@ -8,6 +8,7 @@ import {
   Image,
   Platform,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -46,11 +47,15 @@ export default function HomePage() {
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const fetchUserName = async () => {
     const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
     try {
       const userDocRef = doc(firestore, "users", uid);
       const snapshot = await getDoc(userDocRef);
@@ -61,6 +66,8 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error("Error fetching user name:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -135,6 +142,48 @@ export default function HomePage() {
   const cardWidth = width >= 380 ? "48%" : "100%";
   const headerTitleSize = width >= 380 ? 24 : 20;
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.parallaxContainer}>
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: COLORS.primaryDark }]} />
+          <View style={styles.headerContent}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Barangay Services</Text>
+            </View>
+            <Skeleton style={{ width: 180, height: 28, borderRadius: 6, marginBottom: 8, backgroundColor: "rgba(255,255,255,0.4)" }} />
+            <Skeleton style={{ width: 250, height: 16, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.4)" }} />
+          </View>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
+        >
+          <View style={styles.content}>
+            <Skeleton style={{ width: 200, height: 20, borderRadius: 4, marginBottom: 8 }} />
+            <Skeleton style={{ width: 220, height: 14, borderRadius: 4, marginBottom: 16 }} />
+            <View style={styles.grid}>
+              {[1, 2, 3, 4, 5].map((idx) => (
+                <View key={idx} style={[styles.card, { width: cardWidth }]}>
+                  <View style={styles.cardHeader}>
+                    <Skeleton style={styles.iconBox} />
+                    <Skeleton style={{ width: 20, height: 20, borderRadius: 10 }} />
+                  </View>
+                  <View style={styles.cardBody}>
+                    <Skeleton style={{ width: "80%", height: 18, borderRadius: 4, marginBottom: 6 }} />
+                    <Skeleton style={{ width: "60%", height: 12, borderRadius: 4 }} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
@@ -174,7 +223,7 @@ export default function HomePage() {
               <Text style={styles.badgeText}>Barangay Services</Text>
             </View>
             <Text style={[styles.headerText, { fontSize: headerTitleSize }]}>
-              Hello, {userName ? userName : <ActivityIndicator color="#fff" size="small" />}
+              Hello, {userName}
             </Text>
             <Text style={styles.subtitle}>
               Your voice matters. Connect with us anytime!
@@ -348,3 +397,31 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+// ===============================
+// REUSABLE SKELETON COMPONENT
+// ===============================
+function Skeleton({ style }: { style: any }) {
+  const pulseAnim = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.5,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: "#E5E7EB" }]} />
+  );
+}

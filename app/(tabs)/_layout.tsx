@@ -23,11 +23,11 @@ const TAB_ITEMS = [
 ];
 
 const COLORS = {
-  active: "#2563EB",
+  active: "#F16F24",
   inactive: "#94A3B8",
   bg: "rgba(255,255,255,0.92)",
   shadow: "#000000",
-  border: "rgba(37,99,235,0.12)",
+  border: "rgba(241, 111, 36, 0.15)",
 };
 
 function CustomTabBar({ state, navigation }: any) {
@@ -207,9 +207,9 @@ const styles = StyleSheet.create({
     top: 8,
     height: 48,
     borderRadius: 16,
-    backgroundColor: "rgba(37,99,235,0.12)",
+    backgroundColor: "rgba(241, 111, 36, 0.15)",
     borderWidth: 1,
-    borderColor: "rgba(37,99,235,0.22)",
+    borderColor: "rgba(241, 111, 36, 0.25)",
   },
   tabRow: {
     flexDirection: "row",

@@ -5,10 +5,11 @@ import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
 import { ref as dbRef, get } from "firebase/database";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
   Modal,
   Pressable,
@@ -21,7 +22,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, db, firestore } from "../../backend/firebaseConfig";
 
 type UserData = {
@@ -42,13 +43,14 @@ type UserData = {
 type EditingField = "address" | "phone" | null;
 
 const COLORS = {
-  bg: "#F6F7FB",
+  bg: "#FFFFFF",
   card: "#FFFFFF",
   text: "#111827",
   muted: "#6B7280",
   border: "#E5E7EB",
-  primary: "#4F46E5", // indigo-600
-  primaryDark: "#4338CA",
+  primary: "#F16F24",
+  primaryDark: "#F16F24",
+  accent: "#FBE451",
   danger: "#EF4444",
   success: "#10B981",
   warning: "#F59E0B",
@@ -57,13 +59,12 @@ const COLORS = {
 export default function ProfilePage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [complaintsFiled, setComplaintsFiled] = useState(0);
-  const [complaintsResolved, setComplaintsResolved] = useState(0);
 
   const [isEditing, setIsEditing] = useState<EditingField>(null);
   const [editValue, setEditValue] = useState("");
@@ -84,34 +85,8 @@ export default function ProfilePage() {
     idstatus: "Pending",
   });
 
-  // ===== LOGIC (same as yours) =====
-  const fetchComplaintsStats = async () => {
-    try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) return;
-
-      const complaintsRef = dbRef(db, `users/${currentUser.uid}/userComplaints`);
-      const snapshot = await get(complaintsRef);
-      if (snapshot.exists()) {
-        const complaints = snapshot.val();
-        const allComplaints = Object.values(complaints);
-        const resolvedComplaints = allComplaints.filter(
-          (c: any) => c.status?.toLowerCase() === "resolved"
-        );
-        setComplaintsFiled(allComplaints.length);
-        setComplaintsResolved(resolvedComplaints.length);
-      } else {
-        setComplaintsFiled(0);
-        setComplaintsResolved(0);
-      }
-    } catch (error) {
-      console.error("Error fetching complaints:", error);
-    }
-  };
-
   const refreshProfile = async () => {
     setRefreshing(true);
-    await fetchComplaintsStats();
 
     const currentUser = auth.currentUser;
     if (!currentUser) return;
@@ -162,7 +137,6 @@ export default function ProfilePage() {
   useEffect(() => {
     const init = async () => {
       await refreshProfile();
-      await fetchComplaintsStats();
       setLoading(false);
     };
     init();
@@ -352,32 +326,51 @@ export default function ProfilePage() {
     ? `Purok ${userData.purok}, ${userData.address}`
     : userData.address;
 
-  const stats = useMemo(
-    () => [
-      {
-        label: "Complaints Filed",
-        value: complaintsFiled.toString(),
-        icon: "document-text-outline" as const,
-        color: COLORS.primary,
-      },
-      {
-        label: "Cases Resolved",
-        value: complaintsResolved.toString(),
-        icon: "checkmark-done-circle-outline" as const,
-        color: COLORS.success,
-      },
-    ],
-    [complaintsFiled, complaintsResolved]
-  );
-
-  const statCardWidth = width >= 380 ? "48%" : "100%";
-
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading profile...</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" />
+
+        {/* Premium Gradient Header Skeleton */}
+        <View style={styles.topHeader}>
+          <LinearGradient
+            colors={["rgba(241, 111, 36, 0.85)", "rgba(241, 111, 36, 0.95)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>My Profile</Text>
+          </View>
+          <View style={styles.headerProfile}>
+            <View style={styles.avatarWrap}>
+              <Skeleton style={[styles.avatar, { borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.4)" }]} />
+            </View>
+            <Skeleton style={{ width: 140, height: 24, borderRadius: 12, marginTop: 10, backgroundColor: "rgba(255,255,255,0.4)" }} />
+            <Skeleton style={{ width: 100, height: 14, borderRadius: 7, marginTop: 6, backgroundColor: "rgba(255,255,255,0.4)" }} />
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Personal Details Skeleton */}
+          <View style={styles.card}>
+            <Skeleton style={{ width: 140, height: 20, borderRadius: 4 }} />
+            <View style={styles.divider} />
+            {[1, 2, 3, 4].map((idx) => (
+              <View key={idx} style={styles.infoRow}>
+                <Skeleton style={styles.infoIcon} />
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Skeleton style={{ width: 50, height: 12, borderRadius: 4 }} />
+                  <Skeleton style={{ width: "80%", height: 16, borderRadius: 4 }} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -385,23 +378,26 @@ export default function ProfilePage() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
 
-      {/* Premium Gradient Header */}
-      <LinearGradient
-        colors={[COLORS.primary, "#7C3AED"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.topHeader}
-      >
+      {/* Premium Gradient Header with Blurred Avatar */}
+      <View style={styles.topHeader}>
+        <Image
+          source={
+            userData.avatar
+              ? { uri: userData.avatar }
+              : { uri: "https://via.placeholder.com/150" }
+          }
+          style={StyleSheet.absoluteFillObject}
+          blurRadius={30}
+          resizeMode="cover"
+        />
+        <LinearGradient
+          colors={["rgba(241, 111, 36, 0.85)", "rgba(241, 111, 36, 0.95)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.headerIconBtn}>
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-          </Pressable>
-
           <Text style={styles.headerTitle}>My Profile</Text>
-
-          <Pressable onPress={handleLogout} style={styles.headerIconBtn}>
-            <Ionicons name="log-out-outline" size={22} color="#fff" />
-          </Pressable>
         </View>
 
         {/* Avatar + Name inside header */}
@@ -427,10 +423,10 @@ export default function ProfilePage() {
           <Text style={styles.nameText}>{fullName}</Text>
           <Text style={styles.memberText}>Member since {userData.memberSince}</Text>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -440,26 +436,6 @@ export default function ProfilePage() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          {stats.map((s, idx) => (
-            <View key={idx} style={[styles.statCard, { width: statCardWidth }]}>
-              <View
-                style={[
-                  styles.statIcon,
-                  { backgroundColor: `${s.color}1A` },
-                ]}
-              >
-                <Ionicons name={s.icon} size={22} color={s.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.statValue}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
         {/* Personal details */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Personal Details</Text>
@@ -575,21 +551,18 @@ export default function ProfilePage() {
           )}
         </View>
 
-        <View style={{ height: 18 }} />
-
-        {/* Logout CTA */}
+        {/* Logout Button */}
         <Pressable
-          onPress={handleLogout}
           style={({ pressed }) => [
             styles.logoutBtn,
-            pressed && { opacity: 0.9 },
+            { marginTop: 10 },
+            pressed && { opacity: 0.85 },
           ]}
+          onPress={handleLogout}
         >
-          <Ionicons name="log-out-outline" size={18} color="#fff" />
+          <Ionicons name="log-out-outline" size={20} color="#fff" />
           <Text style={styles.logoutText}>Log Out</Text>
         </Pressable>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Edit Modal */}
@@ -757,23 +730,16 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     borderBottomLeftRadius: 26,
     borderBottomRightRadius: 26,
+    overflow: "hidden",
   },
   headerRow: {
     paddingHorizontal: 18,
     paddingTop: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerIconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.16)",
-    alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "800" },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
 
   headerProfile: { alignItems: "center", marginTop: 14 },
   avatarWrap: { position: "relative" },
@@ -798,36 +764,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.55)",
   },
-  nameText: { marginTop: 10, color: "#fff", fontSize: 20, fontWeight: "800" },
-  memberText: { marginTop: 2, color: "rgba(255,255,255,0.85)", fontSize: 12 },
+  nameText: { marginTop: 10, color: "#fff", fontSize: 20, fontWeight: "900" },
+  memberText: { marginTop: 2, color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "600" },
 
   scroll: { padding: 18, paddingTop: 16 },
-
-  statsRow: { flexDirection: "row", gap: 10, flexWrap: "wrap", marginBottom: 14 },
-  statCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 18,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "rgba(229,231,235,0.65)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  statIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statValue: { fontSize: 18, fontWeight: "900", color: COLORS.text },
-  statLabel: { marginTop: 2, fontSize: 12, color: COLORS.muted },
 
   card: {
     backgroundColor: COLORS.card,
@@ -837,12 +777,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(229,231,235,0.65)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text },
+  sectionTitle: { fontSize: 16, fontWeight: "900", color: COLORS.text },
   divider: { height: 1, backgroundColor: "rgba(229,231,235,0.7)", marginVertical: 12 },
 
   infoRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, gap: 12 },
@@ -854,8 +794,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  infoLabel: { fontSize: 11, color: "#9CA3AF", letterSpacing: 0.6, textTransform: "uppercase" },
-  infoValue: { marginTop: 2, fontSize: 15, fontWeight: "700", color: "#374151" },
+  infoLabel: { fontSize: 11, color: "#9CA3AF", letterSpacing: 0.6, textTransform: "uppercase", fontWeight: "800" },
+  infoValue: { marginTop: 2, fontSize: 15, fontWeight: "800", color: COLORS.text },
 
   editPill: {
     flexDirection: "row",
@@ -866,10 +806,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
   },
-  editPillText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  editPillText: { color: "#fff", fontSize: 12, fontWeight: "900" },
 
   cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  sectionTitle2: { fontSize: 16, fontWeight: "800", color: COLORS.text },
+  sectionTitle2: { fontSize: 16, fontWeight: "900", color: COLORS.text },
 
   idImage: {
     width: "100%",
@@ -890,16 +830,16 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 13, fontWeight: "900" },
 
   noticeBox: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "rgba(251, 228, 81, 0.15)",
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: COLORS.accent,
     padding: 12,
     borderRadius: 16,
     flexDirection: "row",
     gap: 10,
     alignItems: "flex-start",
   },
-  noticeText: { flex: 1, color: "#374151", lineHeight: 18, fontWeight: "600" },
+  noticeText: { flex: 1, color: COLORS.text, lineHeight: 18, fontWeight: "600" },
 
   primaryBtn: {
     backgroundColor: COLORS.primary,
@@ -909,11 +849,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 4,
   },
   primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 15 },
 
@@ -938,11 +873,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    shadowColor: COLORS.danger,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 3,
   },
   logoutText: { color: "#fff", fontWeight: "900", fontSize: 15 },
 
@@ -998,3 +928,31 @@ const styles = StyleSheet.create({
   modalDanger: { backgroundColor: COLORS.danger },
   modalConfirmText: { color: "#fff", fontWeight: "900" },
 });
+
+// ===============================
+// REUSABLE SKELETON COMPONENT
+// ===============================
+function Skeleton({ style }: { style: any }) {
+  const pulseAnim = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.5,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: "#E5E7EB" }]} />
+  );
+}

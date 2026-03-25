@@ -6,6 +6,7 @@ import {
   Alert,
   Image,
   Modal,
+  Animated,
   Platform,
   RefreshControl,
   ScrollView,
@@ -14,8 +15,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
   addDoc,
@@ -32,6 +35,20 @@ import {
   updateDoc
 } from "firebase/firestore";
 import { auth, firestore } from "../../backend/firebaseConfig";
+
+const COLORS = {
+  bg: "#FFFFFF",
+  card: "#FFFFFF",
+  text: "#111827",
+  muted: "#6B7280",
+  border: "#E5E7EB",
+  primary: "#F16F24",
+  primaryDark: "#F16F24",
+  accent: "#FBE451",
+  danger: "#EF4444",
+  success: "#10B981",
+  warning: "#F59E0B",
+};
 
 interface NotificationItem {
   firebaseKey?: string;
@@ -618,14 +635,33 @@ export default function App() {
   // UI
   // ===========================
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
+      
+      <View style={styles.topHeader}>
+        <Text style={styles.headerTitle}>My Complaints</Text>
+        <Text style={styles.headerSubtitle}>Track and manage your reports</Text>
 
-      {/* Header */}
-      <Text style={styles.header}>Complaints</Text>
+        {!fetchingComplaints && (
+          <View style={styles.headerStatsRow}>
+            <View style={styles.headerStatBox}>
+              <Text style={styles.headerStatLabel}>Total Filed</Text>
+              <Text style={styles.headerStatValue}>{notifications.length}</Text>
+            </View>
+            <View style={styles.headerStatDivider} />
+            <View style={styles.headerStatBox}>
+              <Text style={styles.headerStatLabel}>Resolved</Text>
+              <Text style={styles.headerStatValue}>
+                {notifications.filter(n => n.status?.toLowerCase() === "resolved").length}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
 
-      {/* FILTER HEADER */}
-      <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: 10 }}>
-        {["all", "pending", "in progress", "resolved"].map((status) => {
+      <View style={styles.filterWrapper}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {["all", "pending", "in progress", "resolved"].map((status) => {
           const showDot = hasFilterUpdate(status);
           const key = status.toLowerCase().replace(" ", "") as "pending" | "inprogress" | "resolved";
 
@@ -643,22 +679,16 @@ export default function App() {
                   setStatusUpdates(prev => ({ ...prev, [key]: new Set() }));
                 }
               }}
-              style={{
-                paddingVertical: 6,
-                paddingHorizontal: 12,
-                borderRadius: 20,
-                backgroundColor: filterStatus === status ? "#6366f1" : "#e5e7eb",
-                flexDirection: "row",
-                alignItems: "center",
-                position: "relative",
-              }}
+              style={[
+                styles.filterPill,
+                filterStatus === status && styles.filterPillActive
+              ]}
             >
               <Text
-                style={{
-                  color: filterStatus === status ? "#fff" : "#374151",
-                  fontWeight: "600",
-                  textTransform: "capitalize",
-                }}
+                style={[
+                  styles.filterText,
+                  filterStatus === status && styles.filterTextActive
+                ]}
               >
                 {status}
               </Text>
@@ -668,21 +698,37 @@ export default function App() {
                   width: 8,
                   height: 8,
                   borderRadius: 4,
-                  backgroundColor: "#ef4444",
+                  backgroundColor: COLORS.danger,
                   marginLeft: 6,
                 }} />
               )}
             </TouchableOpacity>
           );
         })}
+        </ScrollView>
       </View>
 
       {/* Loading State */}
       {fetchingComplaints ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366f1" />
-          <Text style={styles.loadingText}>Loading complaints...</Text>
-        </View>
+        <ScrollView 
+          style={styles.listContainer} 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={{ paddingBottom: insets.bottom + 160 }}
+        >
+          {[1, 2, 3].map((idx) => (
+            <View key={idx} style={[styles.complaintCard]}>
+              <View style={[styles.cardHeader, { marginBottom: 12 }]}>
+                <Skeleton style={{ width: 60, height: 20, borderRadius: 6 }} />
+                <Skeleton style={{ width: 60, height: 20, borderRadius: 6 }} />
+              </View>
+              <Skeleton style={{ width: "100%", height: 16, borderRadius: 4, marginBottom: 8 }} />
+              <Skeleton style={{ width: "80%", height: 16, borderRadius: 4, marginBottom: 12 }} />
+              <View style={styles.cardFooter}>
+                <Skeleton style={{ width: 100, height: 12, borderRadius: 4, marginTop: 8 }} />
+              </View>
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <>
           {/* Complaint Cards */}
@@ -691,7 +737,7 @@ export default function App() {
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 160 }}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
@@ -790,22 +836,25 @@ export default function App() {
         </>
       )}
 
-      {/* Add Complaint Button */}
-      <TouchableOpacity
-        style={[
-          styles.addButton,
-          !isIdApproved && { backgroundColor: "#d1d5db" }
-        ]}
-        onPress={() => isIdApproved && setComplaintModalVisible(true)}
-        disabled={!isIdApproved}
-      >
-        <Text style={styles.addButtonText}>+ New Complaint</Text>
-      </TouchableOpacity>
-      {!isIdApproved && (
-        <Text style={styles.disabledMessage}>
-          You cannot submit a complaint until your ID is verified.
-        </Text>
-      )}
+      {/* Add Complaint FAB */}
+      <View style={[styles.fabContainer, { bottom: Math.max(insets.bottom + 85, 90) }]}>
+        {!isIdApproved && (
+          <View style={styles.disabledTooltip}>
+            <Text style={styles.disabledMessage}>ID verification required to post</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={[
+            styles.fab,
+            !isIdApproved && { backgroundColor: COLORS.muted, shadowOpacity: 0 }
+          ]}
+          onPress={() => isIdApproved && setComplaintModalVisible(true)}
+          disabled={!isIdApproved}
+        >
+          <Ionicons name="add" size={24} color="#fff" />
+          <Text style={styles.fabText}>Report</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* DETAIL MODAL */}
       <Modal
@@ -834,7 +883,7 @@ export default function App() {
                   onPress={() => setDetailModalVisible(false)}
                   style={styles.closeButton}
                 >
-                  <Text style={styles.closeButtonText}>✕</Text>
+                  <Ionicons name="close" size={24} color={COLORS.muted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -992,7 +1041,7 @@ export default function App() {
                 }}
                 style={styles.closeButton}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Ionicons name="close" size={24} color={COLORS.muted} />
               </TouchableOpacity>
             </View>
 
@@ -1121,7 +1170,7 @@ export default function App() {
                 }}
                 style={styles.closeButton}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Ionicons name="close" size={24} color={COLORS.muted} />
               </TouchableOpacity>
             </View>
 
@@ -1166,22 +1215,58 @@ export default function App() {
 // STYLES
 // ===============================
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-    paddingTop: 0,
-    paddingHorizontal: 15,
+  safeArea: { flex: 1, backgroundColor: COLORS.bg },
+  topHeader: {
+    backgroundColor: COLORS.primary,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
   },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#1f2937",
+  headerTitle: { color: "#fff", fontSize: 24, fontWeight: "900" },
+  headerSubtitle: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "600", marginTop: 4 },
+
+  headerStatsRow: {
+    flexDirection: "row",
+    marginTop: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: "center",
   },
-  listContainer: {
-    flex: 1,
-    marginBottom: 10,
+  headerStatBox: { flex: 1, alignItems: "center" },
+  headerStatLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
+  headerStatValue: { color: "#fff", fontSize: 22, fontWeight: "900" },
+  headerStatDivider: { width: 1, height: "70%", backgroundColor: "rgba(255,255,255,0.2)" },
+
+  filterWrapper: { marginTop: 16, marginBottom: 10 },
+  filterScroll: { paddingHorizontal: 18, gap: 8 },
+  filterPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  filterPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterText: { color: COLORS.muted, fontWeight: "700", textTransform: "capitalize", fontSize: 13 },
+  filterTextActive: { color: "#fff" },
+
+  listContainer: { flex: 1, paddingHorizontal: 18 },
 
   // Loading & Empty States
   loadingContainer: {
@@ -1216,15 +1301,17 @@ const styles = StyleSheet.create({
 
   // Complaint Card Styles
   complaintCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(229,231,235,0.65)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
     position: "relative",
   },
   cardImage: {
@@ -1256,11 +1343,12 @@ const styles = StyleSheet.create({
   statusText: {
     color: "#fff",
     fontSize: 11,
-    fontWeight: "bold",
+    fontWeight: "800",
   },
   messagePreview: {
     fontSize: 15,
-    color: "#374151",
+    color: COLORS.text,
+    fontWeight: "500",
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -1278,11 +1366,11 @@ const styles = StyleSheet.create({
 
   // Detail Modal Styles
   detailModalBox: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.card,
     borderRadius: 20,
     padding: 24,
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 420,
     maxHeight: "85%",
   },
   detailImage: {
@@ -1311,28 +1399,29 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#6b7280",
+    fontWeight: "800",
+    color: COLORS.muted,
     marginBottom: 4,
     textTransform: "uppercase",
   },
   detailValue: {
     fontSize: 15,
-    color: "#1f2937",
+    color: COLORS.text,
+    fontWeight: "500",
     lineHeight: 22,
     flexWrap: 'wrap',
   },
   detailCloseButton: {
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "#F3F4F6",
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 14,
     alignItems: "center",
     marginTop: 12,
   },
   detailCloseButtonText: {
-    color: "#374151",
+    color: COLORS.text,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "800",
   },
 
   // Chat Styles
@@ -1344,10 +1433,10 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   chatTitle: {
-    fontWeight: "bold",
+    fontWeight: "800",
     fontSize: 16,
     marginBottom: 12,
-    color: "#1f2937",
+    color: COLORS.text,
   },
   chatScrollView: {
     maxHeight: 250,
@@ -1355,8 +1444,8 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   emptyChat: {
-    color: "#6b7280",
-    fontStyle: "italic",
+    color: COLORS.muted,
+    fontWeight: "500",
     textAlign: "center",
     paddingVertical: 20,
   },
@@ -1370,27 +1459,36 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   messageBubble: {
-    padding: 12,
-    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
     maxWidth: "80%",
   },
   myMessageBubble: {
-    backgroundColor: "#6366f1",
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryDark,
     borderBottomRightRadius: 4,
+    borderTopLeftRadius: 18,
+    borderBottomLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   theirMessageBubble: {
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "#F9FAFB",
+    borderColor: COLORS.border,
     borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    borderTopRightRadius: 18,
   },
   messageText: {
     fontSize: 14,
     lineHeight: 20,
+    fontWeight: "500",
   },
   myMessageText: {
     color: "#fff",
   },
   theirMessageText: {
-    color: "#374151",
+    color: COLORS.text,
   },
   messageTimestamp: {
     fontSize: 10,
@@ -1406,43 +1504,61 @@ const styles = StyleSheet.create({
   chatInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: "#fff",
+    borderColor: COLORS.border,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#F9FAFB",
     maxHeight: 100,
     fontSize: 14,
+    color: COLORS.text,
   },
   sendButton: {
-    backgroundColor: "#6366f1",
-    paddingHorizontal: 20,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
   },
   sendButtonText: {
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "800",
     fontSize: 14,
   },
 
-  addButton: {
-    backgroundColor: "#6366f1",
-    padding: 16,
-    borderRadius: 12,
+  fabContainer: {
+    position: "absolute",
+    alignSelf: "center",
     alignItems: "center",
-    marginBottom: 10,
-    shadowColor: "#6366f1",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    zIndex: 100,
   },
-  addButtonText: {
-    color: "white",
+  fab: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    gap: 6,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  fabText: {
+    color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "900",
+  },
+  disabledTooltip: {
+    backgroundColor: COLORS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
 
   // Complaint Modal
@@ -1454,11 +1570,11 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   complaintModalBox: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.card,
     borderRadius: 20,
     padding: 24,
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 420,
     maxHeight: "85%",
   },
   modalHeader: {
@@ -1469,18 +1585,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#1f2937",
+    fontWeight: "900",
+    color: COLORS.text,
   },
   closeButton: {
     padding: 5,
   },
-  closeButtonText: {
-    fontSize: 24,
-    color: "#6b7280",
-  },
   deleteButton: {
-    backgroundColor: "#ef4444",
+    backgroundColor: COLORS.danger,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1488,29 +1600,29 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "800",
   },
   label: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#111827",
+    fontWeight: "800",
+    color: COLORS.text,
     marginBottom: 6,
     letterSpacing: 0.3,
   },
   textArea: {
-    borderWidth: 2,
-    borderColor: "#6366F1",       // highlight color
-    backgroundColor: "#EEF2FF",  // soft highlight
-    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    backgroundColor: "rgba(251, 228, 81, 0.1)",
+    borderRadius: 16,
     padding: 14,
     fontSize: 15,
-    color: "#1F2933",
+    color: COLORS.text,
     minHeight: 130,
     marginBottom: 18,
-    shadowColor: "#6366F1",
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowColor: COLORS.accent,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
 
 
@@ -1525,13 +1637,13 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#6366f1",
+    borderColor: COLORS.primary,
   },
   removeImageButton: {
     position: "absolute",
     top: -10,
     right: -10,
-    backgroundColor: "#ef4444",
+    backgroundColor: COLORS.danger,
     borderRadius: 15,
     width: 30,
     height: 30,
@@ -1550,20 +1662,20 @@ const styles = StyleSheet.create({
   },
 
   uploadSection: {
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
+    borderWidth: 1,
+    borderColor: COLORS.border,
     borderStyle: "dashed",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     alignItems: "center",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F9FAFB",
     marginBottom: 20,
   },
   uploadIconContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: COLORS.border,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,
@@ -1573,42 +1685,43 @@ const styles = StyleSheet.create({
   },
   uploadText: {
     fontSize: 14,
-    color: "#6b7280",
+    color: COLORS.muted,
+    fontWeight: "600",
     marginBottom: 12,
   },
   chooseFilesButton: {
     backgroundColor: "#fff",
     paddingVertical: 8,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: COLORS.border,
     minWidth: 100,
     alignItems: "center",
   },
   chooseFilesText: {
     fontSize: 14,
-    color: "#374151",
-    fontWeight: "500",
+    color: COLORS.text,
+    fontWeight: "700",
   },
 
   submitButton: {
-    backgroundColor: "#6366f1",
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: "center",
   },
   submitButtonText: {
     fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.4,
+    fontWeight: "900",
+    letterSpacing: 0.5,
     color: "#FFFFFF",
   },
 
 
   // Success Modal
   modalBox: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.card,
     padding: 30,
     borderRadius: 20,
     width: 280,
@@ -1616,57 +1729,57 @@ const styles = StyleSheet.create({
   },
   successIcon: {
     fontSize: 50,
-    color: "#10b981",
+    color: COLORS.success,
     marginBottom: 15,
   },
   modalText: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "800",
     marginBottom: 20,
     textAlign: "center",
-    color: "#1f2937",
+    color: COLORS.text,
   },
   modalButton: {
-    backgroundColor: "#6366f1",
-    paddingVertical: 12,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
     paddingHorizontal: 40,
-    borderRadius: 10,
+    borderRadius: 14,
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 10,
+    borderColor: COLORS.border,
+    borderRadius: 16,
     backgroundColor: "#F9FAFB",
     marginBottom: 14,
   },
   picker: {
     fontSize: 14,
-    color: "#374151",
+    color: COLORS.text,
   },
 
   input: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 10,
+    borderColor: COLORS.border,
+    borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 14,
-    color: "#374151",
+    color: COLORS.text,
     backgroundColor: "#FFFFFF",
     marginBottom: 14,
   },
 
   disabledMessage: {
-    color: "#ef4444",
-    fontSize: 14,
-    marginBottom: 6,
+    color: COLORS.danger,
+    fontSize: 12,
+    fontWeight: "700",
     textAlign: "center",
   },
   updateBadge: {
     position: "absolute",
     top: 10,
     right: 10,
-    backgroundColor: "#ef4444",
+    backgroundColor: COLORS.danger,
     width: 22,
     height: 22,
     borderRadius: 11,
@@ -1682,7 +1795,7 @@ const styles = StyleSheet.create({
   updateText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: "900",
   },
   resolvedCard: {
     opacity: 0.85,
@@ -1705,11 +1818,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   feedbackButton: {
-    backgroundColor: "#6366f1",
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 10,
-    shadowColor: "#6366f1",
+    borderRadius: 14,
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1718,7 +1831,7 @@ const styles = StyleSheet.create({
   feedbackButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "900",
   },
   feedbackViewContainer: {
     backgroundColor: "#f9fafb",
@@ -1734,3 +1847,31 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
+// ===============================
+// REUSABLE SKELETON COMPONENT
+// ===============================
+function Skeleton({ style }: { style: any }) {
+  const pulseAnim = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.5,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: "#E5E7EB" }]} />
+  );
+}

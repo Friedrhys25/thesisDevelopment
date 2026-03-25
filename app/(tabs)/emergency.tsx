@@ -1,13 +1,10 @@
-﻿import { useRouter } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
   Linking,
-  PanResponder,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -18,96 +15,81 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 
-// ====== Design system copied from your ProfilePage concept ======
+// ====== Centralized App Design System ======
 const COLORS = {
-  bg: "#F6F7FB",
+  bg: "#FFFFFF",
   card: "#FFFFFF",
   text: "#111827",
   muted: "#6B7280",
   border: "#E5E7EB",
-  primary: "#4F46E5",
-  primaryDark: "#4338CA",
+  primary: "#F16F24",
+  primaryDark: "#F16F24",
+  accent: "#FBE451",
   danger: "#EF4444",
   success: "#10B981",
   warning: "#F59E0B",
 };
 
-// ===== Slider constants (your logic kept) =====
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const SLIDE_THRESHOLD = SCREEN_WIDTH * 0.55;
-const PADDING = 16 * 2;
-const BUTTON_SIZE = 50;
-const BAR_WIDTH = SCREEN_WIDTH - PADDING;
-const MAX_DRAG = BAR_WIDTH - BUTTON_SIZE - 10;
+const AnimatedIcon = Animated.createAnimatedComponent(Ionicons);
 
-// ===== Premium 911 Slide Button (design updated) =====
+// ===== Premium 911 Slide Button =====
 const Emergency911Button = () => {
   const NATIONAL_EMERGENCY_NUMBER = "911";
-  const translateX = useRef(new Animated.Value(0)).current;
-  const [busy, setBusy] = useState(false);
+  const fillAnim = useRef(new Animated.Value(0)).current;
+  const isTriggeredRef = useRef(false);
 
   const handleCall911 = () => {
-    Animated.timing(translateX, {
-      toValue: 0,
-      duration: 100,
-      useNativeDriver: false,
-    }).start();
-
     Alert.alert(
-      "Confirm Emergency Call",
+      "Confirm Call",
       `Do you want to immediately call the National Emergency Hotline (${NATIONAL_EMERGENCY_NUMBER})?`,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Cancel", style: "cancel", onPress: resetFill },
         {
           text: "Call 911",
           style: "destructive",
-          onPress: () => Linking.openURL(`tel:${NATIONAL_EMERGENCY_NUMBER}`),
+          onPress: () => {
+            Linking.openURL(`tel:${NATIONAL_EMERGENCY_NUMBER}`);
+            resetFill();
+          },
         },
       ]
     );
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: Animated.event([null, { dx: translateX }], {
-        useNativeDriver: false,
-      }),
-      onPanResponderRelease: (e, gestureState) => {
-        if (gestureState.dx > SLIDE_THRESHOLD) {
-          setBusy(true);
-          Animated.timing(translateX, {
-            toValue: MAX_DRAG,
-            duration: 150,
-            useNativeDriver: false,
-          }).start(() => {
-            setBusy(false);
-            handleCall911();
-          });
-        } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: false,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
-  const panStyle = {
-    transform: [
-      {
-        translateX: translateX.interpolate({
-          inputRange: [0, MAX_DRAG],
-          outputRange: [0, MAX_DRAG],
-          extrapolate: "clamp",
-        }),
-      },
-    ],
+  const resetFill = () => {
+    isTriggeredRef.current = false;
+    Animated.timing(fillAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
   };
+
+  const handlePressIn = () => {
+    if (isTriggeredRef.current) return;
+    Animated.timing(fillAnim, {
+      toValue: 1,
+      duration: 1500, // Time required to hold (1.5 seconds)
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) {
+        isTriggeredRef.current = true;
+        handleCall911();
+      }
+    });
+  };
+
+  const handlePressOut = () => {
+    if (!isTriggeredRef.current) {
+      resetFill();
+    }
+  };
+
+  const iconColor = fillAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [COLORS.danger, "#ffffff", "#ffffff"],
+  });
 
   return (
     <View style={styles.card}>
@@ -120,19 +102,16 @@ const Emergency911Button = () => {
 
       <View style={styles.divider} />
 
-      <View style={styles.slideTrack}>
-        <Text style={styles.slideText}>SLIDE TO CALL 911</Text>
-
-        <Animated.View
-          style={[styles.slideKnob, panStyle]}
-          {...panResponder.panHandlers}
+      <View style={styles.holdContainer}>
+        <Pressable
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={styles.holdTrack}
         >
-          {busy ? (
-            <ActivityIndicator size="small" color={COLORS.danger} />
-          ) : (
-            <Ionicons name="call" size={22} color={COLORS.danger} />
-          )}
-        </Animated.View>
+          <Animated.View style={[styles.holdFill, { transform: [{ scale: fillAnim }] }]} />
+          <AnimatedIcon name="call" size={42} style={{ color: iconColor, zIndex: 10 }} />
+        </Pressable>
+        <Text style={styles.holdText}>HOLD TO CALL 911</Text>
       </View>
 
       <Text style={styles.helperText}>
@@ -152,15 +131,14 @@ type EmergencyService = {
 };
 
 export default function EmergencyPage() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedEmergency, setSelectedEmergency] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const emergencyTypes: EmergencyService[] = [
-    { id: 1, name: "Police", icon: "shield-outline", number: "09353581020", color: "#4A90E2", description: "Crime, security threats" },
-    { id: 2, name: "Fire", icon: "flame-outline", number: "0997 298 5204", color: "#FF6B35", description: "Fire incidents, rescue" },
-    { id: 3, name: "Ambulance", icon: "medical-outline", number: "0926 532 6524", color: "#50C878", description: "Medical emergencies" },
+    { id: 1, name: "Police", icon: "shield-outline", number: "09353581020", color: "#3B82F6", description: "Crime, security threats" },
+    { id: 2, name: "Fire", icon: "flame-outline", number: "0997 298 5204", color: COLORS.primary, description: "Fire incidents, rescue" },
+    { id: 3, name: "Ambulance", icon: "medical-outline", number: "0926 532 6524", color: COLORS.success, description: "Medical emergencies" },
   ];
 
   const safetyTips = [
@@ -185,34 +163,16 @@ export default function EmergencyPage() {
   const quickDialCards = useMemo(() => emergencyTypes, []);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
 
-      {/* Gradient Header like ProfilePage */}
-      <LinearGradient
-        colors={[COLORS.primary, "#7C3AED"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.topHeader}
-      >
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.headerIconBtn}>
-            <Ionicons name="arrow-back" size={20} color="#fff" />
-          </Pressable>
-
-          <Text style={styles.headerTitle}>Emergency Services</Text>
-
-          {/* spacer to balance layout */}
-          <View style={styles.headerIconBtn} />
-        </View>
-
-        <View style={styles.headerSub}>
-          <Text style={styles.headerHeadline}>Quick help, 24/7</Text>
-          <Text style={styles.headerCaption}>
-            Call immediately or use the quick dial cards below.
-          </Text>
-        </View>
-      </LinearGradient>
+      {/* Flat App Header */}
+      <View style={styles.topHeader}>
+        <Text style={styles.headerTitle}>Emergency Services</Text>
+        <Text style={styles.headerSubtitle}>
+          Quick help, 24/7. Call immediately or use the quick dial cards below.
+        </Text>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -260,17 +220,15 @@ export default function EmergencyPage() {
                 <Text style={styles.emergencyNumber}>{service.number}</Text>
                 <Text style={styles.emergencyDesc}>{service.description}</Text>
 
-                <Pressable
-                  onPress={() => handleEmergencyCall(service)}
-                  style={({ pressed }) => [
-                    styles.primaryBtnSmall,
-                    { backgroundColor: service.color },
-                    pressed && { opacity: 0.9 },
+                <View
+                  style={[
+                    styles.callBadge,
+                    { backgroundColor: service.color }
                   ]}
                 >
                   <Ionicons name="call" size={16} color="#fff" />
-                  <Text style={styles.primaryBtnSmallText}>Call Now</Text>
-                </Pressable>
+                  <Text style={styles.callBadgeText}>Call</Text>
+                </View>
               </Pressable>
             );
           })}
@@ -316,62 +274,48 @@ const styles = StyleSheet.create({
 
   // ===== Header =====
   topHeader: {
-    paddingBottom: 18,
+    backgroundColor: COLORS.primary,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
     borderBottomLeftRadius: 26,
     borderBottomRightRadius: 26,
   },
-  headerRow: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerIconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.16)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "800" },
-  headerSub: { paddingHorizontal: 18, paddingTop: 10 },
-  headerHeadline: { color: "#fff", fontSize: 20, fontWeight: "900" },
-  headerCaption: { marginTop: 4, color: "rgba(255,255,255,0.85)", fontSize: 12 },
+  headerTitle: { color: "#fff", fontSize: 24, fontWeight: "900" },
+  headerSubtitle: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "600", marginTop: 4 },
 
-  scroll: { padding: 18, paddingTop: 16 },
+  scroll: { padding: 20, paddingTop: 16 },
 
   // ===== Cards =====
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 22,
+    padding: 20,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: "rgba(229,231,235,0.65)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
-  cardTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 10 },
-  sectionTitle2: { fontSize: 16, fontWeight: "800", color: COLORS.text },
+  cardTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: "900", color: COLORS.text, marginBottom: 12, marginTop: 4, paddingHorizontal: 4 },
+  sectionTitle2: { fontSize: 16, fontWeight: "900", color: COLORS.text },
   divider: { height: 1, backgroundColor: "rgba(229,231,235,0.7)", marginVertical: 12 },
 
   // ===== Notice box (like profile's notice) =====
   noticeBox: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "rgba(251, 228, 81, 0.15)",
     borderWidth: 1,
-    borderColor: "#C7D2FE",
-    padding: 12,
-    borderRadius: 16,
+    borderColor: COLORS.accent,
+    padding: 14,
+    borderRadius: 18,
     flexDirection: "row",
     gap: 10,
-    alignItems: "center",
-    marginBottom: 14,
+    alignItems: "flex-start",
+    marginBottom: 16,
   },
   noticeIcon: {
     width: 30,
@@ -381,7 +325,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  noticeText: { flex: 1, color: "#374151", lineHeight: 18, fontWeight: "600" },
+  noticeText: { flex: 1, color: COLORS.text, lineHeight: 18, fontWeight: "600" },
 
   // ===== Pills =====
   pillDanger: {
@@ -401,40 +345,34 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
 
-  // ===== 911 slider =====
-  slideTrack: {
-    height: 70,
-    borderRadius: 16,
-    backgroundColor: "rgba(239,68,68,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.25)",
-    overflow: "hidden",
-    justifyContent: "center",
-  },
-  slideText: {
-    alignSelf: "center",
-    color: "rgba(239,68,68,0.8)",
-    fontSize: 16,
-    fontWeight: "900",
-    letterSpacing: 1.4,
-  },
-  slideKnob: {
-    position: "absolute",
-    left: 10,
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
-    backgroundColor: "#fff",
+  // ===== 911 Hold button =====
+  holdContainer: {
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(239,68,68,0.15)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 5,
-    zIndex: 10,
+    paddingVertical: 10,
+  },
+  holdTrack: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    backgroundColor: "rgba(239, 68, 68, 0.05)",
+  },
+  holdFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.danger,
+    borderRadius: 55,
+  },
+  holdText: {
+    marginTop: 16,
+    color: COLORS.danger,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 1.5,
   },
   helperText: { marginTop: 10, color: COLORS.muted, fontWeight: "600", lineHeight: 18 },
 
@@ -444,61 +382,62 @@ const styles = StyleSheet.create({
     width: "48%",
     backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: "rgba(229,231,235,0.75)",
-    borderRadius: 18,
+    borderColor: "rgba(229,231,235,0.65)",
+    borderRadius: 20,
     padding: 14,
     marginBottom: 14,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowRadius: 8,
     elevation: 2,
     alignItems: "center",
   },
-  iconBig: { marginBottom: 8 },
-  emergencyName: { fontWeight: "800", fontSize: 15, color: COLORS.text },
-  emergencyNumber: { fontWeight: "900", fontSize: 17, color: "#374151", marginTop: 2 },
-  emergencyDesc: { color: COLORS.muted, fontSize: 12, textAlign: "center", marginVertical: 8, lineHeight: 16 },
+  iconBig: { marginBottom: 10 },
+  emergencyName: { fontWeight: "900", fontSize: 15, color: COLORS.text },
+  emergencyNumber: { fontWeight: "800", fontSize: 14, color: COLORS.muted, marginTop: 2 },
+  emergencyDesc: { color: COLORS.muted, fontSize: 11, textAlign: "center", marginVertical: 8, lineHeight: 16, fontWeight: "500" },
 
-  primaryBtnSmall: {
-    marginTop: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14,
+  callBadge: {
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
   },
-  primaryBtnSmallText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+  callBadgeText: { color: "#fff", fontWeight: "900", fontSize: 13 },
 
   // ===== Tips =====
   tipCard: {
     flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.card,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(229,231,235,0.75)",
+    borderColor: "rgba(229,231,235,0.65)",
     padding: 14,
     marginBottom: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   tipDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(241, 111, 36, 0.15)",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 10,
+    marginRight: 12,
   },
-  tipDotText: { color: "#fff", fontWeight: "900" },
-  tipTitle: { fontWeight: "800", fontSize: 15, color: COLORS.text },
-  tipDesc: { color: COLORS.muted, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  tipDotText: { color: COLORS.primary, fontWeight: "900", fontSize: 16 },
+  tipTitle: { fontWeight: "900", fontSize: 15, color: COLORS.text },
+  tipDesc: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginTop: 2, fontWeight: "500" },
 
-  noteText: { color: COLORS.muted, fontWeight: "600", lineHeight: 19 },
+  noteText: { color: COLORS.muted, fontWeight: "600", lineHeight: 20, fontSize: 13 },
 });

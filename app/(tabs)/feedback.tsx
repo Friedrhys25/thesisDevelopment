@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { get, ref, update } from "firebase/database";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -267,10 +268,31 @@ export default function FeedbackPage() {
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4A90E2" />
-            <Text style={styles.loadingText}>Loading...</Text>
-          </View>
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.searchContainer}>
+              <Skeleton style={{ width: '100%', height: 20, borderRadius: 4 }} />
+            </View>
+            <View style={styles.tabContainer}>
+               <Skeleton style={{ width: '100%', height: 40, borderRadius: 12 }} />
+            </View>
+            
+            <View style={styles.filterContainer}>
+              <Skeleton style={{ width: 120, height: 16, borderRadius: 4, marginBottom: 8 }} />
+              <Skeleton style={{ width: '100%', height: 36, borderRadius: 18 }} />
+            </View>
+            
+            {[1, 2, 3].map((idx) => (
+              <View key={idx} style={styles.personCard}>
+                <View style={styles.personHeader}>
+                  <Skeleton style={[styles.avatarContainer, { backgroundColor: '#E5E7EB', marginRight: 16 }]} />
+                  <View style={styles.personInfo}>
+                    <Skeleton style={{ width: 120, height: 20, borderRadius: 4, marginBottom: 6 }} />
+                    <Skeleton style={{ width: 80, height: 14, borderRadius: 4 }} />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
         ) : (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -862,3 +884,31 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 });
+
+// ===============================
+// REUSABLE SKELETON COMPONENT
+// ===============================
+function Skeleton({ style }: { style: any }) {
+  const pulseAnim = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.5,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: "#E5E7EB" }]} />
+  );
+}
