@@ -3,27 +3,28 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
-import { ref as dbRef, get } from "firebase/database";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { auth, db, firestore } from "../../backend/firebaseConfig";
+import { auth, firestore } from "../../backend/firebaseConfig";
 
 type UserData = {
   firstName: string;
@@ -328,11 +329,11 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" />
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
         {/* Premium Gradient Header Skeleton */}
-        <View style={styles.topHeader}>
+        <View style={[styles.topHeader, { paddingTop: insets.top }]}>
           <LinearGradient
             colors={["rgba(241, 111, 36, 0.85)", "rgba(241, 111, 36, 0.95)"]}
             start={{ x: 0, y: 0 }}
@@ -375,11 +376,11 @@ export default function ProfilePage() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Premium Gradient Header with Blurred Avatar */}
-      <View style={styles.topHeader}>
+      <View style={[styles.topHeader, { paddingTop: insets.top }]}>
         <Image
           source={
             userData.avatar
@@ -573,6 +574,7 @@ export default function ProfilePage() {
         onRequestClose={closeEditModal}
       >
         <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center", justifyContent: "center" }}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
               {isEditing === "address" ? "Edit Address" : "Edit Mobile Number"}
@@ -625,6 +627,7 @@ export default function ProfilePage() {
               </Pressable>
             </View>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -724,7 +727,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  loadingText: { marginTop: 10, color: COLORS.muted, fontSize: 15 },
+  loadingText: { marginTop: 10, color: COLORS.muted, fontSize: 16 },
 
   topHeader: {
     paddingBottom: 18,
@@ -739,7 +742,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
 
   headerProfile: { alignItems: "center", marginTop: 14 },
   avatarWrap: { position: "relative" },
@@ -764,8 +767,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.55)",
   },
-  nameText: { marginTop: 10, color: "#fff", fontSize: 20, fontWeight: "900" },
-  memberText: { marginTop: 2, color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "600" },
+  nameText: { marginTop: 10, color: "#fff", fontSize: 20, fontWeight: "700" },
+  memberText: { marginTop: 2, color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "500" },
 
   scroll: { padding: 18, paddingTop: 16 },
 
@@ -782,7 +785,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "900", color: COLORS.text },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: COLORS.text },
   divider: { height: 1, backgroundColor: "rgba(229,231,235,0.7)", marginVertical: 12 },
 
   infoRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, gap: 12 },
@@ -794,8 +797,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  infoLabel: { fontSize: 11, color: "#9CA3AF", letterSpacing: 0.6, textTransform: "uppercase", fontWeight: "800" },
-  infoValue: { marginTop: 2, fontSize: 15, fontWeight: "800", color: COLORS.text },
+  infoLabel: { fontSize: 11, color: "#9CA3AF", letterSpacing: 0.6, textTransform: "uppercase", fontWeight: "600" },
+  infoValue: { marginTop: 2, fontSize: 16, fontWeight: "500", color: COLORS.text },
 
   editPill: {
     flexDirection: "row",
@@ -806,10 +809,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
   },
-  editPillText: { color: "#fff", fontSize: 12, fontWeight: "900" },
+  editPillText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
   cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  sectionTitle2: { fontSize: 16, fontWeight: "900", color: COLORS.text },
+  sectionTitle2: { fontSize: 16, fontWeight: "700", color: COLORS.text },
 
   idImage: {
     width: "100%",
@@ -827,7 +830,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
-  statusText: { fontSize: 13, fontWeight: "900" },
+  statusText: { fontSize: 13, fontWeight: "600" },
 
   noticeBox: {
     backgroundColor: "rgba(251, 228, 81, 0.15)",
@@ -839,7 +842,7 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: "flex-start",
   },
-  noticeText: { flex: 1, color: COLORS.text, lineHeight: 18, fontWeight: "600" },
+  noticeText: { flex: 1, color: COLORS.text, lineHeight: 24, fontSize: 16, fontWeight: "500" },
 
   primaryBtn: {
     backgroundColor: COLORS.primary,
@@ -850,7 +853,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
-  primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 15 },
+  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 
   secondaryBtn: {
     paddingVertical: 12,
@@ -863,7 +866,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
-  secondaryBtnText: { color: COLORS.primary, fontWeight: "900", fontSize: 14 },
+  secondaryBtnText: { color: COLORS.primary, fontWeight: "700", fontSize: 16 },
 
   logoutBtn: {
     backgroundColor: COLORS.danger,
@@ -874,7 +877,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
-  logoutText: { color: "#fff", fontWeight: "900", fontSize: 15 },
+  logoutText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 
   modalOverlay: {
     flex: 1,
@@ -899,8 +902,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 12,
   },
-  modalTitle: { fontSize: 18, fontWeight: "900", color: COLORS.text, marginBottom: 10 },
-  modalMessage: { color: COLORS.muted, lineHeight: 20, marginBottom: 14, fontWeight: "600" },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: COLORS.text, marginBottom: 10 },
+  modalMessage: { color: COLORS.muted, lineHeight: 20, marginBottom: 14, fontWeight: "500" },
 
   input: {
     borderWidth: 1,
@@ -923,10 +926,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalCancel: { backgroundColor: "#F3F4F6" },
-  modalCancelText: { color: "#374151", fontWeight: "900" },
+  modalCancelText: { color: "#374151", fontWeight: "600" },
   modalConfirm: { backgroundColor: COLORS.primary },
   modalDanger: { backgroundColor: COLORS.danger },
-  modalConfirmText: { color: "#fff", fontWeight: "900" },
+  modalConfirmText: { color: "#fff", fontWeight: "600" },
 });
 
 // ===============================

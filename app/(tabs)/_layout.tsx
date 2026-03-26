@@ -1,23 +1,21 @@
-import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  Animated,
-  Platform,
+    Animated,
+    Platform,
+    Pressable,
+    StyleSheet,
+    useWindowDimensions,
+    View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 
 const TAB_ITEMS = [
   { name: "home", icon: "home-outline", active: "home", label: "Home" },
   { name: "complain", icon: "alert-circle-outline", active: "alert-circle", label: "Complain" },
   { name: "emergency", icon: "medical-outline", active: "medical", label: "Emergency" },
-  { name: "feedback", icon: "chatbubble-outline", active: "chatbubble", label: "Feedback" },
   { name: "FAQS", icon: "help-circle-outline", active: "help-circle", label: "FAQs" },
   { name: "profile", icon: "person-outline", active: "person", label: "Profile" },
 ];
@@ -175,7 +173,6 @@ export default function RootLayout() {
       <Tabs.Screen name="home" options={{ title: "Home" }} />
       <Tabs.Screen name="complain" options={{ title: "Complain" }} />
       <Tabs.Screen name="emergency" options={{ title: "Emergency" }} />
-      <Tabs.Screen name="feedback" options={{ title: "Feedback" }} />
       <Tabs.Screen name="FAQS" options={{ title: "FAQs" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>

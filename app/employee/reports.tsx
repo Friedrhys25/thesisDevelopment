@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     color: "#555",
   },
   categoryValue: {

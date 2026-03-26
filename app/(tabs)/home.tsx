@@ -3,18 +3,17 @@ import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  Image,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    Animated,
+    Image,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
@@ -100,14 +99,6 @@ export default function HomePage() {
         description: "Get urgent help fast",
       },
       {
-        id: 3,
-        name: "Feedback",
-        icon: "chatbubbles",
-        color: COLORS.primary,
-        route: "/feedback",
-        description: "Share suggestions or ideas",
-      },
-      {
         id: 4,
         name: "Profile",
         icon: "person",
@@ -144,9 +135,9 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" />
-        <View style={styles.parallaxContainer}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <View style={[styles.parallaxContainer, { paddingTop: insets.top }]}>
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: COLORS.primaryDark }]} />
           <View style={styles.headerContent}>
             <View style={styles.badge}>
@@ -185,8 +176,8 @@ export default function HomePage() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <Animated.ScrollView
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -204,7 +195,7 @@ export default function HomePage() {
           />
         }
       >
-        <View style={styles.parallaxContainer}>
+        <View style={[styles.parallaxContainer, { paddingTop: insets.top }]}>
           <Animated.View
             style={[
               styles.parallaxBackground,
@@ -312,7 +303,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: COLORS.text, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   headerText: { color: "#fff", fontWeight: "800" },
-  subtitle: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "600" },
+  subtitle: { color: "rgba(255,255,255,0.9)", fontSize: 16, fontWeight: "600" },
 
   content: {
     backgroundColor: COLORS.card,
@@ -329,7 +320,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
-  sectionSubtitle: { fontSize: 12, color: COLORS.muted, marginBottom: 16 },
+  sectionSubtitle: { fontSize: 16, color: COLORS.muted, marginBottom: 16 },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -368,8 +359,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 4 },
   cardDesc: {
     color: COLORS.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: "500",
   },
 
@@ -390,11 +381,11 @@ const styles = StyleSheet.create({
   },
   featureTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text },
   featureText: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#4B5563",
     textAlign: "center",
     marginTop: 6,
-    lineHeight: 18,
+    lineHeight: 20,
   },
 });
 

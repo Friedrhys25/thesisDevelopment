@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     color: "#2c3e50",
   },
   settingDesc: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#999",
     marginTop: 4,
   },
@@ -296,12 +296,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   aboutLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     color: "#555",
   },
   aboutValue: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#2c3e50",
   },
   dangerButton: {

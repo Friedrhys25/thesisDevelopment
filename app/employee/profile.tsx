@@ -223,12 +223,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     color: "#555",
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#2c3e50",
     fontWeight: "500",
   },

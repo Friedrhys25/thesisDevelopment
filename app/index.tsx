@@ -2,20 +2,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../backend/firebaseConfig";
 
 export default function LoginPage() {
@@ -25,6 +27,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
 const handleLogin = async () => {
   if (!email || !password) {
@@ -142,10 +145,12 @@ const handleLogin = async () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+    <>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -153,7 +158,7 @@ const handleLogin = async () => {
       >
         {/* Top Banner Section */}
         <View style={styles.bannerSection}>
-          <View style={styles.banner}>
+          <View style={[styles.banner, { paddingTop: insets.top + 20 }]}>
             <Image 
               source={require("../assets/images/sanroquelogoo.png")} 
               style={styles.logo} 
@@ -269,6 +274,7 @@ const handleLogin = async () => {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </>
   );
 }
 
@@ -312,11 +318,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   bannerSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#E0E7FF",
     fontWeight: "500",
     textAlign: "center",
     paddingHorizontal: 20,
+    lineHeight: 24,
   },
 
   tabContainer: {
@@ -392,7 +399,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: "#1F2937",
     paddingVertical: 0,
   },
@@ -422,12 +429,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#4F46E5",
   },
   rememberText: {
-    fontSize: 13,
+    fontSize: 15,
     color: "#4B5563",
     fontWeight: "500",
   },
   forgotLink: {
-    fontSize: 13,
+    fontSize: 15,
     color: "#4F46E5",
     fontWeight: "700",
   },

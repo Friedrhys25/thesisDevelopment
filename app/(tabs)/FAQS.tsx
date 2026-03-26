@@ -2,26 +2,43 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  LayoutAnimation,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  UIManager,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    LayoutAnimation,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    UIManager,
+    View
 } from "react-native";
 // Import the Google Gen AI SDK
 import { GoogleGenAI } from '@google/genai';
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+const COLORS = {
+  bg: "#FFFFFF",
+  card: "#FFFFFF",
+  text: "#111827",
+  muted: "#6B7280",
+  border: "#E5E7EB",
+  primary: "#F16F24", // Adjusted to match complain.tsx primary
+  primaryDark: "#F16F24",
+  accent: "#FBE451",
+  danger: "#EF4444",
+  success: "#10B981",
+  warning: "#F59E0B",
+  secondaryBg: "#F9FAFB",
+};
 
 // --- Configuration ---
 // !!! IMPORTANT: REPLACE THIS WITH YOUR ACTUAL GEMINI API KEY !!!
@@ -50,15 +67,9 @@ const faqs = [
 
 /**
  * GEMINI API Function: Generates a response strictly based on the provided FAQs.
- * @param userQuestion The question sent by the user.
- * @param faqsList The list of all available FAQs.
- * @returns A promise that resolves to the bot's response string.
  */
 const fetchChatbotResponse = async (userQuestion: string): Promise<string> => {
-  // 1. Format the FAQs into a single reference text
   const faqContext = faqs.map(item => `Q: ${item.q}\nA: ${item.a}`).join('\n---\n');
-
-  // 2. Define the System Instruction for strict constraint
   const systemInstruction = `You are a helpful and constrained FAQ chatbot for the Barangay Feedback System. Your SOLE source of information is the following list of Frequently Asked Questions (FAQs). You MUST only answer questions based on the content of these FAQs. If the user asks a question that is not covered in the FAQs, you MUST respond with the following exact sentence: "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below."
 
     Available FAQs:
@@ -66,23 +77,19 @@ const fetchChatbotResponse = async (userQuestion: string): Promise<string> => {
     ${faqContext}
     ---`;
 
-  // 3. Construct the API call
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: userQuestion,
       config: {
         systemInstruction: systemInstruction,
-        // Optional: Reduce randomness to make responses more factual/lookup-based
         temperature: 0.1,
       }
     });
 
-    // 4. Return the model's text response
     return response.text || "Unable to generate a response. Please try again.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    // Fallback response for API errors
     return "Sorry, I ran into an error while connecting to the help service. Please check your API key or network connection and try again.";
   }
 };
@@ -123,7 +130,6 @@ export default function FAQPage() {
 
     // 2. Fetch bot response (Live Gemini API Call)
     try {
-      // Pass the user question and the FAQs list to the API wrapper
       const botResponse = await fetchChatbotResponse(userMessage);
       setMessages(prev => [
         ...prev,
@@ -144,7 +150,13 @@ export default function FAQPage() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowChatbot(show);
     if (!show) {
-      setMessages([]); // Clear chat history when exiting chatbot
+      setExpandedFaqs([]); // Collapse FAQs if leaving
+    } else {
+        if (messages.length === 0) { // re-init welcome if cleared
+             setMessages([
+                { text: "Hi! I'm here to help answer questions about the Barangay Feedback System. Select a question below or type yours.", isUser: false }
+              ]);
+        }
     }
   };
 
@@ -158,21 +170,18 @@ export default function FAQPage() {
   };
 
   const selectFaq = (faq: typeof faqs[0]) => {
-    // This now simulates the Gemini API result using the hardcoded answer
     setMessages(prev => [
       ...prev,
       { text: faq.q, isUser: true },
       { text: faq.a, isUser: false }
     ]);
     if (!showChatbot) {
-      toggleChatbot(true); // Switch to chat view if selecting from FAQ list
+      toggleChatbot(true);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // FAQs are currently static, so we just simulate a refresh.
-    // In the future, this could re-fetch FAQs from a database.
     setTimeout(() => setRefreshing(false), 1000);
   };
 
@@ -186,161 +195,187 @@ export default function FAQPage() {
   const sendButtonDisabled = !inputText.trim() || isLoading;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={[styles.header]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerText}>Help & Support</Text>
+    <View style={styles.safeArea}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
+      {/* Header - Consistent with Complain.tsx */}
+      <View style={[styles.topHeader, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.headerRow}>
+            <View style={{ flex: 1 }} /> 
+            <TouchableOpacity 
+                style={styles.toggleButton}
+                onPress={() => toggleChatbot(!showChatbot)}
+            >
+                <Ionicons 
+                    name={showChatbot ? "list" : "chatbubbles"} 
+                    size={20} 
+                    color={COLORS.primary} 
+                />
+                <Text style={styles.toggleButtonText}>
+                    {showChatbot ? "FAQs" : "Chat Bot"}
+                </Text>
+            </TouchableOpacity>
+        </View>
 
-        {/* Chat/FAQ Toggle Button (Swapped Logic) */}
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => toggleChatbot(!showChatbot)}
-        >
-          <Ionicons
-            // Icon shows the view the user will switch to
-            name={showChatbot ? "list-outline" : "chatbubble-ellipses"}
-            size={22}
-            color="#3B82F6"
-          />
-          <Text style={styles.toggleButtonText}>
-            {/* Text shows the view the user will switch to */}
-            {showChatbot ? "View All FAQs" : "Start Chat"}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Help & Support</Text>
+        <Text style={styles.headerSubtitle}>Find answers or ask our AI assistant</Text>
       </View>
 
       {!showChatbot ? (
         <>
-          {/* Info Banner */}
-          <View style={styles.infoBanner}>
-            <Ionicons name="information-circle" size={24} color="#3B82F6" />
-            <Text style={styles.infoBannerText}>
-              Find quick answers below or chat with our AI assistant
-            </Text>
-          </View>
-
           {/* FAQ List */}
           <ScrollView
-            style={styles.faqList}
-            contentContainerStyle={styles.faqContainer}
+            style={styles.container}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingHorizontal: 20, paddingTop: 20 }}
+            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#3B82F6"
+                tintColor={COLORS.primary}
               />
             }
           >
-            <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-            {faqs.map((item, index) => (
-              <View key={index} style={styles.faqItem}>
+            {/* Info Banner */}
+            <View style={styles.infoBanner}>
+                <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} />
+                <Text style={styles.infoBannerText}>
+                Tap any question to view the answer.
+                </Text>
+            </View>
+
+            <Text style={styles.sectionTitle}>Common Questions ({faqs.length})</Text>
+
+            {faqs.map((item, index) => {
+               const isExpanded = expandedFaqs.includes(index);
+               return (
+              <View key={index} style={[styles.faqCard, isExpanded && styles.faqCardExpanded]}>
                 <TouchableOpacity
                   onPress={() => toggleFaq(index)}
-                  style={styles.faqQuestionContainer}
+                  style={styles.faqHeader}
+                  activeOpacity={0.7}
                 >
-                  <View style={styles.faqIconContainer}>
-                    <Ionicons name="help-circle" size={20} color="#3B82F6" />
+                  <View style={[styles.faqIconBox, isExpanded && styles.faqIconBoxExpanded]}>
+                    <Ionicons name="help" size={20} color={isExpanded ? "#fff" : COLORS.primary} />
                   </View>
-                  <Text style={styles.faqQuestion}>{item.q}</Text>
+                  <Text style={[styles.faqQuestion, isExpanded && { color: COLORS.primary }]}>{item.q}</Text>
                   <Ionicons
-                    name={expandedFaqs.includes(index) ? "chevron-up" : "chevron-down"}
+                    name={isExpanded ? "chevron-up" : "chevron-down"}
                     size={20}
-                    color="#64748B"
+                    color={COLORS.muted}
                   />
                 </TouchableOpacity>
-                {expandedFaqs.includes(index) && (
-                  <View style={styles.faqAnswerContainer}>
+                {isExpanded && (
+                  <View style={styles.faqBody}>
                     <Text style={styles.faqAnswer}>{item.a}</Text>
+                    <TouchableOpacity 
+                        style={styles.askBotButton}
+                        onPress={() => selectFaq(item)}
+                    >
+                        <Text style={styles.askBotText}>Ask Bot related to this</Text>
+                        <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
-            ))}
+            )})}
 
             {/* Contact Section */}
             <View style={styles.contactSection}>
               <Text style={styles.contactTitle}>Still need help?</Text>
               <Text style={styles.contactText}>
-                Contact the barangay office during office hours
+                Contact the barangay office directly.
               </Text>
-              <Text style={styles.contactHours}>Monday - Friday, 8:00 AM - 5:00 PM</Text>
+              <Text style={styles.contactHours}>Mon - Fri, 8:00 AM - 5:00 PM</Text>
             </View>
           </ScrollView>
         </>
       ) : (
         <KeyboardAvoidingView
-          style={styles.chatContainer}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+          style={styles.chatWrapper}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          {/* Chat Header */}
-          <View style={styles.chatHeader}>
-            <View style={styles.chatHeaderContent}>
-              <View style={styles.botAvatar}>
-                <Ionicons name="chatbox" size={24} color="#fff" />
-              </View>
-              <View>
-                <Text style={styles.chatHeaderTitle}>FAQ Chatbot</Text>
-                <Text style={styles.chatHeaderSubtitle}>Powered by Gemini (Limited to FAQ knowledge)</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Messages */}
           <ScrollView
             ref={scrollViewRef}
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            showsVerticalScrollIndicator={false}
           >
-            {messages.map((msg, index) => (
+             <View style={styles.chatWelcome}>
+                <View style={styles.botAvatarLarge}>
+                    <Ionicons name="chatbubbles" size={32} color="#fff" />
+                </View>
+                <Text style={styles.chatWelcomeText}>Barangay AI Assistant</Text>
+                <Text style={styles.chatWelcomeSub}>I can answer questions based on our FAQs.</Text>
+             </View>
+
+            {messages.slice(1).map((msg, index) => ( // render all except initial if customized header is used, or keep all
+             // Actually let's keep all but style the first one nicely if it's the welcome message
               <View
                 key={index}
                 style={[
-                  styles.messageBubble,
-                  msg.isUser ? styles.userMessage : styles.botMessage
+                  styles.messageRow,
+                  msg.isUser ? styles.messageRowUser : styles.messageRowBot
                 ]}
               >
                 {!msg.isUser && (
                   <View style={styles.botAvatarSmall}>
-                    <Ionicons name="chatbox" size={16} color="#fff" />
+                    <Ionicons name="logo-android" size={14} color="#fff" />
                   </View>
                 )}
                 <View style={[
-                  styles.messageContent,
-                  msg.isUser ? styles.userMessageContent : styles.botMessageContent
+                  styles.messageBubble,
+                  msg.isUser ? styles.bubbleUser : styles.bubbleBot
                 ]}>
                   <Text style={[
                     styles.messageText,
-                    msg.isUser ? styles.userMessageText : styles.botMessageText
+                    msg.isUser ? styles.textUser : styles.textBot
                   ]}>
                     {msg.text}
                   </Text>
                 </View>
               </View>
             ))}
+            
             {/* Typing Indicator */}
             {isLoading && (
-              <View style={[styles.messageBubble, styles.botMessage]}>
-                <View style={styles.botAvatarSmall}>
-                  <Ionicons name="chatbox" size={16} color="#fff" />
-                </View>
-                <View style={[styles.messageContent, styles.botMessageContent]}>
-                  <Text style={styles.botMessageText}>...</Text>
-                </View>
+              <View style={[styles.messageRow, styles.messageRowBot]}>
+                 <View style={styles.botAvatarSmall}>
+                    <Ionicons name="logo-android" size={14} color="#fff" />
+                  </View>
+                  <View style={[styles.messageBubble, styles.bubbleBot, { paddingVertical: 12 }]}>
+                     <ActivityIndicator size="small" color={COLORS.muted} />
+                  </View>
               </View>
             )}
           </ScrollView>
+            
+            {/* Quick Suggestions */}
+          <View style={styles.suggestionsContainer}> 
+             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+                {faqs.slice(0, 5).map((faq, index) => (
+                    <TouchableOpacity
+                        key={index}
+                        style={styles.suggestionPill}
+                        onPress={() => selectFaq(faq)}
+                    >
+                        <Text style={styles.suggestionText} numberOfLines={1}>{faq.q}</Text>
+                    </TouchableOpacity>
+                ))}
+             </ScrollView>
+          </View>
 
           {/* Input Area */}
-          <View style={styles.inputArea}>
+          <View style={styles.inputContainer}>
             <TextInput
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Ask a question..."
+              placeholder="Type your question..."
+              placeholderTextColor="#9CA3AF"
               returnKeyType="send"
               onSubmitEditing={handleSend}
               editable={!isLoading}
@@ -350,319 +385,328 @@ export default function FAQPage() {
               onPress={handleSend}
               disabled={sendButtonDisabled}
             >
-              <Ionicons name="send" size={20} color="#fff" />
+              <Ionicons name="send" size={20} color="#fff" style={{ marginLeft: 2 }} />
             </TouchableOpacity>
           </View>
-
-          {/* FAQ Buttons (Quick Picks) */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.faqButtonsContainer}
-            contentContainerStyle={styles.faqButtonsContent}
-          >
-            {faqs.map((faq, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.faqButton}
-                onPress={() => selectFaq(faq)}
-              >
-                <Text style={styles.faqButtonText} numberOfLines={2}>{faq.q}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </KeyboardAvoidingView>
       )}
 
 
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F8FAFC" },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "#3B82F6",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 4,
+  safeArea: { flex: 1, backgroundColor: COLORS.bg },
+  
+  // Header
+  topHeader: {
+    backgroundColor: COLORS.primary,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 8,
+    zIndex: 10,
   },
-  backButton: { padding: 4 },
-  headerText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fff",
-    flex: 1,
-    marginLeft: 12,
+  headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+  },
+  backButton: {
+      padding: 8,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      borderRadius: 12,
   },
   toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
+    gap: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   toggleButtonText: {
-    color: '#3B82F6',
-    fontWeight: '600',
+    color: COLORS.primary,
+    fontWeight: '700',
     fontSize: 13,
-    marginLeft: 4,
   },
+  headerTitle: { color: "#fff", fontSize: 26, fontWeight: "900", letterSpacing: -0.5 },
+  headerSubtitle: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "500", marginTop: 4 },
+
+  container: { flex: 1 },
 
   infoBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "rgba(241, 111, 36, 0.1)", // Primary opacity
     padding: 16,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
+    borderRadius: 16,
+    marginBottom: 24,
     gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(241, 111, 36, 0.2)",
   },
   infoBannerText: {
     flex: 1,
     fontSize: 14,
-    color: "#1E40AF",
+    color: COLORS.text,
     lineHeight: 20,
+    fontWeight: "500",
+  },
+  sectionTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: COLORS.text,
+      marginBottom: 16,
+      letterSpacing: 0.5,
   },
 
-  faqList: { flex: 1 },
-  faqContainer: { padding: 16, paddingBottom: 80 },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 20,
-  },
-  faqItem: {
-    backgroundColor: "#fff",
+  // FAQ Card
+  faqCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
     marginBottom: 12,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
   },
-  faqQuestionContainer: {
+  faqCardExpanded: {
+      borderColor: COLORS.primary,
+      backgroundColor: "#fff",
+      shadowColor: COLORS.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 4,
+  },
+  faqHeader: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
     gap: 12,
   },
-  faqIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#EFF6FF",
+  faqIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.secondaryBg,
     justifyContent: "center",
     alignItems: "center",
   },
+  faqIconBoxExpanded: {
+      backgroundColor: COLORS.primary,
+  },
   faqQuestion: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 15, // 16px requirement (close enough for list item) or should be 16
     fontWeight: "600",
-    color: "#1E293B",
+    color: COLORS.text,
     lineHeight: 22,
   },
-  faqAnswerContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingLeft: 60,
+  faqBody: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 4,
   },
   faqAnswer: {
-    fontSize: 14,
-    color: "#64748B",
-    lineHeight: 22,
+    fontSize: 15,
+    color: COLORS.muted,
+    lineHeight: 24,
+  },
+  askBotButton: {
+      marginTop: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'flex-start',
+  },
+  askBotText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: COLORS.primary,
   },
 
   contactSection: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: COLORS.secondaryBg,
     padding: 24,
-    borderRadius: 12,
+    borderRadius: 24,
     marginTop: 24,
     alignItems: "center",
+    marginBottom: 40,
   },
   contactTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#1E293B",
+    fontWeight: "800",
+    color: COLORS.text,
     marginBottom: 8,
   },
   contactText: {
     fontSize: 14,
-    color: "#64748B",
+    color: COLORS.muted,
     textAlign: "center",
     marginBottom: 4,
   },
   contactHours: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#3B82F6",
-  },
-
-  chatContainer: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  chatHeader: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-  },
-  chatHeaderContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  botAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#3B82F6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  chatHeaderTitle: {
-    fontSize: 16,
     fontWeight: "700",
-    color: "#1E293B",
-  },
-  chatHeaderSubtitle: {
-    fontSize: 13,
-    color: "#64748B",
-    marginTop: 2,
+    color: COLORS.primary,
   },
 
-  messagesContainer: {
+  // Chat Interface
+  chatWrapper: {
     flex: 1,
+    backgroundColor: COLORS.secondaryBg,
   },
-  messagesContent: {
-    padding: 16,
-    paddingBottom: 8,
+  chatWelcome: {
+      alignItems: 'center',
+      paddingVertical: 32,
   },
-  emptyMessageContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 40,
+  botAvatarLarge: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: COLORS.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+      shadowColor: COLORS.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 6,
   },
-  emptyMessageText: {
-    fontSize: 16,
-    color: "#64748B",
-    textAlign: "center",
+  chatWelcomeText: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: COLORS.text,
+      marginBottom: 4,
   },
-  messageBubble: {
-    flexDirection: "row",
-    marginBottom: 16,
-    alignItems: "flex-start",
-    gap: 8,
+  chatWelcomeSub: {
+      fontSize: 14,
+      color: COLORS.muted,
   },
-  userMessage: {
-    justifyContent: "flex-end",
+  
+  messagesContainer: { flex: 1 },
+  messagesContent: { padding: 16, paddingBottom: 16 },
+
+  messageRow: {
+      marginBottom: 24, // Increased from 16
+      flexDirection: 'row',
+      maxWidth: '85%',
+      alignItems: 'flex-end', // Align avatar to bottom of bubble
   },
-  botMessage: {
-    justifyContent: "flex-start",
+  messageRowUser: {
+      alignSelf: 'flex-end',
+      flexDirection: 'row-reverse',
+  },
+  messageRowBot: {
+      alignSelf: 'flex-start',
   },
   botAvatarSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#3B82F6",
-    justifyContent: "center",
-    alignItems: "center",
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: COLORS.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 4, // Align slightly lower
+      marginRight: 8, // Added margin instead of gap
   },
-  messageContent: {
-    maxWidth: "75%",
-    padding: 12,
-    borderRadius: 16,
+  messageBubble: {
+    padding: 14,
+    borderRadius: 20,
+    flexShrink: 1, // Prevent overflow
   },
-  userMessageContent: {
-    backgroundColor: "#3B82F6",
-    borderBottomRightRadius: 4,
-    marginLeft: "auto",
+  bubbleUser: {
+      backgroundColor: COLORS.primary,
+      borderBottomRightRadius: 4,
   },
-  botMessageContent: {
-    backgroundColor: "#fff",
-    borderBottomLeftRadius: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+  bubbleBot: {
+      backgroundColor: "#fff",
+      borderBottomLeftRadius: 4,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
   },
   messageText: {
-    fontSize: 14,
-    lineHeight: 20,
+      fontSize: 15,
+      lineHeight: 22,
   },
-  userMessageText: {
-    color: "#fff",
+  textUser: { color: "#fff" },
+  textBot: { color: COLORS.text },
+
+  suggestionsContainer: {
+      maxHeight: 50,
+      marginBottom: 8,
   },
-  botMessageText: {
-    color: "#1E293B",
+  suggestionPill: {
+      backgroundColor: "#fff",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginRight: 8,
   },
-  faqButtonsContainer: {
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    maxHeight: 120,
-  },
-  faqButtonsContent: {
-    padding: 12,
-    gap: 8,
-  },
-  faqButton: {
-    backgroundColor: "#EFF6FF",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    minWidth: 120,
-    borderWidth: 1,
-    borderColor: "#3B82F6",
-  },
-  faqButtonText: {
-    color: "#1E40AF",
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "center",
+  suggestionText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.text,
   },
 
-  // Input Styles
-  inputArea: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: COLORS.border,
+    paddingBottom: 100, // Increased for navbar space
   },
   textInput: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    backgroundColor: COLORS.secondaryBg,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     fontSize: 15,
-    color: '#1E293B',
-    marginRight: 8,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: 12,
+    height: 48,
   },
   sendButton: {
-    backgroundColor: '#3B82F6',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    backgroundColor: COLORS.primary,
+    width: 48,
+    height: 48,
+    borderRadius: 24, // Circle
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sendButtonDisabled: {
-    backgroundColor: '#93C5FD',
+    backgroundColor: COLORS.muted,
+    shadowOpacity: 0,
   }
 });

@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#e3f2fd",
   },
   section: {
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e6f4fe",
   },
   filterText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
     color: "#555",
   },
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   detailText: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#666",
   },
   separator: {
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
     color: "#4a90e2",
   },

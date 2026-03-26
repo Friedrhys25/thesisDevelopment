@@ -1,24 +1,25 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
-  Modal,
   Animated,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  StatusBar,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 
 import {
   addDoc,
@@ -26,13 +27,15 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   Timestamp,
-  updateDoc
+  updateDoc,
+  where
 } from "firebase/firestore";
 import { auth, firestore } from "../../backend/firebaseConfig";
 
@@ -64,6 +67,47 @@ interface NotificationItem {
   evidencePhoto?: string;
   hasUpdate?: boolean;
 }
+
+const AnimatedCard = ({ children, onPress, disabled, style }: any) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  // Flashing animation loop
+  const flashAnim = useRef(
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.6, duration: 300, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ])
+    )
+  ).current;
+
+  const handlePressIn = () => {
+    Animated.timing(scale, { toValue: 0.95, duration: 200, useNativeDriver: true }).start();
+    flashAnim.start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    flashAnim.stop();
+    opacity.setValue(1); // Reset opacity
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      onPressIn={!disabled ? handlePressIn : undefined}
+      onPressOut={!disabled ? handlePressOut : undefined}
+      onPress={onPress}
+      disabled={disabled}
+      style={{ marginBottom: 16 }}
+    >
+      <Animated.View style={[style, { transform: [{ scale }], opacity, marginBottom: 0 }]}>
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 export default function App() {
   const insets = useSafeAreaInsets();
@@ -353,9 +397,35 @@ export default function App() {
       return;
     }
 
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Error", "Not logged in");
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Check Daily Limit (Max 2 per day)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const complaintsRef = collection(firestore, "users", user.uid, "userComplaints");
+      const q = query(
+        complaintsRef,
+        where("timestamp", ">=", Timestamp.fromDate(todayStart)),
+        where("timestamp", "<=", Timestamp.fromDate(todayEnd))
+      );
+
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.size >= 2) {
+        Alert.alert("Limit Reached", "You can only submit 2 complaints per day.");
+        setLoading(false);
+        return;
+      }
+
       const API_URL = "http://192.168.224.3:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
@@ -385,14 +455,8 @@ export default function App() {
         newItem.evidencePhoto = selectedImage;
       }
 
-      const user = auth.currentUser;
-      if (!user) {
-        Alert.alert("Error", "Not logged in");
-        setLoading(false);
-        return;
-      }
+      // user is already checked above
 
-      const complaintsRef = collection(firestore, "users", user.uid, "userComplaints");
       const itemToSave = {
         ...newItem,
         timestamp: serverTimestamp(), // Use Firestore serverTimestamp
@@ -635,10 +699,10 @@ export default function App() {
   // UI
   // ===========================
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      <View style={styles.topHeader}>
+      <View style={[styles.topHeader, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>My Complaints</Text>
         <Text style={styles.headerSubtitle}>Track and manage your reports</Text>
 
@@ -762,15 +826,14 @@ export default function App() {
                 return status === filterKey;
               })
               .map((n) => (
-                <TouchableOpacity
+                <AnimatedCard
                   key={n.id}
+                  onPress={() => n.status?.toLowerCase() !== "resolved" && openDetailModal(n)}
+                  disabled={n.status?.toLowerCase() === "resolved"}
                   style={[
                     styles.complaintCard,
                     n.status?.toLowerCase() === "resolved" && styles.resolvedCard
                   ]}
-                  onPress={() => n.status?.toLowerCase() !== "resolved" && openDetailModal(n)}
-                  activeOpacity={n.status?.toLowerCase() === "resolved" ? 1 : 0.7}
-                  disabled={n.status?.toLowerCase() === "resolved"}
                 >
                   {(n.hasUpdate || hasStatusUpdate(n)) && (
                     <View style={styles.updateBadge}>
@@ -830,7 +893,7 @@ export default function App() {
                       </TouchableOpacity>
                     </View>
                   )}
-                </TouchableOpacity>
+                </AnimatedCard>
               ))}
           </ScrollView>
         </>
@@ -864,6 +927,7 @@ export default function App() {
         onRequestClose={() => setDetailModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center", justifyContent: "center" }}>
           <View style={styles.detailModalBox}>
 
             {/* Header */}
@@ -948,7 +1012,7 @@ export default function App() {
                         onPress={sendMessage}
                         style={styles.sendButton}
                       >
-                        <Text style={styles.sendButtonText}>Send</Text>
+                        <Ionicons name="send" size={20} color="#fff" style={{ marginLeft: 2 }} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1018,6 +1082,7 @@ export default function App() {
             </TouchableOpacity>
 
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1029,6 +1094,7 @@ export default function App() {
         onRequestClose={() => setComplaintModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center", justifyContent: "center" }}>
           <View style={styles.complaintModalBox}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Complaint Details</Text>
@@ -1135,6 +1201,7 @@ export default function App() {
             </ScrollView>
 
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1157,6 +1224,7 @@ export default function App() {
       {/* FEEDBACK MODAL */}
       <Modal visible={feedbackModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center", justifyContent: "center" }}>
           <View style={styles.complaintModalBox}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -1204,6 +1272,7 @@ export default function App() {
               )}
             </ScrollView>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1299,189 +1368,224 @@ const styles = StyleSheet.create({
     color: "#6b7280",
   },
 
+
   // Complaint Card Styles
   complaintCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 0, // Handled by AnimatedCard wrapper
     borderWidth: 1,
-    borderColor: "rgba(229,231,235,0.65)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    position: "relative",
+    borderColor: "rgba(229,231,235,0.4)",
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   cardImage: {
     width: "100%",
-    height: 180,
-    borderRadius: 8,
-    marginBottom: 12,
+    height: 200,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 14,
+    alignItems: "center",
   },
   labelBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   labelText: {
     color: "#fff",
-    fontSize: 11,
-    fontWeight: "bold",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   statusText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
+    letterSpacing: 0.5,
   },
   messagePreview: {
-    fontSize: 15,
+    fontSize: 16,
     color: COLORS.text,
-    fontWeight: "500",
-    marginBottom: 12,
-    lineHeight: 20,
+    fontWeight: "600",
+    marginBottom: 16,
+    lineHeight: 24,
   },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    paddingTop: 8,
+    borderTopColor: "rgba(229,231,235,0.6)",
+    paddingTop: 12,
+    marginTop: 4,
+    alignItems: "center",
   },
   footerText: {
-    fontSize: 12,
-    color: "#6b7280",
+    fontSize: 13,
+    color: COLORS.muted,
+    fontWeight: "500",
   },
 
   // Detail Modal Styles
   detailModalBox: {
     backgroundColor: COLORS.card,
-    borderRadius: 20,
+    borderRadius: 32,
     padding: 24,
-    width: "100%",
-    maxWidth: 420,
+    width: "90%",
+    maxWidth: 480,
     maxHeight: "85%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.2,
+    shadowRadius: 40,
+    elevation: 20,
   },
   detailImage: {
     width: "100%",
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 16,
+    height: 220,
+    borderRadius: 20,
+    marginBottom: 20,
   },
   detailBadges: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 24,
   },
   detailBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
   },
   detailBadgeText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "bold",
+    letterSpacing: 0.5,
   },
   detailSection: {
-    marginBottom: 16,
+    marginBottom: 20,
+    backgroundColor: "#F9FAFB",
+    padding: 16,
+    borderRadius: 16,
   },
   detailLabel: {
-    fontSize: 12,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "900",
     color: COLORS.muted,
-    marginBottom: 4,
+    marginBottom: 6,
     textTransform: "uppercase",
+    letterSpacing: 1,
   },
   detailValue: {
-    fontSize: 15,
+    fontSize: 16,
     color: COLORS.text,
-    fontWeight: "500",
-    lineHeight: 22,
-    flexWrap: 'wrap',
+    fontWeight: "600",
+    lineHeight: 26,
   },
   detailCloseButton: {
-    backgroundColor: "#F3F4F6",
-    paddingVertical: 12,
-    borderRadius: 14,
+    backgroundColor: COLORS.text,
+    paddingVertical: 16,
+    justifyContent: "center",
+    borderRadius: 20,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   detailCloseButtonText: {
-    color: COLORS.text,
+    color: "#fff",
     fontSize: 16,
     fontWeight: "800",
+    letterSpacing: 0.5,
   },
 
   // Chat Styles
   chatContainer: {
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 24,
+    marginBottom: 24,
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
-    paddingTop: 16,
+    paddingTop: 20,
   },
   chatTitle: {
-    fontWeight: "800",
-    fontSize: 16,
-    marginBottom: 12,
+    fontWeight: "900",
+    fontSize: 18,
+    marginBottom: 16,
     color: COLORS.text,
   },
   chatScrollView: {
-    maxHeight: 250,
-    marginBottom: 12,
-    paddingRight: 8,
+    maxHeight: 300,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   emptyChat: {
     color: COLORS.muted,
     fontWeight: "500",
     textAlign: "center",
-    paddingVertical: 20,
+    paddingVertical: 40,
+    opacity: 0.7,
   },
   messageContainer: {
-    marginBottom: 12,
+    marginBottom: 16,
+    maxWidth: "85%",
   },
   myMessageContainer: {
+    alignSelf: "flex-end",
     alignItems: "flex-end",
   },
   theirMessageContainer: {
+    alignSelf: "flex-start",
     alignItems: "flex-start",
   },
   messageBubble: {
-    padding: 14,
-    borderWidth: 1,
-    maxWidth: "80%",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   myMessageBubble: {
     backgroundColor: COLORS.primary,
-    borderColor: COLORS.primaryDark,
     borderBottomRightRadius: 4,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   theirMessageBubble: {
-    backgroundColor: "#F9FAFB",
-    borderColor: COLORS.border,
+    backgroundColor: "#F3F4F6",
     borderBottomLeftRadius: 4,
-    borderTopLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  messageActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 4,
+    marginRight: 4,
   },
   messageText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: "500",
   },
   myMessageText: {
@@ -1492,42 +1596,60 @@ const styles = StyleSheet.create({
   },
   messageTimestamp: {
     fontSize: 10,
-    color: "#6b7280",
+    color: "#9CA3AF",
     marginTop: 4,
     paddingHorizontal: 4,
+    alignSelf: "flex-end",
   },
   chatInputContainer: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 16,
+    alignItems: "flex-end",
   },
   chatInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: "#F9FAFB",
-    maxHeight: 100,
-    fontSize: 14,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: "#fff",
+    maxHeight: 120,
+    fontSize: 15,
     color: COLORS.text,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sendButton: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
     justifyContent: "center",
+    borderRadius: 24,
     alignItems: "center",
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 2, // Align with input
   },
   sendButtonText: {
     color: "#fff",
-    fontWeight: "800",
-    fontSize: 14,
+    fontWeight: "bold",
+    fontSize: 13,
   },
 
+  // FAB (+ Report)
   fabContainer: {
     position: "absolute",
+    right: 20, // Move to right side for standard FAB placement? Or keep center?
+               // User asked for "redesign", usually implies better UX. Center is easier for thumb if holding phone with one hand?
+               // Let's keep it center but maybe elevate it more.
     alignSelf: "center",
     alignItems: "center",
     zIndex: 100,
@@ -1536,57 +1658,72 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-    gap: 6,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 32,
+    gap: 10,
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   fabText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "900",
+    letterSpacing: 0.5,
   },
   disabledTooltip: {
-    backgroundColor: COLORS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: "#1F2937",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
-
-  // Complaint Modal
+  
+  // Complaint Modal (Form)
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)", // Darker overlay
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: 16,
   },
   complaintModalBox: {
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
+    backgroundColor: "#fff",
+    borderRadius: 32,
     padding: 24,
     width: "100%",
-    maxWidth: 420,
-    maxHeight: "85%",
+    maxWidth: 500,
+    maxHeight: "90%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.25,
+    shadowRadius: 32,
+    elevation: 24,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    paddingBottom: 16,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "900",
     color: COLORS.text,
+    letterSpacing: -0.5,
   },
   closeButton: {
     padding: 5,
@@ -1603,7 +1740,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   label: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "800",
     color: COLORS.text,
     marginBottom: 6,
@@ -1615,7 +1752,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(251, 228, 81, 0.1)",
     borderRadius: 16,
     padding: 14,
-    fontSize: 15,
+    fontSize: 16,
     color: COLORS.text,
     minHeight: 130,
     marginBottom: 18,
@@ -1753,7 +1890,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   picker: {
-    fontSize: 14,
+    fontSize: 16,
     color: COLORS.text,
   },
 
@@ -1763,7 +1900,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 14,
+    fontSize: 16,
     color: COLORS.text,
     backgroundColor: "#FFFFFF",
     marginBottom: 14,

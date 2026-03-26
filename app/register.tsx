@@ -4,34 +4,37 @@ import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
-  collection,
-  doc,
-  getDocs,
-  limit,
-  query,
-  serverTimestamp,
-  setDoc,
-  where,
+    collection,
+    doc,
+    getDocs,
+    limit,
+    query,
+    serverTimestamp,
+    setDoc,
+    where,
 } from "firebase/firestore";
 import React, { useState } from "react";
 import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../backend/firebaseConfig";
 
 export default function RegisterPage() {
   const router = useRouter();
-
+  const insets = useSafeAreaInsets();
+  
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -281,11 +284,13 @@ export default function RegisterPage() {
   const today = new Date();
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+    <>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView contentContainerStyle={styles.container}>
         {/* Top Banner Section */}
         <View style={styles.bannerSection}>
-          <View style={styles.banner}>
+          <View style={[styles.banner, { paddingTop: insets.top + 20 }]}>
             <Image 
               source={require("../assets/images/sanroquelogoo.png")} 
               style={styles.logo} 
@@ -651,6 +656,7 @@ export default function RegisterPage() {
         </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
+    </>
   );
 }
 
@@ -714,7 +720,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tabActiveText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "800",
     color: "#1F2937",
   },
@@ -726,7 +732,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tabInactiveText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
     color: "#9CA3AF",
   },
@@ -800,7 +806,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     borderRadius: 16,
     backgroundColor: "#F9FAFB",
-    fontSize: 15,
+    fontSize: 16,
     color: "#1F2937",
     justifyContent: "center",
   },
@@ -817,7 +823,7 @@ const styles = StyleSheet.create({
   },
   passwordInput: { 
     flex: 1, 
-    fontSize: 15,
+    fontSize: 16,
     color: "#1F2937",
   },
 
@@ -857,7 +863,7 @@ const styles = StyleSheet.create({
   smallBtnText: { 
     fontWeight: "700", 
     color: "#374151",
-    fontSize: 13
+    fontSize: 16
   },
 
   reviewItem: {
@@ -876,7 +882,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   reviewValue: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
     color: "#1F2937",
   },

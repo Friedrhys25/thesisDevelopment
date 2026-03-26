@@ -1,20 +1,18 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
+import { useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Linking,
-  Pressable,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    Animated,
+    Linking,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    View
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ====== Centralized App Design System ======
 const COLORS = {
@@ -31,7 +29,6 @@ const COLORS = {
   warning: "#F59E0B",
 };
 
-const AnimatedIcon = Animated.createAnimatedComponent(Ionicons);
 
 // ===== Premium 911 Slide Button =====
 const Emergency911Button = () => {
@@ -86,11 +83,6 @@ const Emergency911Button = () => {
     }
   };
 
-  const iconColor = fillAnim.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [COLORS.danger, "#ffffff", "#ffffff"],
-  });
-
   return (
     <View style={styles.card}>
       <View style={styles.cardTitleRow}>
@@ -109,7 +101,13 @@ const Emergency911Button = () => {
           style={styles.holdTrack}
         >
           <Animated.View style={[styles.holdFill, { transform: [{ scale: fillAnim }] }]} />
-          <AnimatedIcon name="call" size={42} style={{ color: iconColor, zIndex: 10 }} />
+          
+          <View style={{ position: 'absolute' }}>
+             <Ionicons name="call" size={42} color={COLORS.danger} />
+          </View>
+          <Animated.View style={{ zIndex: 10, position: 'absolute', opacity: fillAnim.interpolate({ inputRange: [0, 0.4], outputRange: [0, 1] }) }}>
+             <Ionicons name="call" size={42} color="#ffffff" />
+          </Animated.View>
         </Pressable>
         <Text style={styles.holdText}>HOLD TO CALL 911</Text>
       </View>
@@ -163,11 +161,11 @@ export default function EmergencyPage() {
   const quickDialCards = useMemo(() => emergencyTypes, []);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Flat App Header */}
-      <View style={styles.topHeader}>
+      <View style={[styles.topHeader, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>Emergency Services</Text>
         <Text style={styles.headerSubtitle}>
           Quick help, 24/7. Call immediately or use the quick dial cards below.

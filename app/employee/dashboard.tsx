@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   },
   greeting: {
     color: "#e3f2fd",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
   },
   name: {
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#999",
     marginTop: 4,
   },
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   },
   actionDesc: {
     color: "#e3f2fd",
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 4,
   },
   infoBox: {
@@ -310,12 +310,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: "#555",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
   },
   infoValue: {
     color: "#2c3e50",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
   },
   divider: {
