@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
+import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -1295,15 +1296,22 @@ export default function App() {
               </View>
 
               <TouchableOpacity
-                style={styles.submitButton}
                 onPress={handleSubmit}
                 disabled={loading}
+                style={{ overflow: 'hidden', borderRadius: 16 }}
               >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Submit Complaint ➔</Text>
-                )}
+                <LinearGradient
+                   colors={['#F16F24', '#FEB47B']}
+                   start={{ x: 0, y: 0 }}
+                   end={{ x: 1, y: 1 }}
+                   style={styles.submitButton}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Submit Complaint ➔</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
 
             </ScrollView>
@@ -1371,10 +1379,17 @@ export default function App() {
                   />
 
                   <TouchableOpacity
-                    style={styles.submitButton}
                     onPress={submitFeedback}
+                    style={{ overflow: 'hidden', borderRadius: 16 }}
                   >
-                    <Text style={styles.submitButtonText}>Submit Feedback ➔</Text>
+                    <LinearGradient
+                       colors={['#F16F24', '#FEB47B']}
+                       start={{ x: 0, y: 0 }}
+                       end={{ x: 1, y: 1 }}
+                       style={styles.submitButton}
+                    >
+                      <Text style={styles.submitButtonText}>Submit Feedback ➔</Text>
+                    </LinearGradient>
                   </TouchableOpacity>
                 </>
               )}
@@ -1951,7 +1966,6 @@ const styles = StyleSheet.create({
   },
 
   submitButton: {
-    backgroundColor: COLORS.primary,
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: "center",
