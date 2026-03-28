@@ -14,6 +14,7 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -60,12 +61,14 @@ interface NotificationItem {
   label: string;
   type: string;
   timestamp: string;
+  rawTimestamp?: any;
   purok: string;
   status: string;
   incidentPurok?: string;
   incidentLocation?: string;
   evidencePhoto?: string;
   hasUpdate?: boolean;
+  isUrgent?: boolean;
 }
 
 const AnimatedCard = ({ children, onPress, disabled, style }: any) => {
@@ -139,6 +142,9 @@ export default function App() {
   const [viewingFeedback, setViewingFeedback] = useState<string>("");
   const [feedbackComplaintKey, setFeedbackComplaintKey] = useState<string>("");
   const [complaintFeedbacks, setComplaintFeedbacks] = useState<Record<string, string>>({});
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [urgentCooldownMsg, setUrgentCooldownMsg] = useState("");
+  const [isUrgentDisabled, setIsUrgentDisabled] = useState(false);
 
   const isIdApproved = idStatus?.toLowerCase() === "verified" || idStatus?.toLowerCase() === "approved";
 
@@ -340,12 +346,14 @@ export default function App() {
           label: value.label,
           type: value.type,
           timestamp: value.timestamp instanceof Timestamp ? value.timestamp.toDate().toLocaleString() : value.timestamp,
+          rawTimestamp: value.timestamp,
           purok: value.purok,
           status: value.status,
           incidentPurok: value.incidentPurok,
           incidentLocation: value.incidentLocation,
           evidencePhoto: value.evidencePhoto,
           hasUpdate: value.hasUpdate || false,
+          isUrgent: value.isUrgent || false,
         });
       });
 
@@ -375,6 +383,79 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // ===========================
+  // Effect to Check Urgent Cooldown
+  // ===========================
+  useEffect(() => {
+    // Look at past complaints and evaluate cooldown
+    const verifyUrgentUsage = () => {
+      const urgentPast7Days = notifications.filter(n => {
+        if (!n.isUrgent) return false;
+        
+        let reportDate;
+        if (n.rawTimestamp?.toDate) {
+          reportDate = n.rawTimestamp.toDate();
+        } else if (n.timestamp) {
+           // Fallback attempting to parse strings
+           reportDate = new Date(n.timestamp);
+        }
+        if (!reportDate || isNaN(reportDate.getTime())) return false;
+        
+        const now = new Date();
+        const diffMs = now.getTime() - reportDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        return diffDays <= 7;
+      }).sort((a, b) => {
+        const dateA = a.rawTimestamp?.toDate ? a.rawTimestamp.toDate().getTime() : new Date(a.timestamp).getTime();
+        const dateB = b.rawTimestamp?.toDate ? b.rawTimestamp.toDate().getTime() : new Date(b.timestamp).getTime();
+        return dateB - dateA; // Descending
+      });
+
+      if (urgentPast7Days.length >= 2) {
+        setIsUrgentDisabled(true);
+        setIsUrgent(false);
+        // Find the oldest of the 2 most recent ones
+        const oldestOfTop2 = urgentPast7Days[1];
+        
+        if (oldestOfTop2) {
+          let oldestDate = oldestOfTop2.rawTimestamp?.toDate ? oldestOfTop2.rawTimestamp.toDate() : new Date(oldestOfTop2.timestamp);
+          const cooldownExpiry = new Date(oldestDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+          
+          // Calculate human-readable time remaining
+          const now = new Date();
+          const diffMs = cooldownExpiry.getTime() - now.getTime();
+          
+          if (diffMs > 0) {
+            const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            
+            let timeStr = "";
+            if (days > 0) timeStr += `${days}d `;
+            if (hours > 0) timeStr += `${hours}h `;
+            timeStr += `${mins}m`;
+            
+            setUrgentCooldownMsg(`Limit Reached. Available in: ${timeStr}`);
+          } else {
+            // Edge case
+            setIsUrgentDisabled(false);
+            setUrgentCooldownMsg("");
+          }
+        }
+      } else {
+        setIsUrgentDisabled(false);
+        setUrgentCooldownMsg("");
+      }
+    };
+
+    if (!fetchingComplaints) {
+      // Create an interval to keep the timer updated every minute if disabled
+      verifyUrgentUsage();
+      const interval = setInterval(verifyUrgentUsage, 60000); // 1 minute
+      return () => clearInterval(interval);
+    }
+  }, [notifications, fetchingComplaints]);
 
   // Check if complaint has status update badge
   const hasStatusUpdate = (complaint: NotificationItem) => {
@@ -426,7 +507,7 @@ export default function App() {
         return;
       }
 
-      const API_URL = "http://192.168.224.3:5000";
+      const API_URL = "http://192.168.1.49:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",
@@ -436,7 +517,7 @@ export default function App() {
 
       const data = await response.json();
 
-      const normalizedLabel = String(data.label).toLowerCase().trim();
+      const normalizedLabel = isUrgent ? "urgent" : String(data.label).toLowerCase().trim();
       const normalizedType = String(data.type).toLowerCase().trim();
 
       const newItem: NotificationItem = {
@@ -449,6 +530,7 @@ export default function App() {
         incidentPurok: incidentPurok,
         incidentLocation: incidentLocation,
         status: "pending",
+        isUrgent: isUrgent,
       };
 
       if (selectedImage) {
@@ -467,6 +549,7 @@ export default function App() {
       setMessage("");
       setIncidentLocation("");
       setSelectedImage(null);
+      setIsUrgent(false);
       setComplaintModalVisible(false);
       setModalVisible(true);
     } catch (error: any) {
@@ -1104,6 +1187,7 @@ export default function App() {
                   setSelectedImage(null);
                   setMessage("");
                   setIncidentLocation("");
+                  setIsUrgent(false);
                 }}
                 style={styles.closeButton}
               >
@@ -1185,6 +1269,30 @@ export default function App() {
                   )}
                 </View>
               </TouchableOpacity>
+
+              {/* URGENT SWITCH */}
+              <View style={styles.urgentContainer}>
+                <View style={styles.urgentTextContainer}>
+                  <Text style={styles.urgentTitle}>Mark as Urgent</Text>
+                  <Text style={styles.urgentDescription}>
+                    For severe issues that need immediate action. (Max 2 per week)
+                  </Text>
+                  {isUrgentDisabled && (
+                    <Text style={styles.urgentCooldownText}>{urgentCooldownMsg}</Text>
+                  )}
+                </View>
+                <Switch
+                  value={isUrgent}
+                  onValueChange={(val) => {
+                    if (!isUrgentDisabled) {
+                      setIsUrgent(val);
+                    }
+                  }}
+                  disabled={isUrgentDisabled}
+                  trackColor={{ false: "#767577", true: "#fca5a5" }}
+                  thumbColor={isUrgent ? COLORS.danger : "#f4f3f4"}
+                />
+              </View>
 
               <TouchableOpacity
                 style={styles.submitButton}
@@ -1853,6 +1961,38 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0.5,
     color: "#FFFFFF",
+  },
+  urgentContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FEF2F2",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  urgentTextContainer: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  urgentTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: COLORS.danger,
+    marginBottom: 4,
+  },
+  urgentDescription: {
+    fontSize: 12,
+    color: "#991B1B",
+    lineHeight: 16,
+  },
+  urgentCooldownText: {
+    fontSize: 11,
+    color: COLORS.danger,
+    fontWeight: "bold",
+    marginTop: 6,
   },
 
 
