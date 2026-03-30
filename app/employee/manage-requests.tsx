@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ManageRequests() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Mock data - replace with actual Firestore data later
   const requests = [
@@ -51,8 +53,11 @@ export default function ManageRequests() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
+          <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={styles.title}>Manage Requests</Text>
         <Text style={styles.subtitle}>View and manage community complaints & feedback</Text>
       </View>
@@ -121,11 +126,17 @@ export default function ManageRequests() {
       </View>
 
       <View style={styles.spacer} />
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f5f7fa",
+  },
   container: {
     flex: 1,
     backgroundColor: "#f5f7fa",
@@ -133,7 +144,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#4a90e2",
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 20,
   },
   title: {

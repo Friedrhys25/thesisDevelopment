@@ -4,18 +4,18 @@ import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/aut
 import { doc, getDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../backend/firebaseConfig";
@@ -50,20 +50,20 @@ const handleLogin = async () => {
     console.log("✅ Login successful!");
     
     // 🔐 Check if user is employee to route accordingly
-    const userDoc = await getDoc(doc(firestore, "users", userCredential.user.uid));
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      if (userData.isEmployee) {
-        console.log("✅ Employee login - routing to dashboard");
-        router.replace("/employee/dashboard");
-      } else {
+    const employeeDoc = await getDoc(doc(firestore, "employee", userCredential.user.uid));
+    
+    if (employeeDoc.exists()) {
+      console.log("✅ Employee login - routing to dashboard");
+      router.replace("/employee/dashboard");
+    } else {
+      const userDoc = await getDoc(doc(firestore, "users", userCredential.user.uid));
+      if (userDoc.exists()) {
         console.log("✅ Regular user login - routing to home");
         router.replace("/(tabs)/home");
+      } else {
+        console.warn("User document not found in either table, routing to home");
+        router.replace("/(tabs)/home");
       }
-    } else {
-      // If user doc doesn't exist, route to regular home (fallback)
-      console.warn("User document not found, routing to home");
-      router.replace("/(tabs)/home");
     }
   } catch (error: any) {
     let errorTitle = "Login Failed";

@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function Reports() {
+  const insets = useSafeAreaInsets();
   // Mock data for charts (since we're not using external chart library)
   const requestStats = {
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
@@ -22,11 +24,20 @@ export default function Reports() {
   const maxCompletion = Math.max(...completionStats.values);
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Reports & Analytics</Text>
-        <Text style={styles.subtitle}>Track performance and trends</Text>
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <KeyboardAvoidingView 
+        style={styles.safeArea} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView 
+          style={styles.container}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
+        >
+          <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+            <Text style={styles.title}>Reports & Analytics</Text>
+            <Text style={styles.subtitle}>Track performance and trends</Text>
+          </View>
 
       {/* Summary Stats */}
       <View style={styles.section}>
@@ -125,19 +136,23 @@ export default function Reports() {
       </View>
 
       <View style={styles.spacer} />
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#f5f7fa",
+  },
+  container: {
+    flex: 1,
   },
   header: {
     backgroundColor: "#4a90e2",
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 20,
   },
   title: {

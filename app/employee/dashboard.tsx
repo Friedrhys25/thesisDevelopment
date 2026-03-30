@@ -5,16 +5,21 @@ import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
 
 export default function EmployeeDashboard() {
   const route = useRouter();
+  const insets = useSafeAreaInsets();
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,22 +54,7 @@ export default function EmployeeDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
-      { text: "Cancel", onPress: () => {} },
-      {
-        text: "Logout",
-        onPress: async () => {
-          try {
-            await auth.signOut();
-            route.replace("/");
-          } catch (error) {
-            Alert.alert("Error", "Failed to logout");
-          }
-        },
-      },
-    ]);
-  };
+// handleLogout removed
 
   if (loading) {
     return (
@@ -75,9 +65,12 @@ export default function EmployeeDashboard() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Employee Header */}
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}>
+          {/* Employee Header */}
+          <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -168,24 +161,26 @@ export default function EmployeeDashboard() {
         </View>
       </View>
 
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out" size={20} color="#fff" />
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
+      {/* Removed Logout Button */}
 
       <View style={styles.spacer} />
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f5f7fa",
+  },
   container: {
     flex: 1,
     backgroundColor: "#f5f7fa",
   },
   content: {
-    paddingBottom: 40,
+    paddingBottom: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -196,7 +191,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#4a90e2",
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 30,
   },
   profileSection: {

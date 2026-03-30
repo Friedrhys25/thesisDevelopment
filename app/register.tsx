@@ -4,29 +4,29 @@ import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
-    collection,
-    doc,
-    getDocs,
-    limit,
-    query,
-    serverTimestamp,
-    setDoc,
-    where,
+  collection,
+  doc,
+  getDocs,
+  limit,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
 } from "firebase/firestore";
 import React, { useState } from "react";
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../backend/firebaseConfig";
@@ -148,14 +148,27 @@ export default function RegisterPage() {
   const checkDuplicateUser = async () => {
     const uniqueKey = buildUniqueKey();
 
-    const q = query(
+    // Check users collection
+    const qUsers = query(
       collection(firestore, "users"),
       where("uniqueKey", "==", uniqueKey),
       limit(1)
     );
+    const snapUsers = await getDocs(qUsers);
+    
+    if (!snapUsers.empty) {
+      return { exists: true, uniqueKey };
+    }
 
-    const snap = await getDocs(q);
-    return { exists: !snap.empty, uniqueKey };
+    // Check employee collection
+    const qEmployee = query(
+      collection(firestore, "employee"),
+      where("uniqueKey", "==", uniqueKey),
+      limit(1)
+    );
+    const snapEmployee = await getDocs(qEmployee);
+
+    return { exists: !snapEmployee.empty, uniqueKey };
   };
 
   const handleRegister = async () => {
@@ -220,7 +233,8 @@ export default function RegisterPage() {
 
       // 3) Save profile to Firestore
       try {
-        await setDoc(doc(firestore, "users", user.uid), {
+        const targetCollection = isEmployee ? "employee" : "users";
+        await setDoc(doc(firestore, targetCollection, user.uid), {
           firstName,
           middleName: middleName || null,
           lastName,
@@ -380,30 +394,56 @@ export default function RegisterPage() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Birthday *</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-                  <View style={styles.input}>
-                    <Text style={{ color: birthday ? "#1F2937" : "#9CA3AF", fontSize: 15 }}>
-                      {birthday || "Select your birthday"}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={birthday ? new Date(birthday) : new Date()}
-                    mode="date"
-                    maximumDate={today}
-                    display="default"
-                    onChange={(event, selectedDate) => {
-                      setShowDatePicker(false);
-                      if (selectedDate) {
-                        const y = selectedDate.getFullYear();
-                        const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-                        const d = String(selectedDate.getDate()).padStart(2, "0");
-                        setBirthday(`${y}-${m}-${d}`);
-                      }
+                {Platform.OS === "web" ? (
+                  <input
+                    type="date"
+                    value={birthday}
+                    max={today.toISOString().split("T")[0]}
+                    onChange={(e) => setBirthday(e.target.value)}
+                    style={{
+                      width: "100%",
+                      paddingLeft: 16,
+                      paddingRight: 16,
+                      height: 56,
+                      borderWidth: 1,
+                      borderColor: "#E5E7EB",
+                      borderStyle: "solid",
+                      borderRadius: 16,
+                      backgroundColor: "#F9FAFB",
+                      fontSize: 16,
+                      color: birthday ? "#1F2937" : "#9CA3AF",
+                      boxSizing: "border-box",
+                      fontFamily: "inherit",
                     }}
                   />
+                ) : (
+                  <>
+                    <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                      <View style={styles.input}>
+                        <Text style={{ color: birthday ? "#1F2937" : "#9CA3AF", fontSize: 15 }}>
+                          {birthday || "Select your birthday"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={birthday ? new Date(birthday) : new Date()}
+                        mode="date"
+                        maximumDate={today}
+                        display="default"
+                        onChange={(event, selectedDate) => {
+                          setShowDatePicker(false);
+                          if (selectedDate) {
+                            const y = selectedDate.getFullYear();
+                            const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                            const d = String(selectedDate.getDate()).padStart(2, "0");
+                            setBirthday(`${y}-${m}-${d}`);
+                          }
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </View>
             </View>
