@@ -34,7 +34,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   Timestamp,
   updateDoc,
   where
@@ -70,6 +69,9 @@ interface NotificationItem {
   evidencePhoto?: string;
   hasUpdate?: boolean;
   isUrgent?: boolean;
+  deployedTanodUid?: string;
+  deployedTanods?: { uid: string; name: string }[];
+  hasFeedback?: boolean;
 }
 
 const AnimatedCard = ({ children, onPress, disabled, style }: any) => {
@@ -139,10 +141,11 @@ export default function App() {
     resolved: new Set(),
   });
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [viewingFeedback, setViewingFeedback] = useState<string>("");
-  const [feedbackComplaintKey, setFeedbackComplaintKey] = useState<string>("");
-  const [complaintFeedbacks, setComplaintFeedbacks] = useState<Record<string, string>>({});
+  const [viewingFeedback, setViewingFeedback] = useState<{ rating: number; comment: string } | null>(null);
+  const [feedbackComplaint, setFeedbackComplaint] = useState<NotificationItem | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [tanodRatings, setTanodRatings] = useState<Record<string, { rating: number; comment: string }>>({});
+  const [viewingTanodRatings, setViewingTanodRatings] = useState<Record<string, { rating: number; comment: string }>>({});
   const [isUrgent, setIsUrgent] = useState(false);
   const [urgentCooldownMsg, setUrgentCooldownMsg] = useState("");
   const [isUrgentDisabled, setIsUrgentDisabled] = useState(false);
@@ -209,29 +212,6 @@ export default function App() {
     // though onSnapshot handles real-time updates for complaints and feedback
     setRefreshing(false);
   };
-
-  // ===========================
-  // Fetch Feedbacks from Firebase
-  // ===========================
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const feedbackRef = collection(firestore, "complaintFeedback");
-
-    const unsubscribe = onSnapshot(feedbackRef, (snapshot) => {
-      const feedbacks: Record<string, string> = {};
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.feedbackMessage) {
-          feedbacks[doc.id] = data.feedbackMessage;
-        }
-      });
-      setComplaintFeedbacks(feedbacks);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   // ===========================
   // Pick Image from Gallery
@@ -355,6 +335,9 @@ export default function App() {
           evidencePhoto: value.evidencePhoto,
           hasUpdate: value.hasUpdate || false,
           isUrgent: value.isUrgent || false,
+          deployedTanodUid: value.deployedTanodUid || null,
+          deployedTanods: value.deployedTanods || [],
+          hasFeedback: value.hasFeedback || false,
         });
       });
 
@@ -709,42 +692,119 @@ export default function App() {
     }
   };
 
-  // Submit Feedback
+  // Submit Tanod Feedback (Rating + Comment per tanod)
   const submitFeedback = async () => {
-    if (!feedbackMessage.trim()) {
-      Alert.alert("Error", "Please enter your feedback");
+    if (!feedbackComplaint?.firebaseKey) {
+      Alert.alert("Error", "Missing complaint information");
       return;
     }
 
-    if (!feedbackComplaintKey) return;
+    const tanods = feedbackComplaint.deployedTanods || [];
+    if (tanods.length === 0) {
+      Alert.alert("Error", "No tanods assigned to this complaint");
+      return;
+    }
+
+    // Validate: every tanod must have a rating
+    for (const tanod of tanods) {
+      const entry = tanodRatings[tanod.uid];
+      if (!entry || entry.rating === 0) {
+        Alert.alert("Error", `Please rate ${tanod.name || "each tanod"}`);
+        return;
+      }
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Error", "Not logged in");
+      return;
+    }
+
+    setFeedbackLoading(true);
 
     try {
-      const feedbackRef = doc(firestore, "complaintFeedback", feedbackComplaintKey);
-      await setDoc(feedbackRef, {
-        feedbackMessage: feedbackMessage.trim(),
-        timestamp: serverTimestamp(),
-      });
+      const complaintKey = feedbackComplaint.firebaseKey;
 
-      setFeedbackMessage("");
+      // Write rating to each tanod's deploymentHistory
+      for (const tanod of tanods) {
+        const entry = tanodRatings[tanod.uid];
+        await updateDoc(
+          doc(firestore, "employee", tanod.uid, "deploymentHistory", complaintKey),
+          {
+            tanodRating: entry.rating,
+            tanodComment: entry.comment.trim() || null,
+          }
+        );
+      }
+
+      // Flag the complaint as having feedback
+      await updateDoc(
+        doc(firestore, "users", user.uid, "userComplaints", complaintKey),
+        {
+          hasFeedback: true,
+        }
+      );
+
+      setTanodRatings({});
+      setFeedbackComplaint(null);
       setFeedbackModalVisible(false);
-      Alert.alert("Success", "Feedback submitted successfully!");
+      Alert.alert("Success", "Thank you for rating the tanod(s)!");
     } catch (error: any) {
       Alert.alert("Error", "Failed to submit feedback: " + error.message);
+    } finally {
+      setFeedbackLoading(false);
     }
   };
 
   // Open feedback modal for sending or viewing
-  const handleFeedbackAction = (complaintKey: string) => {
-    setFeedbackComplaintKey(complaintKey);
+  const handleFeedbackAction = async (complaint: NotificationItem) => {
+    if (!complaint.firebaseKey) return;
 
-    if (complaintFeedbacks[complaintKey]) {
-      // View existing feedback
-      setViewingFeedback(complaintFeedbacks[complaintKey]);
+    const tanods = complaint.deployedTanods || [];
+
+    // Fallback: if deployedTanods is empty but deployedTanodUid exists
+    if (tanods.length === 0 && complaint.deployedTanodUid) {
+      tanods.push({ uid: complaint.deployedTanodUid, name: "Tanod" });
+    }
+
+    if (tanods.length === 0) {
+      Alert.alert("Not Available", "No tanod has been assigned to this complaint yet.");
+      return;
+    }
+
+    setFeedbackComplaint({ ...complaint, deployedTanods: tanods });
+
+    if (complaint.hasFeedback) {
+      // Fetch existing ratings for each tanod from their deploymentHistory
+      const ratings: Record<string, { rating: number; comment: string }> = {};
+      for (const tanod of tanods) {
+        try {
+          const historyDoc = await getDoc(
+            doc(firestore, "employee", tanod.uid, "deploymentHistory", complaint.firebaseKey)
+          );
+          if (historyDoc.exists()) {
+            const data = historyDoc.data();
+            ratings[tanod.uid] = {
+              rating: data.tanodRating || 0,
+              comment: data.tanodComment || "",
+            };
+          } else {
+            ratings[tanod.uid] = { rating: 0, comment: "" };
+          }
+        } catch {
+          ratings[tanod.uid] = { rating: 0, comment: "" };
+        }
+      }
+      setViewingTanodRatings(ratings);
+      setViewingFeedback({ rating: 0, comment: "" }); // flag as viewing mode
       setFeedbackModalVisible(true);
     } else {
-      // Send new feedback
-      setViewingFeedback("");
-      setFeedbackMessage("");
+      // Init empty ratings for each tanod
+      const initial: Record<string, { rating: number; comment: string }> = {};
+      tanods.forEach((t) => { initial[t.uid] = { rating: 0, comment: "" }; });
+      setTanodRatings(initial);
+      setViewingFeedback(null);
+      setViewingTanodRatings({});
       setFeedbackModalVisible(true);
     }
   };
@@ -967,12 +1027,14 @@ export default function App() {
                     <View style={styles.feedbackOverlay}>
                       <TouchableOpacity
                         style={styles.feedbackButton}
-                        onPress={() => n.firebaseKey && handleFeedbackAction(n.firebaseKey)}
+                        onPress={() => handleFeedbackAction(n)}
                       >
                         <Text style={styles.feedbackButtonText}>
-                          {n.firebaseKey && complaintFeedbacks[n.firebaseKey]
-                            ? "📝 View Feedback"
-                            : "✍️ Send Feedback"}
+                          {n.hasFeedback
+                            ? "⭐ View Rating"
+                            : (n.deployedTanods?.length || n.deployedTanodUid)
+                              ? "⭐ Rate Tanod(s)"
+                              : "⏳ Awaiting Assignment"}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1151,6 +1213,19 @@ export default function App() {
                   <Text style={styles.detailLabel}>Submitted</Text>
                   <Text style={styles.detailValue}>🕒 {selectedComplaint.timestamp}</Text>
                 </View>
+
+                {/* Deployed Tanods */}
+                {selectedComplaint.deployedTanods && selectedComplaint.deployedTanods.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Assigned Tanod(s)</Text>
+                    {selectedComplaint.deployedTanods.map((tanod: { uid: string; name: string }, idx: number) => (
+                      <View key={tanod.uid} style={{ flexDirection: "row", alignItems: "center", marginTop: idx > 0 ? 8 : 4 }}>
+                        <Ionicons name="shield-checkmark" size={18} color={COLORS.primary} />
+                        <Text style={[styles.detailValue, { marginLeft: 8, marginBottom: 0 }]}>{tanod.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
 
 
 
@@ -1337,20 +1412,22 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* FEEDBACK MODAL */}
+      {/* TANOD FEEDBACK MODAL */}
       <Modal visible={feedbackModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center", justifyContent: "center" }}>
           <View style={styles.complaintModalBox}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {viewingFeedback ? "Your Feedback" : "Send Feedback"}
+                {viewingFeedback ? "Tanod Ratings" : "Rate the Tanod(s)"}
               </Text>
               <TouchableOpacity
                 onPress={() => {
                   setFeedbackModalVisible(false);
-                  setFeedbackMessage("");
-                  setViewingFeedback("");
+                  setTanodRatings({});
+                  setViewingFeedback(null);
+                  setViewingTanodRatings({});
+                  setFeedbackComplaint(null);
                 }}
                 style={styles.closeButton}
               >
@@ -1360,26 +1437,99 @@ export default function App() {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {viewingFeedback ? (
-                // View existing feedback
-                <View style={styles.feedbackViewContainer}>
-                  <Text style={styles.feedbackViewText}>{viewingFeedback}</Text>
-                </View>
+                // View existing ratings for each tanod
+                (feedbackComplaint?.deployedTanods || []).map((tanod, index) => {
+                  const existing = viewingTanodRatings[tanod.uid] || { rating: 0, comment: "" };
+                  return (
+                    <View key={tanod.uid} style={{ marginBottom: 24, paddingBottom: 20, borderBottomWidth: index < (feedbackComplaint?.deployedTanods?.length || 1) - 1 ? 1 : 0, borderBottomColor: COLORS.border }}>
+                      <Text style={{ fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 8 }}>
+                        👮 {tanod.name}
+                      </Text>
+                      <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={star <= existing.rating ? "star" : "star-outline"}
+                            size={30}
+                            color={star <= existing.rating ? "#F59E0B" : "#D1D5DB"}
+                          />
+                        ))}
+                      </View>
+                      {existing.comment ? (
+                        <View style={styles.feedbackViewContainer}>
+                          <Text style={{ fontSize: 11, fontWeight: "800", color: COLORS.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+                            Remark
+                          </Text>
+                          <Text style={styles.feedbackViewText}>{existing.comment}</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ color: COLORS.muted, fontStyle: "italic", fontSize: 13 }}>No remark provided</Text>
+                      )}
+                    </View>
+                  );
+                })
               ) : (
-                // Send new feedback
+                // Send new rating for each tanod
                 <>
-                  <Text style={styles.label}>Your Feedback *</Text>
-                  <TextInput
-                    style={styles.textArea}
-                    placeholder="Please share your feedback about how this complaint was handled..."
-                    value={feedbackMessage}
-                    onChangeText={setFeedbackMessage}
-                    multiline
-                    numberOfLines={6}
-                    textAlignVertical="top"
-                  />
+                  <Text style={{ textAlign: "center", fontSize: 14, color: COLORS.muted, marginBottom: 20 }}>
+                    Rate each tanod who responded to your complaint
+                  </Text>
+
+                  {(feedbackComplaint?.deployedTanods || []).map((tanod, index) => {
+                    const entry = tanodRatings[tanod.uid] || { rating: 0, comment: "" };
+                    return (
+                      <View key={tanod.uid} style={{ marginBottom: 24, paddingBottom: 20, borderBottomWidth: index < (feedbackComplaint?.deployedTanods?.length || 1) - 1 ? 1 : 0, borderBottomColor: COLORS.border }}>
+                        <Text style={{ fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 10 }}>
+                          👮 {tanod.name}
+                        </Text>
+
+                        {/* Star Rating */}
+                        <View style={{ flexDirection: "row", justifyContent: "center", gap: 10, marginBottom: 8 }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <TouchableOpacity
+                              key={star}
+                              onPress={() => setTanodRatings((prev) => ({
+                                ...prev,
+                                [tanod.uid]: { ...prev[tanod.uid], rating: star },
+                              }))}
+                            >
+                              <Ionicons
+                                name={star <= entry.rating ? "star" : "star-outline"}
+                                size={36}
+                                color={star <= entry.rating ? "#F59E0B" : "#D1D5DB"}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+
+                        {entry.rating > 0 && (
+                          <Text style={{ textAlign: "center", fontSize: 13, fontWeight: "700", color: "#F59E0B", marginBottom: 10 }}>
+                            {entry.rating === 1 ? "Poor" : entry.rating === 2 ? "Fair" : entry.rating === 3 ? "Good" : entry.rating === 4 ? "Very Good" : "Excellent"}
+                          </Text>
+                        )}
+
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: COLORS.text, marginBottom: 6 }}>
+                          Remark (Optional)
+                        </Text>
+                        <TextInput
+                          style={[styles.textArea, { minHeight: 80 }]}
+                          placeholder={`Comment about ${tanod.name}'s response...`}
+                          value={entry.comment}
+                          onChangeText={(text) => setTanodRatings((prev) => ({
+                            ...prev,
+                            [tanod.uid]: { ...prev[tanod.uid], comment: text },
+                          }))}
+                          multiline
+                          numberOfLines={3}
+                          textAlignVertical="top"
+                        />
+                      </View>
+                    );
+                  })}
 
                   <TouchableOpacity
                     onPress={submitFeedback}
+                    disabled={feedbackLoading}
                     style={{ overflow: 'hidden', borderRadius: 16 }}
                   >
                     <LinearGradient
@@ -1388,7 +1538,11 @@ export default function App() {
                        end={{ x: 1, y: 1 }}
                        style={styles.submitButton}
                     >
-                      <Text style={styles.submitButtonText}>Submit Feedback ➔</Text>
+                      {feedbackLoading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.submitButtonText}>Submit Ratings ⭐</Text>
+                      )}
                     </LinearGradient>
                   </TouchableOpacity>
                 </>
