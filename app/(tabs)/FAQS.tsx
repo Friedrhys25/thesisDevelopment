@@ -16,8 +16,6 @@ import {
     UIManager,
     View
 } from "react-native";
-// Import the Google Gen AI SDK
-import { GoogleGenAI } from '@google/genai';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
@@ -41,11 +39,9 @@ const COLORS = {
 };
 
 // --- Configuration ---
-// !!! IMPORTANT: REPLACE THIS WITH YOUR ACTUAL GEMINI API KEY !!!
-const GEMINI_API_KEY = "AIzaSyDg_EbxqAGrgiAAOBN1jZIoPVzjeeJaXvk";
-
-// Initialize the GoogleGenAI client
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || "";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.1-8b-instant"; // free tier, fast
 
 
 // Define the FAQ structure
@@ -66,32 +62,160 @@ const faqs = [
 ];
 
 /**
- * GEMINI API Function: Generates a response strictly based on the provided FAQs.
+ * Groq-powered FAQ chatbot with hardcoded guardrails.
+ * Pre-filters off-topic questions BEFORE calling Groq to save API quota.
  */
-const fetchChatbotResponse = async (userQuestion: string): Promise<string> => {
-  const faqContext = faqs.map(item => `Q: ${item.q}\nA: ${item.a}`).join('\n---\n');
-  const systemInstruction = `You are a helpful and constrained FAQ chatbot for the Barangay Feedback System. Your SOLE source of information is the following list of Frequently Asked Questions (FAQs). You MUST only answer questions based on the content of these FAQs. If the user asks a question that is not covered in the FAQs, you MUST respond with the following exact sentence: "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below."
 
-    Available FAQs:
-    ---
-    ${faqContext}
-    ---`;
+// Allowed topic keywords — questions must contain at least one to pass the guardrail
+const ALLOWED_KEYWORDS = [
+  // Complaints
+  "complaint", "complain", "report", "submit", "file", "status", "pending", "progress",
+  "resolved", "urgent", "delete", "withdraw", "chat", "message", "respond", "response",
+  "review", "classify", "type", "label", "purok", "incident", "evidence", "photo",
+  "limit", "daily", "per day",
+  // Emergency
+  "emergency", "hotline", "911", "police", "fire", "ambulance", "rescue", "call",
+  "safety", "danger", "help",
+  // Feedback
+  "feedback", "rating", "rate", "star", "tanod", "staff", "service",
+  // Profile/Account
+  "profile", "account", "password", "reset", "login", "register", "sign up", "signup",
+  "email", "phone", "address", "avatar", "verification", "verify", "id", "approved",
+  // App general
+  "app", "barangay", "talk2kap", "notification", "update", "setting", "faq", "question",
+  "how", "what", "where", "when", "can i", "do i",
+];
+
+// Blocked topic patterns — if matched, reject immediately
+const BLOCKED_PATTERNS = [
+  /\b(code|program|script|function|variable|html|css|javascript|python)\b/i,
+  /\b(story|poem|song|joke|riddle|creative)\b/i,
+  /\b(politic|election|president|senator|government)\b/i,
+  /\b(religion|church|god|bible|quran)\b/i,
+  /\b(bitcoin|crypto|stock|invest|money|salary)\b/i,
+  /\b(diagnos|symptom|medicine|prescription|doctor)\b/i,
+  /\b(lawyer|legal advice|court|sue)\b/i,
+  /\b(math|calcul|equation|formula|solve \d)\b/i,
+  /\b(history|geography|science|physics|chemistry)\b/i,
+  /\b(recipe|cook|food|restaurant)\b/i,
+  /\b(game|movie|music|anime|sport)\b/i,
+];
+
+const OFF_TOPIC_RESPONSE = "I'm sorry, I can only help with questions about the Talk2Kap barangay system. Please try asking about complaints, emergencies, feedback, or your account.";
+
+/** Hardcoded guardrail check — runs BEFORE any API call */
+const passesGuardrail = (question: string): boolean => {
+  const lower = question.toLowerCase();
+
+  // Block known off-topic patterns first
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(lower)) return false;
+  }
+
+  // Require at least one allowed keyword
+  return ALLOWED_KEYWORDS.some(kw => lower.includes(kw));
+};
+
+const SYSTEM_INSTRUCTION = `You are the official FAQ assistant for Talk2Kap, a barangay complaint and feedback system app. Answer ONLY about this app's features. Keep answers concise (2-4 sentences). If unrelated, say you can only help with the Talk2Kap system.
+
+APP FEATURES:
+- Complaints: submit with description + purok + photo evidence (<5MB). AI-classified types. Status: Pending → In Progress → Resolved. Limit: 5/day. Urgent: 2/day with 24hr cooldown. Chat with staff. Delete before review only.
+- Emergency: hotlines — 911, Police (09353581020), Fire (0997 298 5204), Ambulance (0926 532 6524)
+- Feedback: rate tanod staff 1-5 stars after complaint resolved
+- Profile: edit phone/address/avatar, ID verification (Pending/Verified/Denied), password reset via login screen
+- Registration: personal info → contact → credentials → residency
+
+FAQS:
+${faqs.map((f, i) => `Q: ${f.q}\nA: ${f.a}`).join('\n')}`;
+
+const fetchChatbotResponse = async (userQuestion: string): Promise<string> => {
+  // Hardcoded guardrail — reject off-topic questions without calling API
+  if (!passesGuardrail(userQuestion)) {
+    return OFF_TOPIC_RESPONSE;
+  }
+
+  // Try local FAQ match first — saves API calls for exact FAQ matches
+  const localResult = localFaqMatch(userQuestion);
+  if (localResult !== null) {
+    return localResult;
+  }
+
+  // Only call Groq for on-topic questions that don't match any FAQ
+  if (!GROQ_API_KEY) {
+    return "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below.";
+  }
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: userQuestion,
-      config: {
-        systemInstruction: systemInstruction,
+    const response = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: "system", content: SYSTEM_INSTRUCTION },
+          { role: "user", content: userQuestion },
+        ],
         temperature: 0.1,
-      }
+        max_tokens: 300,
+      }),
     });
 
-    return response.text || "Unable to generate a response. Please try again.";
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Sorry, I ran into an error while connecting to the help service. Please check your API key or network connection and try again.";
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content?.trim() || "Unable to generate a response. Please try again.";
+  } catch (error: any) {
+    console.error("Groq FAQ Error:", error);
+    return "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below.";
   }
+};
+
+/** Local keyword-matching — returns answer string if matched, null if no match */
+const localFaqMatch = (userQuestion: string): string | null => {
+  const normalize = (text: string) =>
+    text.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+
+  const stopWords = new Set([
+    "i", "me", "my", "the", "a", "an", "is", "are", "was", "were", "do", "does",
+    "did", "will", "can", "could", "should", "would", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "it", "this", "that", "and", "or", "but",
+    "if", "how", "what", "when", "where", "who", "which", "be", "have", "has",
+  ]);
+
+  const queryWords = normalize(userQuestion).filter(w => !stopWords.has(w));
+  if (queryWords.length === 0) return null;
+
+  let bestScore = 0;
+  let bestFaq: typeof faqs[0] | null = null;
+
+  for (const faq of faqs) {
+    const faqWords = new Set([
+      ...normalize(faq.q).filter(w => !stopWords.has(w)),
+      ...normalize(faq.a).filter(w => !stopWords.has(w)),
+    ]);
+
+    let score = 0;
+    for (const word of queryWords) {
+      for (const faqWord of faqWords) {
+        if (faqWord === word) score += 2;
+        else if (faqWord.includes(word) || word.includes(faqWord)) score += 1;
+      }
+    }
+
+    const normalizedScore = score / queryWords.length;
+    if (normalizedScore > bestScore) {
+      bestScore = normalizedScore;
+      bestFaq = faq;
+    }
+  }
+
+  if (bestFaq && bestScore >= 1.5) return bestFaq.a;
+  return null; // No confident match — let Groq handle it
 };
 
 
@@ -128,7 +252,7 @@ export default function FAQPage() {
     setInputText("");
     setIsLoading(true);
 
-    // 2. Fetch bot response (Live Gemini API Call)
+    // 2. Fetch bot response (Live Groq API Call)
     try {
       const botResponse = await fetchChatbotResponse(userMessage);
       setMessages(prev => [
@@ -139,7 +263,7 @@ export default function FAQPage() {
       console.error("Chatbot API Error:", error);
       setMessages(prev => [
         ...prev,
-        { text: "Sorry, I encountered an issue. Please ensure your API key is correct and retry.", isUser: false }
+        { text: "Sorry, I encountered an issue. Please try again.", isUser: false }
       ]);
     } finally {
       setIsLoading(false);

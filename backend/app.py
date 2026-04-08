@@ -4,9 +4,9 @@ import joblib  # type: ignore
 import json
 import os
 import re
+import requests as http_requests  # type: ignore
 from pathlib import Path
 from dotenv import load_dotenv  # type: ignore
-import google.genai as genai  # type: ignore
 
 # ============================================================
 # Load .env from the SAME folder as this app.py (bulletproof)
@@ -24,20 +24,12 @@ label_model = joblib.load("label_model.pkl")
 type_model = joblib.load("type_model.pkl")
 
 # ---------------------------
-# Gemini config (use env var)
+# Groq config (use env var)
 # ---------------------------
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
-print("Gemini key loaded:", "YES" if GEMINI_API_KEY else "NO")
-
-if GEMINI_API_KEY:
-    # Print first few chars for confirmation (masking the rest)
-    prefix = str(GEMINI_API_KEY)[:6]  # type: ignore
-    print(f"Gemini key prefix: {prefix}...")
-else:
-    print("Gemini key prefix: NONE")
-
-if not GEMINI_API_KEY:
-    print("WARNING: GEMINI_API_KEY not found. Gemini features will be disabled.")
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL = "llama-3.3-70b-versatile"  # free tier, best accuracy
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+print("Groq key loaded:", "YES" if GROQ_API_KEY else "NO")
 
 
 # ---------------------------
@@ -114,98 +106,53 @@ def predict_with_confidence(model, text: str):
         return pred, None
 
 # ============================================================
-# Gemini Step 1: Translate to English (for better ML accuracy)
+# Groq: Validate/support the local ML classification
 # ============================================================
-def gemini_translate(text: str) -> str | None:
+def groq_validate(message: str, local_label: str, local_type: str) -> dict:
     """
-    Returns translated English text, or None if Gemini unavailable/fails.
-    Keeps meaning, names, locations. No extra commentary.
+    Uses Groq (Llama 3) to validate the local ML result.
+    Returns: { agree, suggested_label, suggested_type, support }
+    Falls back gracefully if Groq is unavailable.
     """
-    if not GEMINI_API_KEY:
-        return None
-
-    prompt = f"""
-Translate the message into clear English.
-Rules:
-- Return ONLY the translated text (no JSON, no markdown).
-- Keep meaning accurate, keep proper nouns (names/places).
-- If already English, return it unchanged.
-
-Message:
-\"\"\"{text}\"\"\"
-""".strip()
-
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        resp = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
-        )
-        translated = (resp.text or "").strip()
-        return translated if translated else None
-    except Exception as e:
-        print("Gemini translate error:", repr(e))
-        return None
-
-# ============================================================
-# Gemini Step 3: Support/Validate local ML result
-# ============================================================
-def gemini_support(original: str, translated: str, local_label: str, local_type: str) -> dict:
-    """
-    Returns:
-      {
-        "agree": bool,
-        "suggested_label": str|None,
-        "suggested_type": str|None,
-        "support": str|None
-      }
-    Gemini will either agree and give a short support reason,
-    or suggest a corrected label/type (still within allowed lists).
-    """
-    if not GEMINI_API_KEY:
+    if not GROQ_API_KEY:
         return {"agree": True, "suggested_label": None, "suggested_type": None, "support": None}
 
-    prompt = f"""
-You are validating a barangay complaint classification.
+    prompt = f"""You are validating a barangay complaint classification.
 
 Allowed labels: {VALID_LABELS}
 Allowed types: {VALID_TYPES}
 
 Type-to-label mapping:
-{TYPE_TO_LABEL}
+{json.dumps(TYPE_TO_LABEL)}
 
-Given:
-- Original message:
-\"\"\"{original}\"\"\"
+Message: \"\"\"{message}\"\"\"
 
-- English translation:
-\"\"\"{translated}\"\"\"
+Local model result: label="{local_label}", type="{local_type}"
 
-- Local model result:
-label="{local_label}"
-type="{local_type}"
+If correct: return JSON with agree=true and a short support reason.
+If wrong: return JSON with agree=false and corrected label/type from allowed lists.
 
-Task:
-1) Decide if the local result is correct.
-2) If correct: return JSON with agree=true and a short support reason (1 sentence).
-3) If wrong: return JSON with agree=false and provide corrected label/type that follow the allowed lists and mapping.
-
-Return ONLY JSON (no markdown), exactly:
-{{
-  "agree": true/false,
-  "suggested_label": "urgent|non-urgent|spam|null",
-  "suggested_type": "<one allowed type>|null",
-  "support": "<short reason or null>"
-}}
-""".strip()
+Return ONLY JSON:
+{{"agree": true/false, "suggested_label": "...|null", "suggested_type": "...|null", "support": "...|null"}}"""
 
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        resp = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
+        resp = http_requests.post(
+            GROQ_API_URL,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": GROQ_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1,
+                "max_tokens": 200,
+            },
+            timeout=15,
         )
-        cleaned = (resp.text or "").strip()
+        resp.raise_for_status()
+        result = resp.json()
+        cleaned = result["choices"][0]["message"]["content"].strip()
 
         if cleaned.startswith("```"):
             parts = cleaned.split("```")
@@ -215,11 +162,10 @@ Return ONLY JSON (no markdown), exactly:
         parsed = json.loads(cleaned)
 
         agree = bool(parsed.get("agree", True))
-        suggested_label = parsed.get("suggested_label", None)
-        suggested_type = parsed.get("suggested_type", None)
-        support = parsed.get("support", None)
+        suggested_label = parsed.get("suggested_label")
+        suggested_type = parsed.get("suggested_type")
+        support = parsed.get("support")
 
-        # normalize
         if isinstance(suggested_label, str):
             suggested_label = suggested_label.strip().lower()
         if isinstance(suggested_type, str):
@@ -227,13 +173,11 @@ Return ONLY JSON (no markdown), exactly:
         if isinstance(support, str):
             support = support.strip()
 
-        # validate suggestions
         if suggested_label not in VALID_LABELS:
             suggested_label = None
         if suggested_type not in VALID_TYPES:
             suggested_type = None
 
-        # force consistency if Gemini suggests a type
         if suggested_type:
             expected = TYPE_TO_LABEL.get(suggested_type)
             if expected:
@@ -245,9 +189,8 @@ Return ONLY JSON (no markdown), exactly:
             "suggested_type": suggested_type,
             "support": support if support else None
         }
-
     except Exception as e:
-        print("Gemini support error:", repr(e))
+        print("Groq validate error:", repr(e))
         return {"agree": True, "suggested_label": None, "suggested_type": None, "support": None}
 
 # ---------------------------
@@ -258,7 +201,7 @@ def classify():
     data = request.get_json(silent=True) or {}
     raw_message = data.get("message", "")
 
-    # quick spam gate using raw (so we don't waste Gemini calls)
+    # quick spam gate
     if looks_like_nonsense(raw_message):
         return jsonify({
             "message": raw_message,
@@ -269,11 +212,8 @@ def classify():
             "support": None
         })
 
-    # Step 1: Translate using Gemini (if available)
-    translated = gemini_translate(raw_message) or raw_message
-
-    # Step 2: Classify using LOCAL ML on translated text
-    message = normalize_text(translated)
+    # Classify using LOCAL ML
+    message = normalize_text(raw_message)
 
     label_pred, label_conf = predict_with_confidence(label_model, message)
     type_pred, type_conf = predict_with_confidence(type_model, message)
@@ -284,38 +224,28 @@ def classify():
     if type_pred not in VALID_TYPES:
         type_conf = 0.0
 
-    LABEL_OK = (label_conf is None) or (label_conf >= 0.70)
-    TYPE_OK = (type_conf is None) or (type_conf >= 0.60)
-
     expected = TYPE_TO_LABEL.get(type_pred)
     final_label = expected if expected else label_pred
     final_type = type_pred if type_pred in VALID_TYPES else "off-topic"
 
-    # If local is low-confidence, you can still proceed — Gemini support may help.
-    # Step 3: Gemini "support/validate" the LOCAL result (using original + translation)
-    support_result = gemini_support(
-        original=raw_message,
-        translated=translated,
-        local_label=final_label,
-        local_type=final_type
-    )
+    # Groq validation: let AI verify the local ML result
+    validation = groq_validate(raw_message, final_label, final_type)
 
-    # If Gemini disagrees AND it provides a valid suggestion, override the final output
-    if support_result.get("agree") is False and support_result.get("suggested_label") and support_result.get("suggested_type"):
-        final_label = support_result["suggested_label"]
-        final_type = support_result["suggested_type"]
-        source = "local+gemini_override"
+    if validation.get("agree") is False and validation.get("suggested_label") and validation.get("suggested_type"):
+        final_label = validation["suggested_label"]
+        final_type = validation["suggested_type"]
+        source = "local+groq_override"
     else:
-        source = "local+gemini_support" if GEMINI_API_KEY else "local_only"
+        source = "local+groq_support" if GROQ_API_KEY else "local_only"
 
     return jsonify({
         "message": raw_message,
-        "translated": translated if translated != raw_message else None,
+        "translated": None,
         "label": final_label,
         "type": final_type,
         "source": source,
         "confidence": {"label": label_conf, "type": type_conf},
-        "support": support_result.get("support")
+        "support": validation.get("support")
     })
 
 # ---------------------------

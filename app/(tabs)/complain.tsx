@@ -4,39 +4,39 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-  where
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    onSnapshot,
+    orderBy,
+    query,
+    serverTimestamp,
+    Timestamp,
+    updateDoc,
+    where
 } from "firebase/firestore";
 import { auth, firestore } from "../../backend/firebaseConfig";
 
@@ -374,7 +374,7 @@ export default function App() {
   useEffect(() => {
     // Look at past complaints and evaluate cooldown
     const verifyUrgentUsage = () => {
-      const urgentPast7Days = notifications.filter(n => {
+      const urgentToday = notifications.filter(n => {
         if (!n.isUrgent) return false;
         
         let reportDate;
@@ -389,22 +389,22 @@ export default function App() {
         const now = new Date();
         const diffMs = now.getTime() - reportDate.getTime();
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        return diffDays <= 7;
+        return diffDays <= 1;
       }).sort((a, b) => {
         const dateA = a.rawTimestamp?.toDate ? a.rawTimestamp.toDate().getTime() : new Date(a.timestamp).getTime();
         const dateB = b.rawTimestamp?.toDate ? b.rawTimestamp.toDate().getTime() : new Date(b.timestamp).getTime();
         return dateB - dateA; // Descending
       });
 
-      if (urgentPast7Days.length >= 2) {
+      if (urgentToday.length >= 2) {
         setIsUrgentDisabled(true);
         setIsUrgent(false);
         // Find the oldest of the 2 most recent ones
-        const oldestOfTop2 = urgentPast7Days[1];
+        const oldestOfTop2 = urgentToday[1];
         
         if (oldestOfTop2) {
           let oldestDate = oldestOfTop2.rawTimestamp?.toDate ? oldestOfTop2.rawTimestamp.toDate() : new Date(oldestOfTop2.timestamp);
-          const cooldownExpiry = new Date(oldestDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const cooldownExpiry = new Date(oldestDate.getTime() + 1 * 24 * 60 * 60 * 1000);
           
           // Calculate human-readable time remaining
           const now = new Date();
@@ -485,13 +485,13 @@ export default function App() {
       );
 
       const querySnapshot = await getDocs(q);
-      if (querySnapshot.size >= 2) {
-        Alert.alert("Limit Reached", "You can only submit 2 complaints per day.");
+      if (querySnapshot.size >= 5) {
+        Alert.alert("Limit Reached", "You can only submit 5 complaints per day.");
         setLoading(false);
         return;
       }
 
-      const API_URL = "http://192.168.1.49:5000";
+      const API_URL = "http://192.168.68.125:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",

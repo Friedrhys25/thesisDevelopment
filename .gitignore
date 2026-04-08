@@ -49,6 +49,8 @@ app-example
 # The most important one: Ignore the actual env file
 .env
 .env.*
+**/.env
+**/.env.*
 
 # Ignore Python cache (compiled files)
 __pycache__/
