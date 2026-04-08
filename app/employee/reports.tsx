@@ -192,10 +192,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#2c3e50",
-    marginTop: 8,
+    color: "#4a90e2",
   },
   statLabel: {
     fontSize: 12,
@@ -211,11 +210,11 @@ const styles = StyleSheet.create({
   },
   chartBars: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "flex-end",
-    height: 180,
-    width: "100%",
-    marginBottom: 16,
+    justifyContent: "space-between",
+    alignItems: "center",
+    height: 120,
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
   barColumn: {
     alignItems: "center",
@@ -264,13 +263,13 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#e74c3c",
+    backgroundColor: "#4a90e2",
     marginRight: 12,
   },
   categoryLabel: {
     flex: 1,
-    fontSize: 16,
-    color: "#555",
+    fontSize: 14,
+    color: "#333",
   },
   categoryValue: {
     fontSize: 16,

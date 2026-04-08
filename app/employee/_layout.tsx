@@ -3,12 +3,12 @@ import * as Haptics from "expo-haptics";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
-  Animated,
-  Platform,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
+    Animated,
+    Platform,
+    Pressable,
+    StyleSheet,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

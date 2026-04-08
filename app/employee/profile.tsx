@@ -2,26 +2,26 @@
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { signOut } from "firebase/auth";
+import { EmailAuthProvider, reauthenticateWithCredential, signOut, updatePassword } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
@@ -70,6 +70,15 @@ export default function EmployeeProfile() {
   const [isEditing, setIsEditing] = useState<EditingField>(null);
   const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [userData, setUserData] = useState<UserData>({
     firstName: "",
@@ -244,6 +253,62 @@ export default function EmployeeProfile() {
   };
 
   const handleLogout = () => setShowLogoutModal(true);
+
+  const getPasswordStrength = (password: string) => {
+    if (!password) return { label: "", color: "transparent", width: "0%" };
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    if (score <= 1) return { label: "Weak", color: COLORS.danger, width: "20%" };
+    if (score <= 2) return { label: "Fair", color: COLORS.warning, width: "40%" };
+    if (score <= 3) return { label: "Good", color: "#F59E0B", width: "60%" };
+    if (score <= 4) return { label: "Strong", color: COLORS.success, width: "80%" };
+    return { label: "Very Strong", color: COLORS.success, width: "100%" };
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Validation Error", "All fields are required.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert("Validation Error", "New password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Validation Error", "New passwords do not match.");
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      Alert.alert("Error", "You must be logged in.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+      Alert.alert("Success", "Password changed successfully!");
+      setShowChangePasswordModal(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        Alert.alert("Error", "Current password is incorrect.");
+      } else {
+        Alert.alert("Error", "Failed to change password. Please try again.");
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   const confirmLogout = async () => {
     try {
@@ -552,6 +617,19 @@ export default function EmployeeProfile() {
           )}
         </View>
 
+        {/* Change Password Button */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.changePasswordBtn,
+            { marginTop: 10 },
+            pressed && { opacity: 0.85 },
+          ]}
+          onPress={() => setShowChangePasswordModal(true)}
+        >
+          <Ionicons name="lock-closed-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.changePasswordText}>Change Password</Text>
+        </Pressable>
+
         {/* Logout Button */}
         <Pressable
           style={({ pressed }) => [
@@ -673,6 +751,127 @@ export default function EmployeeProfile() {
               </Pressable>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        visible={showChangePasswordModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowChangePasswordModal(false);
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center", justifyContent: "center" }}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Change Password</Text>
+
+              <View style={{ gap: 10 }}>
+                <View style={styles.passwordInputRow}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    onChangeText={setCurrentPassword}
+                    value={currentPassword}
+                    placeholder="Current Password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showCurrentPassword}
+                  />
+                  <Pressable onPress={() => setShowCurrentPassword(!showCurrentPassword)} style={styles.eyeBtn}>
+                    <Ionicons name={showCurrentPassword ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.muted} />
+                  </Pressable>
+                </View>
+                <View style={styles.passwordInputRow}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    onChangeText={setNewPassword}
+                    value={newPassword}
+                    placeholder="New Password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showNewPassword}
+                  />
+                  <Pressable onPress={() => setShowNewPassword(!showNewPassword)} style={styles.eyeBtn}>
+                    <Ionicons name={showNewPassword ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.muted} />
+                  </Pressable>
+                </View>
+                {newPassword.length > 0 && (
+                  <View style={{ gap: 4 }}>
+                    <View style={styles.strengthBarBg}>
+                      <View style={[styles.strengthBarFill, { width: getPasswordStrength(newPassword).width as any, backgroundColor: getPasswordStrength(newPassword).color }]} />
+                    </View>
+                    <Text style={[styles.strengthLabel, { color: getPasswordStrength(newPassword).color }]}>
+                      {getPasswordStrength(newPassword).label}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.passwordInputRow}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    onChangeText={setConfirmPassword}
+                    value={confirmPassword}
+                    placeholder="Confirm New Password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showConfirmPassword}
+                  />
+                  <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn}>
+                    <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.muted} />
+                  </Pressable>
+                </View>
+                {confirmPassword.length > 0 && (
+                  <View style={styles.matchRow}>
+                    <Ionicons
+                      name={newPassword === confirmPassword ? "checkmark-circle" : "close-circle"}
+                      size={16}
+                      color={newPassword === confirmPassword ? COLORS.success : COLORS.danger}
+                    />
+                    <Text style={{ color: newPassword === confirmPassword ? COLORS.success : COLORS.danger, fontSize: 12, fontWeight: "600" }}>
+                      {newPassword === confirmPassword ? "Passwords match" : "Passwords do not match"}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.modalBtnRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.modalBtn,
+                    styles.modalCancel,
+                    pressed && { opacity: 0.9 },
+                  ]}
+                  onPress={() => {
+                    setShowChangePasswordModal(false);
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                  }}
+                  disabled={isChangingPassword}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.modalBtn,
+                    styles.modalConfirm,
+                    pressed && { opacity: 0.9 },
+                    isChangingPassword && { opacity: 0.6 },
+                  ]}
+                  onPress={handleChangePassword}
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.modalConfirmText}>Update</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -878,6 +1077,59 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logoutText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
+  changePasswordBtn: {
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  changePasswordText: { color: COLORS.primary, fontWeight: "700", fontSize: 16 },
+
+  passwordInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    minHeight: 50,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: COLORS.text,
+  },
+  eyeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  strengthBarBg: {
+    height: 4,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  strengthBarFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+  strengthLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  matchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
 
   modalOverlay: {
     flex: 1,

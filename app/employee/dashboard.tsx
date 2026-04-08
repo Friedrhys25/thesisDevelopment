@@ -259,8 +259,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#2c3e50",
-    marginTop: 8,
+    color: "#4a90e2",
   },
   statLabel: {
     fontSize: 14,
@@ -278,12 +277,11 @@ const styles = StyleSheet.create({
   },
   actionText: {
     flex: 1,
-    marginHorizontal: 12,
   },
   actionTitle: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "bold",
   },
   actionDesc: {
     color: "#e3f2fd",
@@ -303,13 +301,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   infoLabel: {
-    color: "#555",
-    fontSize: 16,
-    fontWeight: "600",
+    color: "#999",
+    fontSize: 14,
   },
   infoValue: {
     color: "#2c3e50",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "500",
   },
   divider: {

@@ -1,6 +1,8 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useRef, useState } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     Animated,
     Linking,
@@ -13,6 +15,7 @@ import {
     View
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { firestore } from "../../backend/firebaseConfig";
 
 // ====== Centralized App Design System ======
 const COLORS = {
@@ -120,24 +123,58 @@ const Emergency911Button = () => {
 };
 
 type EmergencyService = {
-  id: number;
+  id: string;
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
   number: string;
   color: string;
-  description: string;
+  category: string;
 };
+
+const CATEGORY_MAP: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+  police: { icon: "shield-outline", color: "#3B82F6" },
+  fire: { icon: "flame-outline", color: COLORS.primary },
+  ambulance: { icon: "medical-outline", color: COLORS.success },
+  rescue: { icon: "boat-outline", color: "#6366F1" },
+  disaster: { icon: "thunderstorm-outline", color: "#8B5CF6" },
+};
+
+const DEFAULT_CATEGORY = { icon: "call-outline" as keyof typeof Ionicons.glyphMap, color: COLORS.muted };
 
 export default function EmergencyPage() {
   const insets = useSafeAreaInsets();
-  const [selectedEmergency, setSelectedEmergency] = useState<number | null>(null);
+  const [selectedEmergency, setSelectedEmergency] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [hotlines, setHotlines] = useState<EmergencyService[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const emergencyTypes: EmergencyService[] = [
-    { id: 1, name: "Police", icon: "shield-outline", number: "09353581020", color: "#3B82F6", description: "Crime, security threats" },
-    { id: 2, name: "Fire", icon: "flame-outline", number: "0997 298 5204", color: COLORS.primary, description: "Fire incidents, rescue" },
-    { id: 3, name: "Ambulance", icon: "medical-outline", number: "0926 532 6524", color: COLORS.success, description: "Medical emergencies" },
-  ];
+  const fetchHotlines = useCallback(async () => {
+    try {
+      const snapshot = await getDocs(collection(firestore, "emergencyHotlines"));
+      const data: EmergencyService[] = snapshot.docs.map((doc) => {
+        const d = doc.data();
+        const cat = (d.category || "").toLowerCase();
+        const mapped = CATEGORY_MAP[cat] || DEFAULT_CATEGORY;
+        return {
+          id: doc.id,
+          name: d.name || "Unknown",
+          number: d.number || "",
+          category: d.category || "",
+          icon: mapped.icon,
+          color: mapped.color,
+        };
+      });
+      setHotlines(data);
+    } catch (e) {
+      console.error("Failed to fetch emergency hotlines:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHotlines();
+  }, [fetchHotlines]);
 
   const safetyTips = [
     { id: 1, title: "Stay Calm", description: "Keep calm and assess the situation before acting." },
@@ -154,11 +191,9 @@ export default function EmergencyPage() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // You can add any future fetch here
-    setTimeout(() => setRefreshing(false), 400);
+    await fetchHotlines();
+    setRefreshing(false);
   };
-
-  const quickDialCards = useMemo(() => emergencyTypes, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -199,38 +234,47 @@ export default function EmergencyPage() {
         {/* Quick Dial */}
         <Text style={styles.sectionTitle}>Quick Emergency Dial</Text>
 
-        <View style={styles.grid}>
-          {quickDialCards.map((service) => {
-            const selected = selectedEmergency === service.id;
-            return (
-              <Pressable
-                key={service.id}
-                onPressIn={() => setSelectedEmergency(service.id)}
-                onPressOut={() => setSelectedEmergency(null)}
-                onPress={() => handleEmergencyCall(service)}
-                style={[
-                  styles.emergencyCard,
-                  selected && { borderColor: service.color, backgroundColor: `${service.color}14` },
-                ]}
-              >
-                <Ionicons name={service.icon} size={40} color={service.color} style={styles.iconBig} />
-                <Text style={styles.emergencyName}>{service.name}</Text>
-                <Text style={styles.emergencyNumber}>{service.number}</Text>
-                <Text style={styles.emergencyDesc}>{service.description}</Text>
-
-                <View
+        {loading ? (
+          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginVertical: 30 }} />
+        ) : hotlines.length === 0 ? (
+          <View style={{ alignItems: "center", marginVertical: 30 }}>
+            <Ionicons name="alert-circle-outline" size={40} color={COLORS.muted} />
+            <Text style={{ color: COLORS.muted, fontWeight: "600", marginTop: 8 }}>No hotlines available</Text>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {hotlines.map((service) => {
+              const selected = selectedEmergency === service.id;
+              return (
+                <Pressable
+                  key={service.id}
+                  onPressIn={() => setSelectedEmergency(service.id)}
+                  onPressOut={() => setSelectedEmergency(null)}
+                  onPress={() => handleEmergencyCall(service)}
                   style={[
-                    styles.callBadge,
-                    { backgroundColor: service.color }
+                    styles.emergencyCard,
+                    selected && { borderColor: service.color, backgroundColor: `${service.color}14` },
                   ]}
                 >
-                  <Ionicons name="call" size={16} color="#fff" />
-                  <Text style={styles.callBadgeText}>Call</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Ionicons name={service.icon} size={40} color={service.color} style={styles.iconBig} />
+                  <Text style={styles.emergencyName}>{service.name}</Text>
+                  <Text style={styles.emergencyNumber}>{service.number}</Text>
+                  <Text style={styles.emergencyDesc}>{service.category}</Text>
+
+                  <View
+                    style={[
+                      styles.callBadge,
+                      { backgroundColor: service.color }
+                    ]}
+                  >
+                    <Ionicons name="call" size={16} color="#fff" />
+                    <Text style={styles.callBadgeText}>Call</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         {/* Safety Tips */}
         <Text style={styles.sectionTitle}>Safety Tips</Text>
@@ -287,7 +331,7 @@ const styles = StyleSheet.create({
   // ===== Cards =====
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 22,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 14,
     borderWidth: 1,
