@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: talk2us-backend
+    runtime: python
+    region: singapore
+    rootDir: talk2us/backend
+    buildCommand: bash build.sh
+    startCommand: bash start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false

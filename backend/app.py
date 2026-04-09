@@ -4,6 +4,7 @@ import joblib  # type: ignore
 import json
 import os
 import re
+import threading
 import requests as http_requests  # type: ignore
 from pathlib import Path
 from dotenv import load_dotenv  # type: ignore
@@ -383,7 +384,203 @@ def faq_chat():
         return jsonify({"error": f"Groq API error: {str(e)}"}), 502
 
 # ---------------------------
-# Run
+# Firebase Admin + Push Notifications
+# ---------------------------
+import firebase_admin  # type: ignore
+from firebase_admin import credentials, firestore as admin_firestore  # type: ignore
+
+def init_firebase_admin():
+    """Initialize Firebase Admin SDK for Firestore listening."""
+    # Option 1: Service account JSON string from environment variable (for cloud deployment)
+    service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if service_account_json:
+        try:
+            import json as _json
+            service_account_info = _json.loads(service_account_json)
+            cred = credentials.Certificate(service_account_info)
+            firebase_admin.initialize_app(cred)
+            print("✅ Firebase Admin SDK initialized from env variable")
+            return admin_firestore.client()
+        except Exception as e:
+            print(f"❌ Firebase Admin init error (from env): {e}")
+            return None
+
+    # Option 2: Service account key file (for local development)
+    service_account_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "serviceAccountKey.json")
+    if not os.path.exists(service_account_path):
+        print(f"⚠️  Firebase service account key not found at: {service_account_path}")
+        print("   Push notifications will NOT work until you add the service account key.")
+        print("   Download it from: Firebase Console → Project Settings → Service Accounts → Generate New Private Key")
+        return None
+    try:
+        cred = credentials.Certificate(service_account_path)
+        firebase_admin.initialize_app(cred)
+        print("✅ Firebase Admin SDK initialized from file")
+        return admin_firestore.client()
+    except Exception as e:
+        print(f"❌ Firebase Admin init error: {e}")
+        return None
+
+
+def send_expo_push(token: str, title: str, body: str, data: dict = None):
+    """Send a push notification via Expo's free push service."""
+    if not token or not token.startswith("ExponentPushToken["):
+        return
+    payload = {
+        "to": token,
+        "sound": "default",
+        "title": title,
+        "body": body,
+        "data": data or {},
+        "priority": "high",
+        "channelId": "complaint-updates",
+    }
+    try:
+        resp = http_requests.post(
+            "https://exp.host/--/api/v2/push/send",
+            json=payload,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            timeout=10,
+        )
+        result = resp.json()
+        if "errors" in result:
+            print(f"Push error: {result['errors']}")
+        else:
+            print(f"✅ Push sent to {token[:30]}...")
+    except Exception as e:
+        print(f"Push send error: {e}")
+
+
+def start_firestore_listeners(db):
+    """Start background Firestore listeners for complaint status changes and deployments."""
+
+    # Track complaint statuses to detect changes
+    complaint_statuses: dict = {}  # key: "{userId}/{complaintKey}" -> last known status
+
+    def on_users_snapshot(col_snapshot, changes, read_time):
+        """Listen to ALL users' complaints for status changes → notify residents."""
+        for change in changes:
+            if change.type.name in ("ADDED", "MODIFIED"):
+                doc = change.document
+                data = doc.to_dict()
+                status = (data.get("status") or "").lower()
+                complaint_type = data.get("type", "complaint")
+
+                # Extract userId from document path: users/{uid}/userComplaints/{key}
+                path_parts = doc.reference.path.split("/")
+                if len(path_parts) >= 4:
+                    user_id = path_parts[1]
+                    complaint_key = path_parts[3]
+                else:
+                    continue
+
+                tracker_key = f"{user_id}/{complaint_key}"
+                prev_status = complaint_statuses.get(tracker_key)
+                complaint_statuses[tracker_key] = status
+
+                # Skip initial load (no previous status)
+                if prev_status is None:
+                    continue
+
+                # Only notify on actual status changes
+                if prev_status == status:
+                    continue
+
+                # Get the user's push token
+                try:
+                    user_ref = db.collection("users").document(user_id)
+                    user_doc = user_ref.get()
+                    if not user_doc.exists:
+                        continue
+                    user_data = user_doc.to_dict()
+                    push_token = user_data.get("expoPushToken")
+                    if not push_token:
+                        continue
+                except Exception as e:
+                    print(f"Error fetching user push token: {e}")
+                    continue
+
+                if status == "in progress" or status == "in-progress":
+                    send_expo_push(
+                        push_token,
+                        "Complaint In Progress",
+                        f"Your {complaint_type} complaint is now being handled by a tanod.",
+                        {"screen": "complain", "complaintKey": complaint_key},
+                    )
+                elif status == "resolved":
+                    send_expo_push(
+                        push_token,
+                        "Complaint Resolved",
+                        f"Your {complaint_type} complaint has been resolved.",
+                        {"screen": "complain", "complaintKey": complaint_key},
+                    )
+
+    # Track employee deployment statuses
+    employee_deployment_status: dict = {}  # uid -> last known deploymentStatus
+
+    def on_employee_snapshot(col_snapshot, changes, read_time):
+        """Listen to employee documents for new deployments → notify tanods."""
+        for change in changes:
+            if change.type.name in ("ADDED", "MODIFIED"):
+                doc = change.document
+                data = doc.to_dict()
+                uid = doc.id
+                deployment_status = data.get("deploymentStatus", "available")
+                deployed_to = data.get("deployedTo")
+
+                prev = employee_deployment_status.get(uid)
+                employee_deployment_status[uid] = deployment_status
+
+                # Skip initial load
+                if prev is None:
+                    continue
+
+                # Detect new deployment
+                if prev != "deployed" and deployment_status == "deployed" and deployed_to:
+                    push_token = data.get("expoPushToken")
+                    if not push_token:
+                        continue
+                    complaint_type = deployed_to.get("type", "complaint")
+                    purok = deployed_to.get("incidentPurok", "")
+                    send_expo_push(
+                        push_token,
+                        "New Complaint Assigned",
+                        f"You have been deployed to a {complaint_type} complaint in Purok {purok}.",
+                        {"screen": "manage-requests", "complaintKey": deployed_to.get("complaintKey", "")},
+                    )
+
+    # Start listening to all users' complaints using collection group query
+    print("🔔 Starting Firestore listeners for push notifications...")
+
+    # Listen to all userComplaints across all users
+    db.collection_group("userComplaints").on_snapshot(on_users_snapshot)
+    print("   ✅ Listening to complaint status changes")
+
+    # Listen to all employee documents
+    db.collection("employee").on_snapshot(on_employee_snapshot)
+    print("   ✅ Listening to employee deployment changes")
+
+
+# ---------------------------
+# Initialize Firebase Admin + Start Listeners (runs under both flask dev server and gunicorn)
+# ---------------------------
+_admin_db = init_firebase_admin()
+if _admin_db:
+    _listener_thread = threading.Thread(
+        target=start_firestore_listeners,
+        args=(_admin_db,),
+        daemon=True,
+    )
+    _listener_thread.start()
+else:
+    print("⚠️  Running without push notifications (no service account key)")
+
+
+# ---------------------------
+# Run (only when running directly, not via gunicorn)
 # ---------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

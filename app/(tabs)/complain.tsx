@@ -39,6 +39,10 @@ import {
     where
 } from "firebase/firestore";
 import { auth, firestore } from "../../backend/firebaseConfig";
+import {
+  savePushTokenToFirestore,
+  showLocalNotification,
+} from "../../utils/notifications";
 
 const COLORS = {
   bg: "#FFFFFF",
@@ -206,6 +210,8 @@ export default function App() {
 
   useEffect(() => {
     fetchUserData();
+    // Register push token for this resident
+    savePushTokenToFirestore("users");
   }, []);
 
   const onRefresh = async () => {
@@ -355,6 +361,21 @@ export default function App() {
           const prev = fk ? prevMap.get(fk) : undefined;
           if (prev && prev.status !== c.status && fk) {
             addStatusUpdateKey(statusKey, fk);
+
+            // Trigger local notification + beep on status change
+            if (c.status?.toLowerCase() === "in progress") {
+              showLocalNotification(
+                "Complaint In Progress",
+                `Your ${c.type} complaint is now being handled by a tanod.`,
+                { screen: "complain", complaintKey: fk }
+              );
+            } else if (c.status?.toLowerCase() === "resolved") {
+              showLocalNotification(
+                "Complaint Resolved",
+                `Your ${c.type} complaint has been resolved.`,
+                { screen: "complain", complaintKey: fk }
+              );
+            }
           }
 
           if (c.hasUpdate && fk) {
@@ -535,7 +556,7 @@ export default function App() {
         return;
       }
 
-      const API_URL = "http://192.168.68.126:5000";
+      const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "http://192.168.68.126:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",

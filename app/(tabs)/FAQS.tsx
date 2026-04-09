@@ -39,7 +39,7 @@ const COLORS = {
 };
 
 // --- Configuration ---
-const BACKEND_URL = "http://192.168.68.126:5000";
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "http://192.168.68.126:5000";
 
 
 // Define the FAQ structure

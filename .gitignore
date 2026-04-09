@@ -67,3 +67,7 @@ env/
 # Ignore your trained Machine Learning models (usually too big for Git)
 *.pkl
 *.joblib
+
+# Firebase Admin SDK service account key (NEVER commit this!)
+serviceAccountKey.json
+**/serviceAccountKey.json

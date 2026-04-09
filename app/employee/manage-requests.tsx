@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
+import {
+  savePushTokenToFirestore,
+  showLocalNotification,
+} from "../../utils/notifications";
 
 interface CoDeployedTanod {
   uid: string;
@@ -76,6 +80,12 @@ export default function ManageRequests() {
       return;
     }
 
+    // Register push token for this employee
+    savePushTokenToFirestore("employee");
+
+    // Track previous deployment status to detect new deployments
+    let prevDeploymentStatus: string | null = null;
+
     // Listen to tanod's own employee document for current deployment + ID status
     const tanodRef = doc(firestore, "employee", user.uid);
     const unsubTanod = onSnapshot(tanodRef, async (snapshot) => {
@@ -98,6 +108,24 @@ export default function ManageRequests() {
         }
       }
       setIdStatus(status || "Pending");
+
+      // Detect new deployment and trigger notification
+      const currentDeploymentStatus = data.deploymentStatus || "available";
+      if (
+        prevDeploymentStatus !== null &&
+        prevDeploymentStatus !== "deployed" &&
+        currentDeploymentStatus === "deployed" &&
+        data.deployedTo
+      ) {
+        const deployed = data.deployedTo;
+        showLocalNotification(
+          "New Complaint Assigned",
+          `You have been deployed to a ${deployed.type} complaint in Purok ${deployed.incidentPurok}.`,
+          { screen: "manage-requests", complaintKey: deployed.complaintKey }
+        );
+      }
+      prevDeploymentStatus = currentDeploymentStatus;
+
       if (data.deploymentStatus === "deployed" && data.deployedTo) {
         setActiveDeployment(data.deployedTo as ActiveDeployment);
       } else {
