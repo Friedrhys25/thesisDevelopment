@@ -57,7 +57,7 @@ export default function RegisterPage() {
   const [number, setNumber] = useState("");
 
   // NEW: Tenant / Residency
-  const [residencyStatus, setResidencyStatus] = useState<"resident" | "tenant">("resident");
+  const [residencyStatus, setResidencyStatus] = useState<"resident" | "renter">("resident");
 
   // NEW: Employee toggle
   const [isEmployee, setIsEmployee] = useState(false);
@@ -124,6 +124,21 @@ export default function RegisterPage() {
   const isPasswordStrong = (pw: string) => {
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
     return regex.test(pw);
+  };
+
+  const getPasswordStrength = (pw: string) => {
+    if (!pw) return { label: "", color: "transparent", width: "0%" };
+    let score = 0;
+    if (pw.length >= 6) score++;
+    if (pw.length >= 8) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    if (score <= 1) return { label: "Weak", color: "#EF4444", width: "20%" };
+    if (score <= 2) return { label: "Fair", color: "#F97316", width: "40%" };
+    if (score <= 3) return { label: "Good", color: "#F59E0B", width: "60%" };
+    if (score <= 4) return { label: "Strong", color: "#10B981", width: "80%" };
+    return { label: "Very Strong", color: "#10B981", width: "100%" };
   };
 
   // AGE CALCULATION
@@ -247,7 +262,7 @@ export default function RegisterPage() {
           age: calculateAge(birthday),
           number,
 
-          residencyStatus, // "resident" | "tenant"
+          residencyStatus, // "resident" | "renter"
 
           isEmployee,
 
@@ -496,19 +511,19 @@ export default function RegisterPage() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Tenant in Barangay?</Text>
+                <Text style={styles.inputLabel}>Renter in Barangay?</Text>
                 <View style={styles.rowBtns}>
                   <TouchableOpacity
                     style={[styles.smallBtn, residencyStatus === "resident" && styles.smallBtnActive]}
                     onPress={() => setResidencyStatus("resident")}
                   >
-                    <Text style={styles.smallBtnText}>NO (Resident)</Text>
+                    <Text style={styles.smallBtnText}>Resident</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.smallBtn, residencyStatus === "tenant" && styles.smallBtnActive]}
-                    onPress={() => setResidencyStatus("tenant")}
+                    style={[styles.smallBtn, residencyStatus === "renter" && styles.smallBtnActive]}
+                    onPress={() => setResidencyStatus("renter")}
                   >
-                    <Text style={styles.smallBtnText}>YES (Tenant)</Text>
+                    <Text style={styles.smallBtnText}>Renter</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -545,9 +560,19 @@ export default function RegisterPage() {
                     onChangeText={setPassword}
                   />
                   <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-                    <Ionicons name={passwordVisible ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
+                    <Ionicons name={passwordVisible ? "eye" : "eye-off"} size={22} color="#9CA3AF" />
                   </TouchableOpacity>
                 </View>
+                {password.length > 0 && (
+                  <View style={{ gap: 4, marginTop: 6 }}>
+                    <View style={styles.strengthBarBg}>
+                      <View style={[styles.strengthBarFill, { width: getPasswordStrength(password).width as any, backgroundColor: getPasswordStrength(password).color }]} />
+                    </View>
+                    <Text style={[styles.strengthLabel, { color: getPasswordStrength(password).color }]}>
+                      {getPasswordStrength(password).label}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.inputGroup}>
@@ -562,12 +587,21 @@ export default function RegisterPage() {
                     onChangeText={setConfirmPassword}
                   />
                   <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
-                    <Ionicons name={confirmPasswordVisible ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
+                    <Ionicons name={confirmPasswordVisible ? "eye" : "eye-off"} size={22} color="#9CA3AF" />
                   </TouchableOpacity>
                 </View>
 
-                {confirmPassword && password !== confirmPassword && (
-                  <Text style={styles.errorText}>Passwords do not match</Text>
+                {confirmPassword.length > 0 && (
+                  <View style={styles.matchRow}>
+                    <Ionicons
+                      name={password === confirmPassword ? "checkmark-circle" : "close-circle"}
+                      size={16}
+                      color={password === confirmPassword ? "#10B981" : "#EF4444"}
+                    />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: password === confirmPassword ? "#10B981" : "#EF4444" }}>
+                      {password === confirmPassword ? "Passwords match" : "Passwords do not match"}
+                    </Text>
+                  </View>
                 )}
               </View>
 
@@ -631,7 +665,7 @@ export default function RegisterPage() {
               <View style={styles.reviewItem}>
                 <Text style={styles.reviewLabel}>Residency Status</Text>
                 <Text style={styles.reviewValue}>
-                  {residencyStatus === "resident" ? "Resident" : "Tenant"}
+                  {residencyStatus === "resident" ? "Resident" : "Renter"}
                 </Text>
               </View>
 
@@ -1061,5 +1095,26 @@ const styles = StyleSheet.create({
     color: "#fff", 
     fontSize: 16, 
     fontWeight: "800" 
+  },
+
+  strengthBarBg: {
+    height: 4,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  strengthBarFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+  strengthLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  matchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
   },
 });

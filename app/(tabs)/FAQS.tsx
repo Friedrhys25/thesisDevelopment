@@ -39,9 +39,7 @@ const COLORS = {
 };
 
 // --- Configuration ---
-const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || "";
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.1-8b-instant"; // free tier, fast
+const BACKEND_URL = "http://192.168.68.126:5000";
 
 
 // Define the FAQ structure
@@ -84,6 +82,11 @@ const ALLOWED_KEYWORDS = [
   // App general
   "app", "barangay", "talk2kap", "notification", "update", "setting", "faq", "question",
   "how", "what", "where", "when", "can i", "do i",
+  // Tagalog / Filipino keywords
+  "reklamo", "sumbong", "tulong", "tanong", "paano", "saan", "kailan", "ano",
+  "problema", "isyu", "kapitan", "barangay", "kontrol", "ayuda", "paalala",
+  "magreklamo", "magsumbong", "magtanong", "nasaan", "anong", "papaano",
+  "gawa", "lagay", "pasok", "sulat", "kuha", "pag-alam", "opisyal",
 ];
 
 // Blocked topic patterns — if matched, reject immediately
@@ -118,6 +121,8 @@ const passesGuardrail = (question: string): boolean => {
 
 const SYSTEM_INSTRUCTION = `You are the official FAQ assistant for Talk2Kap, a barangay complaint and feedback system app. Answer ONLY about this app's features. Keep answers concise (2-4 sentences). If unrelated, say you can only help with the Talk2Kap system.
 
+IMPORTANT: Users may write in Tagalog, Taglish (mixed Tagalog-English), Bisaya, or use Filipino slang. ALWAYS translate any non-English input to English first, understand the question, then respond in English. If the user writes in Tagalog/Taglish, you may include a brief Tagalog translation of your answer in parentheses after the English answer.
+
 APP FEATURES:
 - Complaints: submit with description + purok + photo evidence (<5MB). AI-classified types. Status: Pending → In Progress → Resolved. Limit: 5/day. Urgent: 2/day with 24hr cooldown. Chat with staff. Delete before review only.
 - Emergency: hotlines — 911, Police (09353581020), Fire (0997 298 5204), Ambulance (0926 532 6524)
@@ -140,37 +145,29 @@ const fetchChatbotResponse = async (userQuestion: string): Promise<string> => {
     return localResult;
   }
 
-  // Only call Groq for on-topic questions that don't match any FAQ
-  if (!GROQ_API_KEY) {
-    return "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below.";
-  }
-
+  // Only call backend for on-topic questions that don't match any FAQ
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const response = await fetch(`${BACKEND_URL}/api/chat`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: GROQ_MODEL,
         messages: [
           { role: "system", content: SYSTEM_INSTRUCTION },
           { role: "user", content: userQuestion },
         ],
-        temperature: 0.1,
-        max_tokens: 300,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`);
+      throw new Error(`Backend error: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content?.trim() || "Unable to generate a response. Please try again.";
+    return data.answer?.trim() || "Unable to generate a response. Please try again.";
   } catch (error: any) {
-    console.error("Groq FAQ Error:", error);
+    console.error("FAQ Chat Error:", error);
     return "I'm sorry, I can only provide answers based on the Frequently Asked Questions list. Please try rephrasing your question or selecting one of the quick buttons below.";
   }
 };

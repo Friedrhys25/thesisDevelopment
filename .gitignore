@@ -42,6 +42,9 @@ app-example
 /ios
 /android
 
+# Firebase service config (contains API keys)
+app/google-services.json
+
 # -------------------------
 # Python / Flask Additions
 # -------------------------

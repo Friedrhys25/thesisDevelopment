@@ -149,6 +149,9 @@ export default function App() {
   const [isUrgent, setIsUrgent] = useState(false);
   const [urgentCooldownMsg, setUrgentCooldownMsg] = useState("");
   const [isUrgentDisabled, setIsUrgentDisabled] = useState(false);
+  const [tanodAvatars, setTanodAvatars] = useState<Record<string, { avatar: string; name: string }>>({});
+  const [tanodInfoModalVisible, setTanodInfoModalVisible] = useState(false);
+  const [selectedTanod, setSelectedTanod] = useState<{ uid: string; name: string; avatar: string } | null>(null);
 
   const isIdApproved = idStatus?.toLowerCase() === "verified" || idStatus?.toLowerCase() === "approved";
 
@@ -369,6 +372,47 @@ export default function App() {
   }, []);
 
   // ===========================
+  // Fetch Tanod Avatars for deployed tanods
+  // ===========================
+  useEffect(() => {
+    const fetchTanodAvatars = async () => {
+      const uids = new Set<string>();
+      notifications.forEach((n) => {
+        if (n.deployedTanods) {
+          n.deployedTanods.forEach((t) => uids.add(t.uid));
+        }
+        if (n.deployedTanodUid) uids.add(n.deployedTanodUid);
+      });
+
+      // Only fetch avatars we don't already have
+      const newUids = [...uids].filter((uid) => !tanodAvatars[uid]);
+      if (newUids.length === 0) return;
+
+      const fetched: Record<string, { avatar: string; name: string }> = {};
+      for (const uid of newUids) {
+        try {
+          const empDoc = await getDoc(doc(firestore, "employee", uid));
+          if (empDoc.exists()) {
+            const data = empDoc.data();
+            fetched[uid] = {
+              avatar: data.avatar || "",
+              name: `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Tanod",
+            };
+          }
+        } catch (e) {
+          console.error("Error fetching tanod avatar:", e);
+        }
+      }
+
+      if (Object.keys(fetched).length > 0) {
+        setTanodAvatars((prev) => ({ ...prev, ...fetched }));
+      }
+    };
+
+    fetchTanodAvatars();
+  }, [notifications]);
+
+  // ===========================
   // Effect to Check Urgent Cooldown
   // ===========================
   useEffect(() => {
@@ -491,7 +535,7 @@ export default function App() {
         return;
       }
 
-      const API_URL = "http://192.168.68.125:5000";
+      const API_URL = "http://192.168.68.126:5000";
 
       const response = await fetch(`${API_URL}/classify`, {
         method: "POST",
@@ -1020,6 +1064,39 @@ export default function App() {
                   {/* Footer Row */}
                   <View style={styles.cardFooter}>
                     <Text style={styles.footerText}>🕒 {n.timestamp}</Text>
+                    {/* Deployed Tanod Avatars */}
+                    {(n.deployedTanods?.length || n.deployedTanodUid) && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        {(n.deployedTanods || (n.deployedTanodUid ? [{ uid: n.deployedTanodUid, name: "Tanod" }] : [])).map((tanod: { uid: string; name: string }) => {
+                          const info = tanodAvatars[tanod.uid];
+                          return (
+                            <TouchableOpacity
+                              key={tanod.uid}
+                              onPress={() => {
+                                setSelectedTanod({
+                                  uid: tanod.uid,
+                                  name: info?.name || tanod.name || "Tanod",
+                                  avatar: info?.avatar || "",
+                                });
+                                setTanodInfoModalVisible(true);
+                              }}
+                              style={{ marginLeft: 2 }}
+                            >
+                              {info?.avatar ? (
+                                <Image
+                                  source={{ uri: info.avatar }}
+                                  style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: COLORS.primary }}
+                                />
+                              ) : (
+                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center" }}>
+                                  <Ionicons name="shield" size={14} color="#fff" />
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
 
                   {/* Feedback Button Overlay for Resolved Complaints */}
@@ -1553,6 +1630,26 @@ export default function App() {
         </View>
       </Modal>
 
+      {/* Tanod Info Modal */}
+      <Modal visible={tanodInfoModalVisible} transparent animationType="fade" onRequestClose={() => setTanodInfoModalVisible(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" }} activeOpacity={1} onPress={() => setTanodInfoModalVisible(false)}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 24, alignItems: "center", width: 280 }}>
+            {selectedTanod?.avatar ? (
+              <Image source={{ uri: selectedTanod.avatar }} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 12, borderWidth: 2, borderColor: COLORS.primary }} />
+            ) : (
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center", marginBottom: 12 }}>
+                <Ionicons name="shield-checkmark" size={36} color="#fff" />
+              </View>
+            )}
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#1A1A1A", marginBottom: 4 }}>{selectedTanod?.name || "Tanod"}</Text>
+            <Text style={{ fontSize: 13, color: "#6B6B6B" }}>Assigned Tanod</Text>
+            <TouchableOpacity style={{ marginTop: 16, backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 }} onPress={() => setTanodInfoModalVisible(false)}>
+              <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -1654,11 +1751,6 @@ const styles = StyleSheet.create({
     marginBottom: 0, // Handled by AnimatedCard wrapper
     borderWidth: 1,
     borderColor: "rgba(229,231,235,0.4)",
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
   },
   cardImage: {
     width: "100%",
@@ -1834,11 +1926,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   myMessageBubble: {
     backgroundColor: COLORS.primary,
@@ -1895,11 +1982,6 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     fontSize: 15,
     color: COLORS.text,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 2,
   },
   sendButton: {
     backgroundColor: COLORS.primary,

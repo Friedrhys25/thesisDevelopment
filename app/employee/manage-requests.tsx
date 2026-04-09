@@ -67,6 +67,7 @@ export default function ManageRequests() {
   const [resolving, setResolving] = useState(false);
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
   const [cardToResolve, setCardToResolve] = useState<ComplaintCard | null>(null);
+  const [idStatus, setIdStatus] = useState<string>("Pending");
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -75,15 +76,28 @@ export default function ManageRequests() {
       return;
     }
 
-    // Listen to tanod's own employee document for current deployment
+    // Listen to tanod's own employee document for current deployment + ID status
     const tanodRef = doc(firestore, "employee", user.uid);
-    const unsubTanod = onSnapshot(tanodRef, (snapshot) => {
+    const unsubTanod = onSnapshot(tanodRef, async (snapshot) => {
       if (!snapshot.exists()) {
         setActiveDeployment(null);
         setLoading(false);
         return;
       }
       const data = snapshot.data();
+      let status = data.idstatus || "";
+      // Also check "users" collection if employee doc doesn't have idstatus
+      if (!status) {
+        try {
+          const userDoc = await getDoc(doc(firestore, "users", user.uid));
+          if (userDoc.exists()) {
+            status = userDoc.data().idstatus || "Pending";
+          }
+        } catch (e) {
+          console.error("Error fetching user doc:", e);
+        }
+      }
+      setIdStatus(status || "Pending");
       if (data.deploymentStatus === "deployed" && data.deployedTo) {
         setActiveDeployment(data.deployedTo as ActiveDeployment);
       } else {
@@ -280,6 +294,33 @@ export default function ManageRequests() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4a90e2" />
           <Text style={styles.loadingText}>Loading complaints...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Block access if ID is not verified (case-insensitive check)
+  const isIdVerified = idStatus?.toLowerCase() === "verified" || idStatus?.toLowerCase() === "approved";
+  if (!isIdVerified) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <View style={styles.loadingContainer}>
+          <Ionicons name="shield-outline" size={80} color="#ff9800" />
+          <Text style={{ fontSize: 20, fontWeight: "bold", color: "#2c3e50", marginTop: 20, textAlign: "center" }}>
+            ID Verification Required
+          </Text>
+          <Text style={{ fontSize: 15, color: "#666", marginTop: 12, textAlign: "center", paddingHorizontal: 40 }}>
+            {idStatus === "Pending"
+              ? "Your ID is still being verified. Please wait for admin approval before accessing complaint management."
+              : "Your ID verification was denied. Please upload a valid ID in your profile to regain access."}
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 24, backgroundColor: "#4a90e2", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }}
+            onPress={() => router.push("/employee/profile")}
+          >
+            <Text style={{ color: "#fff", fontWeight: "600", fontSize: 15 }}>Go to Profile</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );

@@ -25,7 +25,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -223,7 +222,7 @@ const handleLogin = async () => {
                 disabled={loading}
               >
                 <Ionicons
-                  name={showPassword ? "eye-off" : "eye"}
+                  name={showPassword ? "eye" : "eye-off"}
                   size={18}
                   color="#999"
                 />
@@ -231,18 +230,8 @@ const handleLogin = async () => {
             </View>
           </View>
 
-          {/* Remember Me & Forgot Password */}
+          {/* Forgot Password */}
           <View style={styles.bottomOptionsRow}>
-            <View style={styles.rememberContainer}>
-              <TouchableOpacity 
-                style={[styles.checkbox, rememberMe && styles.checkboxActive]}
-                onPress={() => setRememberMe(!rememberMe)}
-                activeOpacity={0.8}
-              >
-                {rememberMe && <Ionicons name="checkmark" size={16} color="#fff" />}
-              </TouchableOpacity>
-              <Text style={styles.rememberText}>Remember me</Text>
-            </View>
             <TouchableOpacity onPress={handleForgotPassword} disabled={loading}>
               <Text style={styles.forgotLink}>Forgot Password?</Text>
             </TouchableOpacity>
@@ -406,32 +395,9 @@ const styles = StyleSheet.create({
 
   bottomOptionsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
     marginBottom: 32,
-  },
-  rememberContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: "#4F46E5",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
-  checkboxActive: {
-    backgroundColor: "#4F46E5",
-  },
-  rememberText: {
-    fontSize: 15,
-    color: "#4B5563",
-    fontWeight: "500",
   },
   forgotLink: {
     fontSize: 15,

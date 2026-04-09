@@ -93,6 +93,54 @@ def looks_like_nonsense(text: str) -> bool:
     return False
 
 # ---------------------------
+# Groq: Translate Tagalog/slang to English
+# ---------------------------
+def groq_translate(message: str) -> str:
+    """
+    Detects if the message is in Tagalog, Filipino slang, or mixed
+    Taglish and translates to English using Groq.
+    Returns translated English text, or original if already English.
+    """
+    if not GROQ_API_KEY:
+        return message
+
+    prompt = f"""You are a translator. Determine if this message is in Tagalog, Filipino slang, Taglish (mixed Tagalog-English), or any Filipino dialect.
+
+Message: \"\"\"{message}\"\"\"
+
+If the message is already in English, return it as-is.
+If it contains Tagalog, Filipino slang, or Taglish, translate the ENTIRE message to clear English while preserving the meaning and urgency.
+
+Return ONLY the translated English text, nothing else. No quotes, no explanation."""
+
+    try:
+        resp = http_requests.post(
+            GROQ_API_URL,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": GROQ_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1,
+                "max_tokens": 300,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        translated = result["choices"][0]["message"]["content"].strip()
+        # Remove surrounding quotes if the model added them
+        if (translated.startswith('"') and translated.endswith('"')) or \
+           (translated.startswith("'") and translated.endswith("'")):
+            translated = translated[1:-1].strip()
+        return translated if translated else message
+    except Exception as e:
+        print("Groq translate error:", repr(e))
+        return message
+
+# ---------------------------
 # Local predictions with confidence
 # ---------------------------
 def predict_with_confidence(model, text: str):
@@ -106,18 +154,39 @@ def predict_with_confidence(model, text: str):
         return pred, None
 
 # ============================================================
-# Groq: Validate/support the local ML classification
+# Groq: Classify the complaint type directly using AI
 # ============================================================
-def groq_validate(message: str, local_label: str, local_type: str) -> dict:
+def groq_classify(message: str, local_label: str, local_type: str, type_conf: float) -> dict:
     """
-    Uses Groq (Llama 3) to validate the local ML result.
+    Uses Groq (Llama 3) to classify or validate the complaint type.
+    When local confidence is low (<0.7), Groq does primary classification.
+    When high, Groq validates the local result.
     Returns: { agree, suggested_label, suggested_type, support }
     Falls back gracefully if Groq is unavailable.
     """
     if not GROQ_API_KEY:
         return {"agree": True, "suggested_label": None, "suggested_type": None, "support": None}
 
-    prompt = f"""You are validating a barangay complaint classification.
+    low_confidence = type_conf is None or type_conf < 0.7
+
+    if low_confidence:
+        prompt = f"""You are a barangay complaint classifier. Classify this complaint message.
+
+Allowed labels: {VALID_LABELS}
+Allowed types: {VALID_TYPES}
+
+Type-to-label mapping (use this to determine the correct label from the type):
+{json.dumps(TYPE_TO_LABEL)}
+
+Message: \"\"\"{message}\"\"\"
+
+Classify the message into the most accurate type from the allowed types list.
+Then determine the label using the type-to-label mapping.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{"agree": false, "suggested_label": "<label>", "suggested_type": "<type>", "support": "<brief reason>"}}"""
+    else:
+        prompt = f"""You are validating a barangay complaint classification.
 
 Allowed labels: {VALID_LABELS}
 Allowed types: {VALID_TYPES}
@@ -127,13 +196,13 @@ Type-to-label mapping:
 
 Message: \"\"\"{message}\"\"\"
 
-Local model result: label="{local_label}", type="{local_type}"
+Local model result: label="{local_label}", type="{local_type}" (confidence: {type_conf:.2f})
 
-If correct: return JSON with agree=true and a short support reason.
-If wrong: return JSON with agree=false and corrected label/type from allowed lists.
+If the type is correct: return JSON with agree=true and a short support reason.
+If the type is wrong: return JSON with agree=false and the corrected label/type from the allowed lists.
 
-Return ONLY JSON:
-{{"agree": true/false, "suggested_label": "...|null", "suggested_type": "...|null", "support": "...|null"}}"""
+Return ONLY valid JSON (no markdown, no explanation):
+{{"agree": true/false, "suggested_label": "<label or null>", "suggested_type": "<type or null>", "support": "<brief reason or null>"}}"""
 
     try:
         resp = http_requests.post(
@@ -190,7 +259,7 @@ Return ONLY JSON:
             "support": support if support else None
         }
     except Exception as e:
-        print("Groq validate error:", repr(e))
+        print("Groq classify error:", repr(e))
         return {"agree": True, "suggested_label": None, "suggested_type": None, "support": None}
 
 # ---------------------------
@@ -212,8 +281,12 @@ def classify():
             "support": None
         })
 
-    # Classify using LOCAL ML
-    message = normalize_text(raw_message)
+    # Translate Tagalog/slang to English first
+    translated = groq_translate(raw_message)
+    is_translated = translated.lower().strip() != raw_message.lower().strip()
+
+    # Classify using LOCAL ML (use translated text for better accuracy)
+    message = normalize_text(translated)
 
     label_pred, label_conf = predict_with_confidence(label_model, message)
     type_pred, type_conf = predict_with_confidence(type_model, message)
@@ -228,25 +301,86 @@ def classify():
     final_label = expected if expected else label_pred
     final_type = type_pred if type_pred in VALID_TYPES else "off-topic"
 
-    # Groq validation: let AI verify the local ML result
-    validation = groq_validate(raw_message, final_label, final_type)
+    # Groq AI: classify or validate the type (use both original and translated)
+    classify_msg = translated if is_translated else raw_message
+    validation = groq_classify(classify_msg, final_label, final_type, type_conf)
 
-    if validation.get("agree") is False and validation.get("suggested_label") and validation.get("suggested_type"):
-        final_label = validation["suggested_label"]
-        final_type = validation["suggested_type"]
-        source = "local+groq_override"
+    # Groq overrides when it disagrees OR when local confidence is low
+    if validation.get("agree") is False:
+        if validation.get("suggested_type"):
+            final_type = validation["suggested_type"]
+            source = "groq_classified"
+        if validation.get("suggested_label"):
+            final_label = validation["suggested_label"]
+        elif validation.get("suggested_type"):
+            # Derive label from type mapping
+            expected_from_groq = TYPE_TO_LABEL.get(final_type)
+            if expected_from_groq:
+                final_label = expected_from_groq
+            source = "groq_classified"
+        else:
+            source = "local+groq_support" if GROQ_API_KEY else "local_only"
     else:
         source = "local+groq_support" if GROQ_API_KEY else "local_only"
 
     return jsonify({
         "message": raw_message,
-        "translated": None,
+        "translated": translated if is_translated else None,
         "label": final_label,
         "type": final_type,
         "source": source,
         "confidence": {"label": label_conf, "type": type_conf},
         "support": validation.get("support")
     })
+
+# ---------------------------
+# FAQ Chat Proxy (Groq)
+# ---------------------------
+GROQ_FAQ_MODEL = "llama-3.1-8b-instant"  # fast model for FAQ chat
+
+@app.route("/api/chat", methods=["POST"])
+def faq_chat():
+    """Proxy FAQ chatbot requests to Groq — keeps API key server-side."""
+    if not GROQ_API_KEY:
+        return jsonify({"error": "Groq API key not configured"}), 500
+
+    data = request.get_json(force=True)
+    messages = data.get("messages")
+    if not messages or not isinstance(messages, list):
+        return jsonify({"error": "messages array is required"}), 400
+
+    # Validate message structure
+    for msg in messages:
+        if not isinstance(msg, dict) or "role" not in msg or "content" not in msg:
+            return jsonify({"error": "Each message must have role and content"}), 400
+        if msg["role"] not in ("system", "user", "assistant"):
+            return jsonify({"error": f"Invalid role: {msg['role']}"}), 400
+        if not isinstance(msg["content"], str) or len(msg["content"]) > 5000:
+            return jsonify({"error": "Content must be a string under 5000 chars"}), 400
+
+    try:
+        resp = http_requests.post(
+            GROQ_API_URL,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": GROQ_FAQ_MODEL,
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": 300,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        answer = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        return jsonify({"answer": answer})
+    except http_requests.exceptions.Timeout:
+        return jsonify({"error": "Groq API timed out"}), 504
+    except http_requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 502
 
 # ---------------------------
 # Run

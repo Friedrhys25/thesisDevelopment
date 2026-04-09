@@ -165,10 +165,10 @@ export default function ProfilePage() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.2, // Aggressive compression to stay under 1MB Firestore limit
+        quality: 0.1,
         base64: true,
       });
 
@@ -179,6 +179,13 @@ export default function ProfilePage() {
 
       if (!currentUser || !base64String) {
         Alert.alert("Error", "You must be logged in.");
+        return;
+      }
+
+      // Check base64 size before writing to Firestore (limit ~700KB to stay under 1MB doc limit)
+      const sizeInBytes = Math.ceil(base64String.length * 0.75);
+      if (sizeInBytes > 700000) {
+        Alert.alert("Image Too Large", "Please choose a smaller image or crop it further.");
         return;
       }
 
@@ -212,10 +219,10 @@ export default function ProfilePage() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.2, // Aggressive compression to stay under 1MB Firestore limit
+        quality: 0.1,
         base64: true,
       });
 
@@ -226,6 +233,13 @@ export default function ProfilePage() {
 
       if (!currentUser || !base64String) {
         Alert.alert("Error", "Login required.");
+        return;
+      }
+
+      // Check base64 size before writing to Firestore (limit ~700KB to stay under 1MB doc limit)
+      const sizeInBytes = Math.ceil(base64String.length * 0.75);
+      if (sizeInBytes > 700000) {
+        Alert.alert("Image Too Large", "Please choose a smaller image or crop it further.");
         return;
       }
 
@@ -276,6 +290,13 @@ export default function ProfilePage() {
     }
     if (newPassword.length < 6) {
       Alert.alert("Validation Error", "New password must be at least 6 characters.");
+      return;
+    }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(newPassword)) {
+      Alert.alert(
+        "Weak Password",
+        "Password must include:\n• At least 1 uppercase letter\n• At least 1 lowercase letter\n• At least 1 digit\n• Minimum 6 characters"
+      );
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -453,7 +474,7 @@ export default function ProfilePage() {
               : { uri: "https://via.placeholder.com/150" }
           }
           style={StyleSheet.absoluteFillObject}
-          blurRadius={30}
+          blurRadius={10}
           resizeMode="cover"
         />
         <LinearGradient
@@ -782,7 +803,7 @@ export default function ProfilePage() {
                     secureTextEntry={!showCurrentPassword}
                   />
                   <Pressable onPress={() => setShowCurrentPassword(!showCurrentPassword)} style={styles.eyeBtn}>
-                    <Ionicons name={showCurrentPassword ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.muted} />
+                    <Ionicons name={showCurrentPassword ? "eye-outline" : "eye-off-outline"} size={20} color={COLORS.muted} />
                   </Pressable>
                 </View>
                 <View style={styles.passwordInputRow}>
@@ -795,7 +816,7 @@ export default function ProfilePage() {
                     secureTextEntry={!showNewPassword}
                   />
                   <Pressable onPress={() => setShowNewPassword(!showNewPassword)} style={styles.eyeBtn}>
-                    <Ionicons name={showNewPassword ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.muted} />
+                    <Ionicons name={showNewPassword ? "eye-outline" : "eye-off-outline"} size={20} color={COLORS.muted} />
                   </Pressable>
                 </View>
                 {newPassword.length > 0 && (
@@ -818,7 +839,7 @@ export default function ProfilePage() {
                     secureTextEntry={!showConfirmPassword}
                   />
                   <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn}>
-                    <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.muted} />
+                    <Ionicons name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} size={20} color={COLORS.muted} />
                   </Pressable>
                 </View>
                 {confirmPassword.length > 0 && (
