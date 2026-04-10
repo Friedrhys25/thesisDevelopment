@@ -20,8 +20,7 @@
         "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "talk2kap-8c526",
         "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "talk2kap-8c526.firebasestorage.app",
         "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "608373284626",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:608373284626:android:627a36be04434fdbf5ddcb",
-        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": ""
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:608373284626:android:627a36be04434fdbf5ddcb"
       }
     },
     "production": {
