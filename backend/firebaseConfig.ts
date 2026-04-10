@@ -1,9 +1,10 @@
 // Import the functions you need from the SDKs you need
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { type Auth, getAuth, getReactNativePersistence, initializeAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // 🔐 Firebase configuration using environment variables
 // Never hardcode API keys! Use .env.local for local development
@@ -61,7 +62,18 @@ try {
 }
 
 // Export Firebase services
-export const auth = getAuth(app);
+// Use initializeAuth with AsyncStorage persistence so users stay logged in across app restarts
+function getAppAuth(): Auth {
+  try {
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch {
+    // If auth is already initialized (hot reload), get existing instance
+    return getAuth(app);
+  }
+}
+export const auth = getAppAuth();
 export const db = getDatabase(app);
 export const storage = getStorage(app);
 export const firestore = getFirestore(app);

@@ -536,7 +536,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      // Check Daily Limit (Max 2 per day)
+      // Check Daily Limit (Max 5 per day)
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date();
@@ -1449,7 +1449,7 @@ export default function App() {
                 <View style={styles.urgentTextContainer}>
                   <Text style={styles.urgentTitle}>Mark as Urgent</Text>
                   <Text style={styles.urgentDescription}>
-                    For severe issues that need immediate action. (Max 2 per week)
+                    For severe issues that need immediate action. (Max 2 per day)
                   </Text>
                   {isUrgentDisabled && (
                     <Text style={styles.urgentCooldownText}>{urgentCooldownMsg}</Text>

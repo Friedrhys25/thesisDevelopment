@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { collection, doc, getDoc, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query } from "firebase/firestore";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
@@ -119,6 +119,7 @@ export default function EmployeeDashboard() {
   const [totalComplaints, setTotalComplaints] = useState(0);
   const [resolvedCount, setResolvedCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
+  const [officials, setOfficials] = useState<{ name: string; position: string; picture: string }[]>([]);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -153,6 +154,7 @@ export default function EmployeeDashboard() {
 
     // Initial load from users collection
     loadEmployeeData();
+    fetchOfficials();
 
     return () => {
       unsubEmp();
@@ -206,7 +208,36 @@ export default function EmployeeDashboard() {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadEmployeeData();
+    await fetchOfficials();
     setRefreshing(false);
+  };
+
+  const getPositionRank = (position: string) => {
+    const p = position.toLowerCase();
+    if (p.includes("captain") || p.includes("punong")) return 0;
+    if (p.includes("secretary")) return 1;
+    if (p.includes("treasurer")) return 2;
+    if (p.includes("kagawad")) return 3;
+    if (p.includes("sk")) return 4;
+    return 5;
+  };
+
+  const fetchOfficials = async () => {
+    try {
+      const snapshot = await getDocs(collection(firestore, "officials"));
+      const list = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          name: data.name || "",
+          position: data.position || "",
+          picture: data.picture || "",
+        };
+      });
+      list.sort((a, b) => getPositionRank(a.position) - getPositionRank(b.position));
+      setOfficials(list);
+    } catch (error) {
+      console.error("Error fetching officials:", error);
+    }
   };
 
   const getIdStatusInfo = useCallback(() => {
@@ -364,6 +395,36 @@ export default function EmployeeDashboard() {
               </View>
             </View>
           </View>
+
+          {/* Barangay Officials Section */}
+          {officials.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Barangay Officials</Text>
+              <View style={styles.officialsCard}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {officials.map((official, index) => (
+                    <View key={index} style={styles.officialItem}>
+                      {official.picture ? (
+                        <Image source={{ uri: official.picture }} style={styles.officialAvatar} />
+                      ) : (
+                        <View style={[styles.officialAvatar, styles.officialAvatarPlaceholder]}>
+                          <Ionicons name="person" size={28} color={COLORS.textMuted} />
+                        </View>
+                      )}
+                      <Text style={styles.officialPosition} numberOfLines={2}>{official.position}</Text>
+                      <Text style={styles.officialName} numberOfLines={2}>{official.name}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+                <View style={styles.thanksContainer}>
+                  <Ionicons name="heart" size={14} color={COLORS.brand} />
+                  <Text style={styles.thanksText}>
+                    Thank you to the Barangay Officials of San Roque for supporting this project
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           <View style={styles.spacer} />
         </ScrollView>
@@ -639,5 +700,63 @@ const styles = StyleSheet.create({
 
   spacer: {
     height: 20,
+  },
+  officialsCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    padding: 14,
+  },
+  officialItem: {
+    alignItems: "center",
+    width: 110,
+    marginHorizontal: 4,
+    paddingVertical: 8,
+  },
+  officialAvatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: COLORS.brand,
+  },
+  officialAvatarPlaceholder: {
+    backgroundColor: COLORS.surface2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  officialPosition: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: COLORS.brand,
+    textAlign: "center",
+    lineHeight: 13,
+    marginBottom: 2,
+  },
+  officialName: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.text,
+    textAlign: "center",
+    lineHeight: 15,
+  },
+  thanksContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: COLORS.border,
+    gap: 6,
+  },
+  thanksText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    textAlign: "center",
+    fontStyle: "italic",
+    flex: 1,
   },
 });

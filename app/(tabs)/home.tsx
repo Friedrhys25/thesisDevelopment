@@ -1,6 +1,6 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Animated,
@@ -47,6 +47,7 @@ export default function HomePage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [officials, setOfficials] = useState<{ name: string; position: string; picture: string }[]>([]);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const fetchUserName = async () => {
@@ -72,11 +73,41 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchUserName();
+    fetchOfficials();
   }, []);
+
+  const getPositionRank = (position: string) => {
+    const p = position.toLowerCase();
+    if (p.includes("captain") || p.includes("punong")) return 0;
+    if (p.includes("secretary")) return 1;
+    if (p.includes("treasurer")) return 2;
+    if (p.includes("kagawad")) return 3;
+    if (p.includes("sk")) return 4;
+    return 5;
+  };
+
+  const fetchOfficials = async () => {
+    try {
+      const snapshot = await getDocs(collection(firestore, "officials"));
+      const list = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          name: data.name || "",
+          position: data.position || "",
+          picture: data.picture || "",
+        };
+      });
+      list.sort((a, b) => getPositionRank(a.position) - getPositionRank(b.position));
+      setOfficials(list);
+    } catch (error) {
+      console.error("Error fetching officials:", error);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchUserName();
+    await fetchOfficials();
     setRefreshing(false);
   };
 
@@ -266,6 +297,35 @@ export default function HomePage() {
             </Text>
           </View>
         </View>
+
+        {/* Barangay Officials Section */}
+        {officials.length > 0 && (
+          <View style={[styles.content, { marginTop: 20 }]}>
+            <Text style={styles.sectionTitle}>Barangay Officials</Text>
+            <Text style={styles.sectionSubtitle}>The leaders of Barangay San Roque</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
+              {officials.map((official, index) => (
+                <View key={index} style={styles.officialCard}>
+                  {official.picture ? (
+                    <Image source={{ uri: official.picture }} style={styles.officialAvatar} />
+                  ) : (
+                    <View style={[styles.officialAvatar, styles.officialAvatarPlaceholder]}>
+                      <Ionicons name="person" size={28} color={COLORS.muted} />
+                    </View>
+                  )}
+                  <Text style={styles.officialPosition} numberOfLines={2}>{official.position}</Text>
+                  <Text style={styles.officialName} numberOfLines={2}>{official.name}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.thanksContainer}>
+              <Ionicons name="heart" size={16} color={COLORS.primary} />
+              <Text style={styles.thanksText}>
+                Thank you to the Barangay Officials of San Roque for supporting this project
+              </Text>
+            </View>
+          </View>
+        )}
       </Animated.ScrollView>
     </SafeAreaView>
   );
@@ -386,6 +446,57 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
     lineHeight: 20,
+  },
+  officialCard: {
+    alignItems: "center",
+    width: 110,
+    marginHorizontal: 8,
+    paddingVertical: 12,
+  },
+  officialAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  officialAvatarPlaceholder: {
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  officialPosition: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.primary,
+    textAlign: "center",
+    lineHeight: 14,
+    marginBottom: 2,
+  },
+  officialName: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.text,
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  thanksContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 6,
+  },
+  thanksText: {
+    fontSize: 12,
+    color: COLORS.muted,
+    textAlign: "center",
+    fontStyle: "italic",
+    flex: 1,
   },
 });
 
