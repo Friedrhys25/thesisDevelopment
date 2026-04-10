@@ -1,5 +1,6 @@
-# Backend (not needed for mobile build)
-backend/
+# Backend (exclude Python files, keep firebaseConfig.ts)
+backend/*
+!backend/firebaseConfig.ts
 
 # Development/CI files
 .github/
