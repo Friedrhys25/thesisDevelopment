@@ -3,7 +3,7 @@ services:
     name: talk2us-backend
     runtime: python
     region: singapore
-    rootDir: talk2us/backend
+    rootDir: backend
     buildCommand: bash build.sh
     startCommand: bash start.sh
     envVars:
