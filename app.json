@@ -14,7 +14,7 @@
       "googleServicesFile": "./app/GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.talk2us.barangaysanroque",
+      "package": "com.victoria.talk2us",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
