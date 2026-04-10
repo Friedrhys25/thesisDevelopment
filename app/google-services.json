@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "608373284626",
+    "firebase_url": "https://talk2kap-8c526-default-rtdb.firebaseio.com",
+    "project_id": "talk2kap-8c526",
+    "storage_bucket": "talk2kap-8c526.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:608373284626:android:627a36be04434fdbf5ddcb",
+        "android_client_info": {
+          "package_name": "com.victoria.talk2us"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQWMr_o34cWu-h-X8NyNsE6PRVzu-qtfQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

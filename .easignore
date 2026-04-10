@@ -1,0 +1,19 @@
+# Backend (not needed for mobile build)
+backend/
+
+# Development/CI files
+.github/
+.vscode/
+
+# Documentation
+*.md
+!README.md
+
+# Python files
+*.py
+*.csv
+*.pkl
+*.joblib
+
+# Service account keys
+serviceAccountKey.json
