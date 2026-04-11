@@ -9,8 +9,11 @@
 - [x] Firebase configured (google-services.json)
 - [x] Expo project ID linked (`bd094578-9bf6-4fe9-8962-294847628923`)
 - [x] Signing keystore managed by Expo (Build Credentials I9TprMrNBb)
+- [x] eas.json production env vars configured (Firebase) — DONE April 12, 2026
+- [x] Production AAB build started (versionCode 3) — DONE April 12, 2026
+  - Build: https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/703b6aac-e114-4186-9413-8e4474d3882d
 
-### What You Still Need ❌
+### What You Still Need ❌ (all doable on 📱 Phone)
 - [ ] **Google Play Developer Account** ($25 one-time fee) — https://play.google.com/console
 - [ ] **Privacy Policy URL** (REQUIRED by Play Store) — hosted on a public website
 - [ ] **Feature Graphic** (1024x500 PNG) — banner image for Play Store listing
@@ -20,22 +23,18 @@
 - [ ] **App Category** — e.g., "Communication" or "Productivity"
 - [ ] **Content Rating Questionnaire** — filled out in Play Console
 - [ ] **Data Safety Form** — declare what data your app collects (camera, location, notifications, Firebase)
-- [ ] **Production AAB Build** (not APK) — Play Store requires `.aab` format
 
 ---
 
 ## WHERE TO DO EACH TASK
 
-### 🖥️ Tasks in VS Code (Terminal/Code Editor)
-| Task | What to Do |
-|------|------------|
-| Update `eas.json` production env vars | Add Firebase env vars to production profile |
-| Build production AAB | Run `eas build --platform android --profile production` |
-| Submit via CLI (optional) | Run `eas submit --platform android --profile production` |
-| Create Privacy Policy page | If hosting on GitHub Pages or in your repo |
-| Take screenshots | Run app on emulator/device and capture from VS Code |
+### 🖥️ VS Code Tasks — ALL COMPLETED ✅
+| Task | Status |
+|------|--------|
+| ~~Update `eas.json` production env vars~~ | ✅ DONE |
+| ~~Build production AAB~~ | ✅ DONE (building on cloud) |
 
-### 🌐 Tasks Outside VS Code (Browser / Play Console)
+### 📱 Remaining Tasks — ALL on Phone
 | Task | Where |
 |------|-------|
 | Create Google Play Developer Account | https://play.google.com/console ($25 fee) |
@@ -46,30 +45,10 @@
 | Fill Data Safety form | Play Console → Data Safety |
 | Set App Access (provide test credentials) | Play Console → App Access |
 | Select target audience & ads declaration | Play Console → Target Audience / Ads |
-| Upload AAB file | Play Console → Production → Releases |
+| Download AAB from expo.dev & upload to Play Console | Play Console → Production → Releases |
 | Submit for Google review | Play Console → Publishing Overview |
-| Create/host Privacy Policy webpage | Any website/hosting (Google Sites, GitHub Pages, etc.) |
-| Create Feature Graphic image (1024x500) | Canva, Photoshop, or any design tool |
-
-🖥️ In VS Code (5 tasks):
-Update eas.json production profile with env vars
-Build production AAB (eas build --platform android --profile production)
-Submit via CLI (optional shortcut)
-Create privacy policy (if hosting in repo/GitHub Pages)
-Take app screenshots
-
-🌐 Outside VS Code — in browser (11 tasks):
-Create Google Play Developer Account ($25)
-Create app listing in Play Console
-Upload feature graphic & screenshots
-Write store description
-Content rating questionnaire
-Data safety form
-App access (test credentials)
-Target audience & ads declaration
-Upload AAB file
-Submit for review
-Create privacy policy webpage & feature graphic image
+| Create Privacy Policy webpage | Google Sites (free) |
+| Create Feature Graphic image (1024x500) | Canva app (phone) |
 
 ---
 
@@ -105,35 +84,11 @@ Create privacy policy webpage & feature graphic image
 
 ---
 
-### PHASE 3: Build Production AAB
+### ~~PHASE 3: Build Production AAB~~ ✅ COMPLETED
 
-**Step 4: Update eas.json production profile**
-Your `eas.json` already has a production profile, but it needs the environment variables.
-Add the same env vars from `preview` to `production`:
-
-```json
-"production": {
-  "autoIncrement": true,
-  "env": {
-    "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCQWMr_o34cWu-h-X8NyNsE6PRVzu-qtfQ",
-    "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "talk2kap-8c526.firebaseapp.com",
-    "EXPO_PUBLIC_FIREBASE_DATABASE_URL": "https://talk2kap-8c526-default-rtdb.firebaseio.com",
-    "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "talk2kap-8c526",
-    "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "talk2kap-8c526.firebasestorage.app",
-    "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "608373284626",
-    "EXPO_PUBLIC_FIREBASE_APP_ID": "1:608373284626:android:627a36be04434fdbf5ddcb"
-  }
-}
-```
-
-**Step 5: Build the Production AAB**
-Run this command:
-```bash
-eas build --platform android --profile production
-```
-- This creates an `.aab` file (Android App Bundle) — required by Play Store
-- The `autoIncrement` setting will handle version codes automatically
-- Build takes ~15-30 minutes on Expo servers
+> **Step 4: eas.json production profile** — ✅ DONE (April 12, 2026)
+> **Step 5: Production AAB build** — ✅ DONE (versionCode 3, building on Expo cloud)
+> Build link: https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/703b6aac-e114-4186-9413-8e4474d3882d
 
 ---
 
@@ -459,3 +414,37 @@ eas submit --platform ios --profile production
 **Step 11 (📱 Phone):** Wait 1-3 days for Apple's review. They may reject and ask for changes — check email.
 
 **Step 12 (📱 Phone):** 🎉 App goes live on the App Store!
+
+---
+
+## NEW LAPTOP SETUP (For iOS build steps or future updates)
+
+> If you switch to a different laptop/computer, here's the MINIMAL setup needed.
+> You do NOT need full project dependencies — EAS builds in the cloud.
+
+### What to install:
+1. **Node.js** — Download from https://nodejs.org (LTS version)
+2. **EAS CLI** — Run in terminal: `npm install -g eas-cli`
+3. **Login to Expo** — Run: `eas login` (account: rhysjonathan)
+
+### What you do NOT need:
+- ❌ `npm install` (no local project dependencies needed)
+- ❌ Python
+- ❌ Android SDK / Android Studio
+- ❌ Xcode (EAS handles iOS signing in the cloud)
+- ❌ Java / Gradle
+- ❌ CocoaPods
+
+### Then just:
+```bash
+git clone <your-repo-url>
+cd talk2us-build
+# For iOS:
+eas credentials            # Link Apple Developer Account
+eas build --platform ios --profile production    # Build IPA
+eas submit --platform ios --profile production   # Upload to App Store
+# For Android updates:
+eas build --platform android --profile production
+```
+
+**That's it — 3 installs (Node, EAS CLI, Expo login) and you're ready to build/submit from any computer.**
