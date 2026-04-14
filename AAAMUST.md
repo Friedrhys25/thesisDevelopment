@@ -1,233 +1,230 @@
 # PLAY STORE DEPLOYMENT GUIDE — talk2us
-
-## READINESS REVIEW
-
-### What You Already Have ✅
-- [x] Android package name: `com.victoria.talk2us`
-- [x] App icon configured (Bagong San Roque logo)
-- [x] EAS Build configured with `production` profile (auto-increment enabled)
-- [x] Firebase configured (google-services.json)
-- [x] Expo project ID linked (`bd094578-9bf6-4fe9-8962-294847628923`)
-- [x] Signing keystore managed by Expo (Build Credentials I9TprMrNBb)
-- [x] eas.json production env vars configured (Firebase) — DONE April 12, 2026
-- [x] Production AAB build started (versionCode 3) — DONE April 12, 2026
-  - Build: https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/703b6aac-e114-4186-9413-8e4474d3882d
-
-### What You Still Need ❌ (all doable on 📱 Phone)
-- [ ] **Google Play Developer Account** ($25 one-time fee) — https://play.google.com/console
-- [ ] **Privacy Policy URL** (REQUIRED by Play Store) — hosted on a public website
-- [ ] **Feature Graphic** (1024x500 PNG) — banner image for Play Store listing
-- [ ] **Screenshots** (at least 2) — phone screenshots of your app
-- [ ] **Short Description** (max 80 characters) — for Play Store listing
-- [ ] **Full Description** (max 4000 characters) — for Play Store listing
-- [ ] **App Category** — e.g., "Communication" or "Productivity"
-- [ ] **Content Rating Questionnaire** — filled out in Play Console
-- [ ] **Data Safety Form** — declare what data your app collects (camera, location, notifications, Firebase)
+> **Last Updated: April 14, 2026**
 
 ---
 
-## WHERE TO DO EACH TASK
+## OVERALL STATUS
 
-### 🖥️ VS Code Tasks — ALL COMPLETED ✅
-| Task | Status |
-|------|--------|
-| ~~Update `eas.json` production env vars~~ | ✅ DONE |
-| ~~Build production AAB~~ | ✅ DONE (building on cloud) |
-
-### 📱 Remaining Tasks — ALL on Phone
-| Task | Where |
-|------|-------|
-| Create Google Play Developer Account | https://play.google.com/console ($25 fee) |
-| Create app listing in Play Console | Play Console → Create App |
-| Upload feature graphic & screenshots | Play Console → Store Listing |
-| Write short/full description | Play Console → Store Listing |
-| Fill Content Rating questionnaire | Play Console → Content Rating |
-| Fill Data Safety form | Play Console → Data Safety |
-| Set App Access (provide test credentials) | Play Console → App Access |
-| Select target audience & ads declaration | Play Console → Target Audience / Ads |
-| Download AAB from expo.dev & upload to Play Console | Play Console → Production → Releases |
-| Submit for Google review | Play Console → Publishing Overview |
-| Create Privacy Policy webpage | Google Sites (free) |
-| Create Feature Graphic image (1024x500) | Canva app (phone) |
-
----
-
-## STEP-BY-STEP DEPLOYMENT PROCESS
-
-### PHASE 1: Prepare Your Google Play Account
-
-**Step 1: Create Google Play Developer Account**
-1. Go to https://play.google.com/console
-2. Sign in with a Google account
-3. Pay the $25 one-time registration fee
-4. Complete your developer profile (name, address, contact info)
-5. Verify your identity (may take 24-48 hours)
+| Milestone | Status |
+|-----------|--------|
+| Google Play Developer Account | ✅ DONE |
+| Package ownership verified (`com.victoria.talk2us`) | ✅ DONE |
+| Production AAB built (versionCode 4, RECORD_AUDIO removed) | ✅ BUILDING |
+| Privacy Policy created (`privacy-policy.html`) | ✅ DONE (needs hosting) |
+| Content Rating questionnaire | ✅ DONE |
+| Data Safety form | ✅ DONE |
+| Store listing text (short + full description) | ✅ DONE |
+| Target audience (18+) | ✅ DONE |
+| Ads declaration (no ads) | ✅ DONE |
+| Advertising ID declaration (no) | ✅ DONE |
+| Store listing graphics (icon, feature graphic, screenshots) | ❌ PENDING |
+| Privacy Policy hosted on public URL | ❌ PENDING |
+| Test reviewer account created in Firebase | ❌ PENDING |
+| App Access (test credentials for Google reviewers) | ❌ PENDING |
+| Account deletion URL (Google Form) | ❌ PENDING |
+| Upload AAB to closed testing | ❌ PENDING |
+| Add 12+ testers for closed test | ❌ PENDING |
+| Apply for Production access (after 14 days) | ❌ PENDING |
 
 ---
 
-### PHASE 2: Prepare App Assets
+## BUILDS
 
-**Step 2: Create Privacy Policy**
-1. Create a privacy policy page (Google requires this)
-2. Must disclose: data collection (Firebase analytics, camera, location, notifications)
-3. Host it on a public URL (options: GitHub Pages, Google Sites, or your backend)
-4. Example URL: `https://yoursite.com/talk2us/privacy-policy`
+| Build | Type | versionCode | Status | Link |
+|-------|------|-------------|--------|------|
+| Production AAB (old) | AAB | 3 | ✅ Done | https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/703b6aac-e114-4186-9413-8e4474d3882d |
+| Ownership verification APK | APK | — | ✅ Done | https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/6e3556de-c392-45e7-8479-5822f1d46f9d |
+| **Production AAB (LATEST — USE THIS)** | **AAB** | **4** | **✅ Building** | **https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/480ce3c1-7127-42b6-bbb8-94a10a033347** |
 
-**Step 3: Prepare Store Listing Graphics**
-1. **App Icon**: Already done ✅ (512x512 PNG required — EAS generates this)
-2. **Feature Graphic**: Create a 1024x500 PNG banner image
-   - Should show app branding, name "talk2us", and Barangay San Roque theme
-3. **Screenshots**: Take at least 2 screenshots from your app (phone size)
-   - Recommended: 4-8 screenshots showing key features
-   - Size: 1080x1920 or similar phone resolution
-   - Show: home screen, complaint form, feedback, emergency, profile
+> ⚠️ **USE versionCode 4 AAB** — it has the unused RECORD_AUDIO permission removed. Do NOT upload versionCode 3.
 
 ---
 
-### ~~PHASE 3: Build Production AAB~~ ✅ COMPLETED
+## REMAINING STEPS (ALL ON PHONE)
 
-> **Step 4: eas.json production profile** — ✅ DONE (April 12, 2026)
-> **Step 5: Production AAB build** — ✅ DONE (versionCode 3, building on Expo cloud)
-> Build link: https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/703b6aac-e114-4186-9413-8e4474d3882d
+### STEP 1: Host Privacy Policy ❌
+1. Go to https://sites.google.com on your phone
+2. Create a new site: "talk2us Privacy Policy"
+3. Copy ALL text from `privacy-policy.html` (in this project folder)
+4. Publish → copy the public URL
+5. Paste URL in Play Console → App content → Privacy policy
+
+### STEP 2: Create Account Deletion Google Form ❌
+1. Go to https://forms.google.com
+2. Create form: "talk2us - Account Deletion Request"
+3. Add fields: Email (required), Full Name (required), Reason (optional)
+4. Add description: "Submit this form to request deletion of your talk2us account and associated data. Your account and all personal data will be permanently deleted within 30 days."
+5. Publish → copy the form URL
+6. Paste in Play Console → Data Safety → Delete account URL AND Delete data URL
+
+### STEP 3: Create Test Reviewer Account ❌
+**CRITICAL — Without this, Google WILL reject your app!**
+1. Open your talk2us app on your phone
+2. Register a new account:
+   - Email: `reviewer.talk2us@gmail.com`
+   - Password: `Review2026!Safe`
+   - Name: Google Reviewer
+   - Phone: 09123456789
+   - Purok: 1
+   - Residency: Resident
+3. Go to Play Console → App content → App access
+4. Select "All or some functionality is restricted"
+5. Add instructions:
+   ```
+   Email: reviewer.talk2us@gmail.com
+   Password: Review2026!Safe
+   
+   Instructions:
+   1. Enter the email and password above to log in
+   2. Main features: Complaints tab, Emergency tab, FAQs tab, Profile tab
+   3. To test complaints: Complaints tab → "+" button → write description → submit
+   4. App requires internet connection
+   5. Government service app for Barangay San Roque, Victoria, Laguna, Philippines
+   ```
+
+### STEP 4: Create Store Graphics ❌
+
+**App Icon (512x512 PNG):**
+- Download from your EAS build page, or resize your barangay logo in Canva
+
+**Feature Graphic (1024x500 PNG):**
+- Open Canva → Custom size → 1024 x 500
+- Background: Dark blue `#0b1a3d`
+- Add "Talk2Us" in large white text
+- Tagline: "Your Voice, Our Action" or "AI-Powered Barangay Service"
+- Add barangay logo
+- Download as PNG → Upload to Play Console
+
+**Phone Screenshots (minimum 2, recommended 4-8):**
+Take screenshots of these screens:
+1. Home screen (welcome + barangay officials)
+2. Complaint submission form
+3. Emergency hotlines screen
+4. FAQ/AI Chatbot screen
+5. Complaint list with status badges
+6. Profile screen
+
+**Tip:** Go to Store Settings → set app to **Phone only** so you don't need tablet screenshots.
+
+### STEP 5: Download & Upload Production AAB ❌
+1. Open on phone: https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/480ce3c1-7127-42b6-bbb8-94a10a033347
+2. Log in to Expo account (rhysjonathanabalon@gmail.com)
+3. Download the `.aab` file once build is finished
+4. In Play Console → Testing → **Closed testing** → Create track
+5. Create a new release → Upload the AAB
+6. Add release notes:
+   ```
+   Initial release of talk2us — the official AI-powered complaint and feedback management system for Barangay San Roque, Victoria, Laguna, Philippines.
+   
+   Features:
+   • Smart complaint filing with AI classification
+   • Real-time chat with assigned barangay staff
+   • Emergency hotline directory
+   • AI-powered FAQ chatbot (Filipino & English)
+   • Service quality feedback system
+   • Staff dashboard with analytics
+   ```
+
+### STEP 6: Add Testers for Closed Testing ❌
+**Google requires closed testing before production for new accounts!**
+1. In Play Console → Testing → Closed testing
+2. Create a testers list → Add at least **12 email addresses**
+   - Can be classmates, friends, barangay staff
+   - They'll get an invite link to install the app
+3. Roll out the release to testers
+4. Wait **14 days** of active testing
+
+### STEP 7: Apply for Production Access ❌
+After 14 days of closed testing:
+1. Go to Production → Create release
+2. Upload the same AAB (or a new one if you made changes)
+3. Go to Publishing Overview → verify all sections are green
+4. Click "Send for review"
+5. Wait 3-7 days for Google review
 
 ---
 
-### PHASE 4: Create App in Play Console
+## CONTENT RATING ANSWERS (Already Submitted ✅)
 
-**Step 6: Create a New App in Google Play Console**
-1. Go to https://play.google.com/console
-2. Click **"Create app"**
-3. Fill in:
-   - App name: `talk2us`
-   - Default language: English
-   - App or Game: **App**
-   - Free or Paid: **Free**
-4. Accept the declarations and click **Create app**
+| Question | Answer |
+|----------|--------|
+| Ratings-relevant content in APK? | No |
+| Users interact/exchange content? | Yes |
+| User-generated content is primary? | No |
+| Public sharing of nudity? | No |
+| Public sharing of graphic violence? | No |
+| Ability to block users? | No |
+| Ability to report users? | No |
+| Chat moderation? | Yes (AI classification) |
+| Interactions limited to invited friends? | No |
+| Share precise location with others? | No |
+| Purchase digital goods? | No |
+| Cash rewards/NFTs? | No |
+| Web browser or search engine? | No |
+| News or educational product? | No |
+| Target age: 18+ | Yes |
+| Restrict minors | Yes |
 
-**Step 7: Fill Out Store Listing**
-1. Go to **Main store listing** in the left menu
-2. Fill in:
-   - **App name**: talk2us
-   - **Short description**: AI-powered complaint & feedback system for Barangay San Roque
-   - **Full description**: (Describe all features — complaints, feedback, emergency alerts, chatbot, etc.)
-3. Upload:
-   - **App icon**: 512x512 PNG (auto-generated from EAS build)
-   - **Feature graphic**: 1024x500 PNG (create this)
-   - **Phone screenshots**: At least 2 (recommended 4-8)
-4. Click **Save**
+## DATA SAFETY ANSWERS (Already Submitted ✅)
 
-**Step 8: Complete Content Rating**
-1. Go to **Content rating** in the left menu
-2. Click **Start questionnaire**
-3. Answer questions about your app content:
-   - Violence: No
-   - Sexual content: No
-   - Language: No profanity
-   - User-generated content: Yes (complaints/feedback)
-4. Submit and get your rating
+| Setting | Answer |
+|---------|--------|
+| Collects user data? | Yes |
+| Data encrypted in transit? | Yes |
+| Account creation method | Username and password |
+| Advertising ID? | No |
+| Government app? | No (selected to avoid proof requirement delays) |
 
-**Step 9: Complete Data Safety Form**
-1. Go to **Data safety** in the left menu
-2. Declare what your app collects:
-   - **Personal info**: Name, email (for login/registration)
-   - **Location**: Yes (if emergency feature uses location)
-   - **Photos/Videos**: Yes (camera permission for complaints)
-   - **Device info**: Yes (Firebase analytics/notifications)
-3. Specify: data is NOT sold, data is encrypted in transit
-4. Link your **Privacy Policy URL**
+**Data types collected (all = Collected, NOT shared, NOT ephemeral, Required, App functionality + Account management):**
+- Name
+- Email address
+- User IDs
+- Address
 
-**Step 10: Set Up App Access**
-1. Go to **App access** in the left menu
-2. Since your app requires login, select **"All or some functionality is restricted"**
-3. Provide test credentials so Google reviewers can test:
-   - Username/email and password for a test account
-   - Instructions on how to log in
-
-**Step 11: Select Target Audience**
-1. Go to **Target audience** in the left menu
-2. Select age group: **18+** (or appropriate for government service app)
-3. Confirm the app is NOT directed at children
-
-**Step 12: Ads Declaration**
-1. Go to **Ads** in the left menu
-2. Select: **No, my app does not contain ads**
+**Delete account URL:** Google Form (create per Step 2 above)
+**Delete data URL:** Same Google Form
 
 ---
 
-### PHASE 5: Upload and Release
+## CODE CHANGES MADE (April 14, 2026)
 
-**Step 13: Upload AAB to Play Console**
-1. Go to **Production** → **Releases** in the left menu
-2. Click **"Create new release"**
-3. For **App signing**: Let Google manage your signing key (recommended)
-4. Upload the `.aab` file from your EAS build
-   - Download the AAB from: https://expo.dev/accounts/rhysjonathan/projects/talk2us/builds/
-   - (Use the production build, not preview)
-5. Add **Release notes**: "Initial release of talk2us — AI-powered complaint & feedback management for Barangay San Roque, Victoria, Laguna"
-
-**Step 14: Review and Submit**
-1. Go to **Publishing overview** in the left menu
-2. Review all sections — make sure everything is green/complete
-3. Click **"Send for review"**
-
----
-
-### PHASE 6: After Submission
-
-**Step 15: Wait for Google Review**
-- First-time apps typically take **3-7 days** for review
-- Google may request changes or additional info
-- You'll receive email notifications about the review status
-
-**Step 16: App Goes Live 🎉**
-- Once approved, your app will be live on the Play Store
-- Share the Play Store link with Barangay San Roque residents
-
----
-
-## COMMANDS CHEAT SHEET
-
-```bash
-# Build production AAB for Play Store
-eas build --platform android --profile production
-
-# Submit to Play Store directly from CLI (after first manual setup)
-eas submit --platform android --profile production
-
-# Check build status
-eas build:list
-
-# Update app version in app.json before new releases
-# (autoIncrement handles versionCode, but update "version" for display)
-```
+1. **Removed `RECORD_AUDIO` permission** from `app.json` — was unused, would cause rejection
+2. **Created `assets/adi-registration.properties`** — Google Play ownership verification snippet
+3. **Created `plugins/withAdiRegistration.js`** — Config plugin to inject verification file into Android assets
+4. **Added plugin to `app.json`** — `"./plugins/withAdiRegistration"`
+5. **Created `privacy-policy.html`** — Complete privacy policy for hosting
 
 ---
 
 ## IMPORTANT NOTES
 
-1. **APK vs AAB**: Your `preview` profile builds APK (for testing). Play Store requires AAB. The `production` profile builds AAB by default.
-2. **Environment Variables**: Make sure production env vars are set in `eas.json` or EAS dashboard.
-3. **Signing Key**: Expo manages your upload key. Google manages the app signing key. This is handled automatically.
-4. **Updates**: For future updates, increment `version` in `app.json`, build a new AAB, and create a new release in Play Console.
-5. **Backend**: Ensure your backend (app.py on Render) is running and accessible before submitting to Play Store.
-6. **Firebase**: Ensure Firebase project has production-ready security rules.
+1. **USE versionCode 4 AAB** — Has RECORD_AUDIO fix. Do NOT use versionCode 3.
+2. **Closed testing is REQUIRED** for new developer accounts before production access.
+3. **Test reviewer account is CRITICAL** — Create it before submitting or Google will reject.
+4. **Backend must be running** — Ensure `app.py` on Render is active when Google reviews.
+5. **Firebase security rules** — Ensure production-ready rules are set.
+6. **Privacy Policy must be public** — Host on Google Sites before filling App content section.
 
 ---
 
-## ESTIMATED TIMELINE
+## COMMANDS CHEAT SHEET (For future laptop access)
 
-| Task | Time |
-|------|------|
-| Google Play Developer Account setup | 1-2 days (identity verification) |
-| Prepare store assets (screenshots, graphics, descriptions) | 1-2 hours |
-| Build production AAB | 30-60 minutes |
-| Fill out Play Console forms | 1-2 hours |
-| Google review | 3-7 days |
-| **Total** | **~1 week** |
+```bash
+# Build production AAB
+npx eas-cli build --platform android --profile production
 
----
+# Build preview APK (for testing)
+npx eas-cli build --platform android --profile preview
 
-## TODO: iOS APP STORE DEPLOYMENT (Requires Apple Developer Account)
+# Check build status
+npx eas-cli build:list
+
+# Login to Expo
+npx eas-cli login
+
+# View credentials
+npx eas-cli credentials --platform android
+```
 
 > ⚠️ **Apple Developer Account NOT purchased yet ($99/year)**
 > Complete these steps once you have the account and terminal access.
