@@ -4,7 +4,7 @@
     "slug": "talk2us",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/615343176_859516540278700_5342692051307596866_n.jpg",
+    "icon": "./assets/main_icon.png",
     "scheme": "talk2us",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -17,10 +17,10 @@
       }
     },
     "android": {
-      "package": "com.victoria.talk2us",
+      "package": "com.victoria.talk2us2026",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/615343176_859516540278700_5342692051307596866_n.jpg"
+        "foregroundImage": "./assets/main_icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
