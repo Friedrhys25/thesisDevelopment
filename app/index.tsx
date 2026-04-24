@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
+import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import {
@@ -47,10 +47,19 @@ const handleLogin = async () => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log("✅ Login successful!");
-    
+
+    if (!userCredential.user.emailVerified) {
+      await signOut(auth);
+      Alert.alert(
+        "Email Not Verified",
+        "Your email address has not been verified yet. Please check your inbox for the verification link."
+      );
+      return;
+    }
+
     // 🔐 Check if user is employee to route accordingly
     const employeeDoc = await getDoc(doc(firestore, "employee", userCredential.user.uid));
-    
+
     if (employeeDoc.exists()) {
       console.log("✅ Employee login - routing to dashboard");
       router.replace("/employee/dashboard");

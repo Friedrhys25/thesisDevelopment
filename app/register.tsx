@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  signInWithEmailAndPassword,
   signOut,
   updateProfile,
 } from "firebase/auth";
@@ -21,6 +22,7 @@ import {
 import React, { useState } from "react";
 import {
   Alert,
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -125,6 +127,8 @@ export default function RegisterPage() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
 
   const allowOnlyLetters = (text: string) => text.replace(/[^A-Za-z\s]/g, "");
 
@@ -221,6 +225,8 @@ export default function RegisterPage() {
       return;
     }
 
+    setIsLoading(true);
+
     try {
       // 1) Duplicate check
       let exists = false;
@@ -238,6 +244,7 @@ export default function RegisterPage() {
             "Failed to verify account uniqueness: " + dupError.message
           );
         }
+        setIsLoading(false);
         return;
       }
 
@@ -294,9 +301,12 @@ export default function RegisterPage() {
           "Auth account created, but profile could not be saved. Contact support. Error: " +
             saveError.message
         );
+        setIsLoading(false);
         return;
       }
 
+      await signOut(auth);
+      setIsLoading(false);
       setModalVisible(true);
     } catch (error: any) {
       let errorMessage = "Something went wrong.";
@@ -317,12 +327,69 @@ export default function RegisterPage() {
           errorMessage = error.message;
       }
       Alert.alert("Registration Error", errorMessage);
+      setIsLoading(false);
     }
   };
 
   const handleSuccessClose = () => {
     setModalVisible(false);
     router.push("/");
+  };
+
+  const handleResendVerificationEmail = async () => {
+    if (!email || !password) {
+      Alert.alert("Retry Verification", "Unable to resend email because your credentials are incomplete.");
+      return;
+    }
+
+    setIsCheckingVerification(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(userCredential.user);
+      await signOut(auth);
+      Alert.alert(
+        "Verification Email Sent",
+        `A new verification email has been sent to ${email}. Please check your inbox.`
+      );
+    } catch (error: any) {
+      Alert.alert(
+        "Resend Failed",
+        error.message || "Unable to resend the verification email. Please try again later."
+      );
+    } finally {
+      setIsCheckingVerification(false);
+    }
+  };
+
+  const handleCheckVerificationStatus = async () => {
+    if (!email || !password) {
+      Alert.alert("Verification Check", "Please complete your registration first.");
+      return;
+    }
+
+    setIsCheckingVerification(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await userCredential.user.reload();
+      if (userCredential.user.emailVerified) {
+        setModalVisible(false);
+        router.replace("/(tabs)/home");
+        return;
+      }
+      await signOut(auth);
+      Alert.alert(
+        "Email Not Verified",
+        "We still could not verify your email. Please open the email and click the verification link."
+      );
+    } catch (error: any) {
+      await signOut(auth);
+      Alert.alert(
+        "Verification Check Failed",
+        error.message || "Unable to verify your email at this time. Please try again later."
+      );
+    } finally {
+      setIsCheckingVerification(false);
+    }
   };
 
   const max18Date = getMax18Date();
@@ -772,9 +839,16 @@ export default function RegisterPage() {
                 <TouchableOpacity
                   style={[styles.submitButton, { marginLeft: "auto" }]}
                   onPress={handleRegister}
+                  disabled={isLoading}
                 >
-                  <Text style={styles.submitButtonText}>Create Account</Text>
-                  <Ionicons name="checkmark" size={18} color="#fff" />
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Text style={styles.submitButtonText}>Create Account</Text>
+                      <Ionicons name="checkmark" size={18} color="#fff" />
+                    </>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -807,12 +881,40 @@ export default function RegisterPage() {
                 </View>
                 <Text style={styles.modalInstructions}>
                   Please open the email and click the activation link to complete your
-                  registration. After verifying, you can log in.
+                  registration. After clicking the link, use the buttons below to
+                  confirm verification or resend the email.
                 </Text>
                 <Text style={styles.modalNote}>
                   Didn't receive it? Check your spam/junk folder.
                 </Text>
-                <TouchableOpacity style={styles.closeButton} onPress={handleSuccessClose}>
+                <View style={styles.modalActionsRow}>
+                  <TouchableOpacity
+                    style={[styles.secondaryButton, styles.modalButtonLeft]}
+                    onPress={handleResendVerificationEmail}
+                    disabled={isCheckingVerification}
+                  >
+                    {isCheckingVerification ? (
+                      <ActivityIndicator color="#4F46E5" size="small" />
+                    ) : (
+                      <Text style={styles.secondaryButtonText}>Resend Email</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.closeButton, styles.modalButtonRight]}
+                    onPress={handleCheckVerificationStatus}
+                    disabled={isCheckingVerification}
+                  >
+                    {isCheckingVerification ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.closeButtonText}>I Have Verified</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={[styles.closeButton, styles.modalSecondaryAction]}
+                  onPress={handleSuccessClose}
+                >
                   <Text style={styles.closeButtonText}>Go to Login</Text>
                 </TouchableOpacity>
               </View>
@@ -970,6 +1072,30 @@ const styles = StyleSheet.create({
     borderRadius: 16, width: "100%", alignItems: "center",
   },
   closeButtonText: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  modalActionsRow: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  secondaryButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryButtonText: {
+    color: "#4F46E5",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  modalButtonLeft: { flex: 1 },
+  modalButtonRight: { flex: 1 },
+  modalSecondaryAction: { marginTop: 0 },
   strengthBarBg: { height: 4, backgroundColor: "#E5E7EB", borderRadius: 2, overflow: "hidden" },
   strengthBarFill: { height: 4, borderRadius: 2 },
   strengthLabel: { fontSize: 11, fontWeight: "700" },
