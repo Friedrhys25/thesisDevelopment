@@ -38,7 +38,9 @@ type UserData = {
   memberSince: string;
   id_verification: string;
   avatar: string;
-  idstatus: "Pending" | "Denied" | "Verified";
+  idstatus: "Pending" | "Denied" | "declined" | "Verified";
+  declineMessage: string;
+  residencyStatus: string;
 };
 
 type EditingField = "address" | "phone" | null;
@@ -93,6 +95,8 @@ export default function ProfilePage() {
     id_verification: "",
     avatar: "",
     idstatus: "Pending",
+    declineMessage: "",
+    residencyStatus: "",
   });
 
   const refreshProfile = async () => {
@@ -117,7 +121,7 @@ export default function ProfilePage() {
         firstName: data.firstName || "",
         middleName: data.middleName || "",
         lastName: data.lastName || "",
-        email: data.email || currentUser.email || "",
+        email: data.email || currentUser?.email || "",
         phone: data.number || "No phone number",
         address: data.address || "No address",
         purok: data.purok || "",
@@ -126,6 +130,8 @@ export default function ProfilePage() {
         id_verification: data.idImage || "", // In register.tsx it's idImage
         avatar: data.avatar || "",
         idstatus: data.idstatus || "Pending",
+        declineMessage: data.declineMessage || "",
+        residencyStatus: data.residencyStatus || "",
       });
     }
 
@@ -137,6 +143,7 @@ export default function ProfilePage() {
       case "Verified":
         return COLORS.success;
       case "Denied":
+      case "declined":
         return COLORS.danger;
       case "Pending":
       default:
@@ -547,7 +554,11 @@ export default function ProfilePage() {
           />
 
           {!!userData.age && (
-            <InfoRow icon="calendar-outline" label="Age" value={userData.age} />
+            <InfoRow icon="calendar-outline" label="Age" value={userData.age || ""} />
+          )}
+
+          {!!userData.residencyStatus && (
+            <InfoRow icon="home-outline" label="Residency Status" value={userData.residencyStatus} />
           )}
         </View>
 
@@ -589,6 +600,17 @@ export default function ProfilePage() {
                   {userData.idstatus}
                 </Text>
               </View>
+
+              {userData.idstatus === "declined" && (
+                <View style={{ gap: 12 }}>
+                  <View style={styles.noticeBox}>
+                    <Ionicons name="close-circle-outline" size={18} color={COLORS.danger} />
+                    <Text style={styles.noticeText}>
+                      Your ID verification was rejected{userData.declineMessage ? `: ${userData.declineMessage}` : ''}. Please re-upload a valid ID.
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               <Pressable
                 style={({ pressed }) => [
@@ -920,7 +942,7 @@ function InfoRow({
 
       <View style={{ flex: 1 }}>
         <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
+        <Text style={styles.infoValue}>{value || ""}</Text>
       </View>
 
       {actionLabel && onAction ? (
