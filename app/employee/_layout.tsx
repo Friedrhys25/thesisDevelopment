@@ -13,20 +13,22 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const TAB_ITEMS = [
-  { name: "dashboard", icon: "home-outline", active: "home", label: "Dashboard" },
-  { name: "manage-requests", icon: "list-outline", active: "list", label: "Requests" },
-  { name: "reports", icon: "bar-chart-outline", active: "bar-chart", label: "Reports" },
-  { name: "profile", icon: "person-outline", active: "person", label: "Profile" },
+  { name: "dashboard",       icon: "home-outline",      active: "home",      label: "Dashboard" },
+  { name: "manage-requests", icon: "list-outline",       active: "list",      label: "Requests"  },
+  { name: "reports",         icon: "bar-chart-outline",  active: "bar-chart", label: "Reports"   },
+  { name: "profile",         icon: "person-outline",     active: "person",    label: "Profile"   },
 ];
 
-const COLORS = {
-  active: "#4A90E2", // Employee blue
-  inactive: "#94A3B8",
-  bg: "rgba(255,255,255,0.92)",
-  shadow: "#000000",
-  border: "rgba(74, 144, 226, 0.15)", 
-  activeBg: "rgba(74, 144, 226, 0.15)", 
-  activeBorder: "rgba(74, 144, 226, 0.25)",
+// ── Employee palette: same dark navy base, Philippine blue accent ─────────────
+const C = {
+  blue:       "#1E56D8",
+  blueDim:    "rgba(30,86,216,0.2)",
+  blueBorder: "rgba(30,86,216,0.4)",
+  navy:       "#0b1a3d",
+  navyLight:  "#0f2050",
+  inactive:   "rgba(255,255,255,0.38)",
+  goldBorder: "rgba(245,158,11,0.2)",   // subtle gold rim — ties to splash
+  gold:       "#f59e0b",
 };
 
 function CustomTabBar({ state, navigation }: any) {
@@ -34,84 +36,63 @@ function CustomTabBar({ state, navigation }: any) {
   const { width } = useWindowDimensions();
   const currentIndex = state.index;
 
-  const isWide = width >= 760;
-  const tabCount = state.routes.length;
-  const pillContainerWidth = Math.min(560, Math.max(320, width - 32));
-  const itemWidth = pillContainerWidth / tabCount;
-  const paddingX = 8;
-  const bubbleWidth = itemWidth - paddingX * 2;
+  const tabCount     = state.routes.length;
+  const barWidth     = Math.min(460, Math.max(280, width - 28));
+  const itemWidth    = barWidth / tabCount;
+  const indicatorPad = 6;
+  const indicatorW   = itemWidth - indicatorPad * 2;
 
-  const motion = useRef(new Animated.Value(currentIndex)).current;
+  const motion      = useRef(new Animated.Value(currentIndex)).current;
+  const glowOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.spring(motion, {
       toValue: currentIndex,
       useNativeDriver: true,
-      bounciness: 10,
-      speed: 14,
+      bounciness: 8,
+      speed: 16,
     }).start();
-  }, [currentIndex, motion]);
+
+    Animated.sequence([
+      Animated.timing(glowOpacity, { toValue: 0.4, duration: 80,  useNativeDriver: true }),
+      Animated.timing(glowOpacity, { toValue: 1,   duration: 320, useNativeDriver: true }),
+    ]).start();
+  }, [currentIndex]);
 
   const inputRange = state.routes.map((_: any, i: number) => i);
-  const outputRange = inputRange.map((i: number) => i * itemWidth);
-
-  const activeTranslateX = motion.interpolate({
-    inputRange,
-    outputRange,
-    extrapolate: "clamp",
-  });
+  const translateX = motion.interpolate({ inputRange, outputRange: inputRange.map((i: number) => i * itemWidth), extrapolate: "clamp" });
 
   return (
-    <View
-      style={[
-        styles.pillOuter,
-        {
-          bottom: Math.max(insets.bottom + 12, 16),
-          width: pillContainerWidth,
-          height: isWide ? 76 : 64,
-          borderRadius: isWide ? 38 : 32,
-        },
-      ]}
-    >
-      <View style={styles.backdropContainer} />
+    <View style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 14) }]}>
+      {/* Ambient blue glow */}
+      <Animated.View style={[styles.outerGlow, { width: barWidth + 24, opacity: glowOpacity }]} />
 
-      <Animated.View
-        style={[
-          styles.activeBubble,
-          {
-            width: bubbleWidth,
-            left: paddingX,
-            top: 8,
-            bottom: 8,
-            transform: [{ translateX: activeTranslateX }],
-          },
-        ]}
-      />
+      <View style={[styles.bar, { width: barWidth }]}>
+        {/* Gold rim accent on top edge */}
+        <View style={styles.topAccent} />
 
-      <View style={styles.tabRow}>
+        {/* Sliding indicator */}
+        <Animated.View
+          style={[
+            styles.indicator,
+            { width: indicatorW, left: indicatorPad, transform: [{ translateX }] },
+          ]}
+        />
+
         {state.routes.map((route: any, index: number) => {
           const active = currentIndex === index;
-          const item = TAB_ITEMS.find((t) => t.name.toLowerCase() === route.name.toLowerCase()) || {
-            icon: "ellipse-outline",
-            active: "ellipse",
-            label: route.name,
+          const item   = TAB_ITEMS.find((t) => t.name.toLowerCase() === route.name.toLowerCase()) || {
+            icon: "ellipse-outline", active: "ellipse", label: route.name,
           };
 
-          const scale = motion.interpolate({
-            inputRange: [index - 1, index, index + 1],
-            outputRange: [1, 1.15, 1],
+          const iconScale = motion.interpolate({
+            inputRange:  [index - 1, index, index + 1],
+            outputRange: [0.88, 1.12, 0.88],
             extrapolate: "clamp",
           });
-
-          const translateY = motion.interpolate({
-            inputRange: [index - 1, index, index + 1],
-            outputRange: [0, -3, 0],
-            extrapolate: "clamp",
-          });
-
-          const opacity = motion.interpolate({
-            inputRange: [index - 1, index, index + 1],
-            outputRange: [0.6, 1, 0.6],
+          const iconY = motion.interpolate({
+            inputRange:  [index - 1, index, index + 1],
+            outputRange: [0, -2, 0],
             extrapolate: "clamp",
           });
 
@@ -119,44 +100,26 @@ function CustomTabBar({ state, navigation }: any) {
             <Pressable
               key={route.key}
               onPress={() => {
-                const event = navigation.emit({
-                  type: "tabPress",
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-
+                const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
                 if (!event.defaultPrevented) {
                   navigation.navigate(route.name);
-                  Haptics.selectionAsync();
-                  if (Platform.OS !== "web") {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 }
               }}
               style={({ pressed }) => [
-                styles.tabTouch,
+                styles.tab,
                 { width: itemWidth },
-                pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] },
+                pressed && { opacity: 0.7, transform: [{ scale: 0.93 }] },
               ]}
             >
-              <Animated.View style={{ transform: [{ scale }, { translateY }] }}>
+              <Animated.View style={{ transform: [{ scale: iconScale }, { translateY: iconY }], alignItems: "center" }}>
                 <Ionicons
                   name={active ? item.active as any : item.icon as any}
-                  size={24}
-                  color={active ? COLORS.active : COLORS.inactive}
+                  size={22}
+                  color={active ? C.blue : C.inactive}
                 />
+                {active && <View style={styles.activeDot} />}
               </Animated.View>
-              
-              {isWide ? (
-                <Animated.Text
-                  style={[
-                    styles.tabLabel,
-                    { color: active ? COLORS.active : COLORS.inactive, opacity },
-                  ]}
-                >
-                  {item.label}
-                </Animated.Text>
-              ) : null}
             </Pressable>
           );
         })}
@@ -171,61 +134,84 @@ export default function EmployeeLayout() {
       screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}
       tabBar={(props) => <CustomTabBar {...props} />}
     >
-      <Tabs.Screen name="dashboard" options={{ title: "Dashboard" }} />
-      <Tabs.Screen name="manage-requests" options={{ title: "Requests" }} />
-      <Tabs.Screen name="reports" options={{ title: "Reports" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+      <Tabs.Screen name="dashboard"       options={{ title: "Dashboard" }} />
+      <Tabs.Screen name="manage-requests" options={{ title: "Requests"  }} />
+      <Tabs.Screen name="reports"         options={{ title: "Reports"   }} />
+      <Tabs.Screen name="profile"         options={{ title: "Profile"   }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  pillOuter: {
-    position: "absolute",
-    alignSelf: "center",
-    backgroundColor: COLORS.bg,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    elevation: 14,
-    overflow: "hidden",
-  },
-  backdropContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.75)",
-    borderRadius: 999,
-  },
-  activeBubble: {
-    position: "absolute",
-    top: 8,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: COLORS.activeBg,
-    borderWidth: 1,
-    borderColor: COLORS.activeBorder,
-  },
-  tabRow: {
-    flexDirection: "row",
-    width: "100%",
-    height: "100%",
+  wrapper: {
+    position:   "absolute",
+    alignSelf:  "center",
     alignItems: "center",
-    justifyContent: "space-between",
-    zIndex: 10,
+    zIndex:     100,
   },
-  tabTouch: {
-    alignItems: "center",
+
+  outerGlow: {
+    position:        "absolute",
+    height:          72,
+    borderRadius:    999,
+    backgroundColor: C.blue,
+    opacity:         0.1,
+    shadowColor:     C.blue,
+    shadowOffset:    { width: 0, height: 0 },
+    shadowOpacity:   0.8,
+    shadowRadius:    28,
+    elevation:       0,
+  },
+
+  bar: {
+    height:          60,
+    borderRadius:    999,
+    backgroundColor: C.navy,
+    borderWidth:     1,
+    borderColor:     C.blueBorder,
+    flexDirection:   "row",
+    alignItems:      "center",
+    overflow:        "hidden",
+    shadowColor:     "#000",
+    shadowOffset:    { width: 0, height: 12 },
+    shadowOpacity:   0.5,
+    shadowRadius:    20,
+    elevation:       20,
+  },
+
+  // Thin gold line at the very top of the bar — ties employee bar to app theme
+  topAccent: {
+    position:        "absolute",
+    top:             0,
+    left:            32,
+    right:           32,
+    height:          1,
+    backgroundColor: C.gold,
+    opacity:         0.3,
+  },
+
+  indicator: {
+    position:        "absolute",
+    top:             8,
+    bottom:          8,
+    borderRadius:    14,
+    backgroundColor: C.blueDim,
+    borderWidth:     1,
+    borderColor:     C.blueBorder,
+  },
+
+  tab: {
+    height:         "100%",
+    alignItems:     "center",
     justifyContent: "center",
-    height: "100%",
-    paddingTop: 4,
+    zIndex:         10,
   },
-  tabLabel: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.3,
+
+  activeDot: {
+    marginTop:       4,
+    width:           4,
+    height:          4,
+    borderRadius:    2,
+    backgroundColor: C.blue,
   },
 });
