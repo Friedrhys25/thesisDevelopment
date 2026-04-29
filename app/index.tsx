@@ -271,10 +271,7 @@ export default function LoginPage() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => {
-                    animateTab(1);
-                    setTimeout(() => router.push("/register"), 200);
-                  }}
+                  onPress={() => router.replace("/register")}
                   style={styles.tabBase}
                   activeOpacity={1}
                 >
@@ -366,10 +363,7 @@ export default function LoginPage() {
               <View style={styles.signupContainer}>
                 <Text style={styles.signupBaseText}>Don't have an account? </Text>
                 <TouchableOpacity
-                  onPress={() => {
-                    animateTab(1);
-                    setTimeout(() => router.push("/register"), 200);
-                  }}
+                  onPress={() => router.replace("/register")}
                   disabled={loading}
                   activeOpacity={1}
                 >

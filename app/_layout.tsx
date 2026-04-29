@@ -22,9 +22,9 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="register" />
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0b1a3d" } }}>
+      <Stack.Screen name="index" options={{ animation: "none" }} />
+      <Stack.Screen name="register" options={{ animation: "none" }} />
       <Stack.Screen name="modal" options={{ presentation: "modal" }} />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="employee" />
