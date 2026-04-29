@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import {
   createUserWithEmailAndPassword,
@@ -100,6 +99,41 @@ const getMax18Date = () => {
 
 const normalize = (s: string) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
+const COLORS = {
+  bg: "#0b1a3d",
+  surface: "#0f1e45",
+  surfaceAlt: "#162254",
+  elevated: "#162254",
+  text: "#E8EEFF",
+  textMuted: "#8895BB",
+  textDim: "#4A5880",
+  gold: "#f59e0b",
+  goldLight: "#fbbf24",
+  goldDim: "rgba(245,158,11,0.15)",
+  goldBorder: "rgba(245,158,11,0.3)",
+  border: "rgba(255,255,255,0.06)",
+  red: "#ce1126",
+};
+
+const SUFFIX_OPTIONS = [
+  { label: "None", value: "" },
+  { label: "Jr.", value: "Jr." },
+  { label: "Sr.", value: "Sr." },
+  { label: "II", value: "II" },
+  { label: "III", value: "III" },
+  { label: "IV", value: "IV" },
+  { label: "V", value: "V" },
+];
+
+const PUROK_OPTIONS = [
+  { label: "Purok 1", value: "1" },
+  { label: "Purok 2", value: "2" },
+  { label: "Purok 3", value: "3" },
+  { label: "Purok 4", value: "4" },
+  { label: "Purok 5", value: "5" },
+  { label: "Purok 6", value: "6" },
+];
+
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
@@ -126,11 +160,17 @@ export default function RegisterPage() {
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [accountCreatedModalVisible, setAccountCreatedModalVisible] = useState(false);
+  const [selectionModal, setSelectionModal] = useState<null | "suffix" | "purok">(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingVerification, setIsCheckingVerification] = useState(false);
 
   const allowOnlyLetters = (text: string) => text.replace(/[^A-Za-z\s]/g, "");
+  const getSuffixLabel = () =>
+    SUFFIX_OPTIONS.find((option) => option.value === suffix)?.label ?? "None";
+  const getPurokLabel = () =>
+    PUROK_OPTIONS.find((option) => option.value === purok)?.label ?? "Purok 1";
 
   const validateStep1 = () => {
     if (!firstName.trim() || !lastName.trim()) {
@@ -307,7 +347,7 @@ export default function RegisterPage() {
 
       await signOut(auth);
       setIsLoading(false);
-      setModalVisible(true);
+      setAccountCreatedModalVisible(true);
     } catch (error: any) {
       let errorMessage = "Something went wrong.";
       switch (error.code) {
@@ -334,6 +374,11 @@ export default function RegisterPage() {
   const handleSuccessClose = () => {
     setModalVisible(false);
     router.push("/");
+  };
+
+  const handleAccountCreatedClose = () => {
+    setAccountCreatedModalVisible(false);
+    setModalVisible(true);
   };
 
   const handleResendVerificationEmail = async () => {
@@ -401,7 +446,11 @@ export default function RegisterPage() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.bannerSection}>
             <View style={[styles.banner, { paddingTop: insets.top + 20 }]}>
               <Image
@@ -441,7 +490,7 @@ export default function RegisterPage() {
                   <TextInput
                     style={styles.input}
                     placeholder="Enter your first name"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={COLORS.textMuted}
                     value={firstName}
                     onChangeText={(t) => setFirstName(allowOnlyLetters(t))}
                     autoCapitalize="words"
@@ -453,7 +502,7 @@ export default function RegisterPage() {
                   <TextInput
                     style={styles.input}
                     placeholder="Optional"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={COLORS.textMuted}
                     value={middleName}
                     onChangeText={(t) => setMiddleName(allowOnlyLetters(t))}
                     autoCapitalize="words"
@@ -465,7 +514,7 @@ export default function RegisterPage() {
                   <TextInput
                     style={styles.input}
                     placeholder="Enter your last name"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={COLORS.textMuted}
                     value={lastName}
                     onChangeText={(t) => setLastName(allowOnlyLetters(t))}
                     autoCapitalize="words"
@@ -474,17 +523,21 @@ export default function RegisterPage() {
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Suffix</Text>
-                  <View style={styles.pickerContainer}>
-                    <Picker selectedValue={suffix} onValueChange={setSuffix}>
-                      <Picker.Item label="None" value="" />
-                      <Picker.Item label="Jr." value="Jr." />
-                      <Picker.Item label="Sr." value="Sr." />
-                      <Picker.Item label="II" value="II" />
-                      <Picker.Item label="III" value="III" />
-                      <Picker.Item label="IV" value="IV" />
-                      <Picker.Item label="V" value="V" />
-                    </Picker>
-                  </View>
+                  <TouchableOpacity
+                    style={styles.selectField}
+                    activeOpacity={0.85}
+                    onPress={() => setSelectionModal("suffix")}
+                  >
+                    <Text
+                      style={[
+                        styles.selectFieldText,
+                        !suffix && styles.selectFieldPlaceholder,
+                      ]}
+                    >
+                      {getSuffixLabel()}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={COLORS.gold} />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -501,12 +554,12 @@ export default function RegisterPage() {
                         paddingRight: 16,
                         height: 56,
                         borderWidth: 1,
-                        borderColor: "#E5E7EB",
+                        borderColor: COLORS.border,
                         borderStyle: "solid",
                         borderRadius: 16,
-                        backgroundColor: "#F9FAFB",
+                        backgroundColor: COLORS.elevated,
                         fontSize: 16,
-                        color: birthday ? "#1F2937" : "#9CA3AF",
+                        color: birthday ? COLORS.text : COLORS.textMuted,
                         boxSizing: "border-box",
                         fontFamily: "inherit",
                       }}
@@ -515,7 +568,7 @@ export default function RegisterPage() {
                     <>
                       <TouchableOpacity onPress={() => setShowDatePicker(true)}>
                         <View style={styles.input}>
-                          <Text style={{ color: birthday ? "#1F2937" : "#9CA3AF", fontSize: 15 }}>
+                          <Text style={{ color: birthday ? COLORS.text : COLORS.textMuted, fontSize: 15 }}>
                             {birthday || "Select your birthday"}
                           </Text>
                         </View>
@@ -556,7 +609,7 @@ export default function RegisterPage() {
                     <TextInput
                       style={styles.input}
                       placeholder="e.g. 123 Rizal Street"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={COLORS.textMuted}
                       value={houseStreet}
                       onChangeText={setHouseStreet}
                     />
@@ -567,7 +620,7 @@ export default function RegisterPage() {
                     <TextInput
                       style={styles.input}
                       placeholder="Optional (e.g. Green Meadows)"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={COLORS.textMuted}
                       value={subdivision}
                       onChangeText={setSubdivision}
                     />
@@ -575,21 +628,21 @@ export default function RegisterPage() {
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Purok</Text>
-                    <View style={styles.pickerContainer}>
-                      <Picker selectedValue={purok} onValueChange={setPurok}>
-                        <Picker.Item label="Purok 1" value="1" />
-                        <Picker.Item label="Purok 2" value="2" />
-                        <Picker.Item label="Purok 3" value="3" />
-                        <Picker.Item label="Purok 4" value="4" />
-                        <Picker.Item label="Purok 5" value="5" />
-                        <Picker.Item label="Purok 6" value="6" />
-                      </Picker>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.selectField}
+                      activeOpacity={0.85}
+                      onPress={() => setSelectionModal("purok")}
+                    >
+                      <Text style={styles.selectFieldText}>
+                        {getPurokLabel()}
+                      </Text>
+                      <Ionicons name="chevron-down" size={18} color={COLORS.gold} />
+                    </TouchableOpacity>
                   </View>
 
                   {houseStreet.trim() !== "" && (
                     <View style={styles.addressPreview}>
-                      <Ionicons name="location" size={14} color="#4F46E5" />
+                      <Ionicons name="location" size={14} color={COLORS.gold} />
                       <Text style={styles.addressPreviewText}>
                         {[houseStreet.trim(), subdivision.trim(), `Purok ${purok}`]
                           .filter(Boolean)
@@ -604,7 +657,7 @@ export default function RegisterPage() {
                   <TextInput
                     style={styles.input}
                     placeholder="09XXXXXXXXX"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                     maxLength={11}
                     value={number}
@@ -656,7 +709,7 @@ export default function RegisterPage() {
                 <Text style={styles.sectionTitle}>Account Information</Text>
 
                 <View style={styles.infoBanner}>
-                  <Ionicons name="information-circle" size={16} color="#4F46E5" />
+                  <Ionicons name="information-circle" size={16} color={COLORS.gold} />
                   <Text style={styles.infoBannerText}>
                     Accepted domains: {ALLOWED_DOMAINS.join(" · ")}
                   </Text>
@@ -667,7 +720,7 @@ export default function RegisterPage() {
                   <TextInput
                     style={styles.input}
                     placeholder="yourname@gmail.com"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={COLORS.textMuted}
                     value={email}
                     onChangeText={setEmail}
                     autoCapitalize="none"
@@ -692,7 +745,7 @@ export default function RegisterPage() {
                     <TextInput
                       style={styles.passwordInput}
                       placeholder="Min. 6 characters"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={COLORS.textMuted}
                       secureTextEntry={!passwordVisible}
                       value={password}
                       onChangeText={setPassword}
@@ -701,7 +754,7 @@ export default function RegisterPage() {
                       <Ionicons
                         name={passwordVisible ? "eye" : "eye-off"}
                         size={22}
-                        color="#9CA3AF"
+                        color={COLORS.textMuted}
                       />
                     </TouchableOpacity>
                   </View>
@@ -736,7 +789,7 @@ export default function RegisterPage() {
                     <TextInput
                       style={styles.passwordInput}
                       placeholder="Re-enter password"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={COLORS.textMuted}
                       secureTextEntry={!confirmPasswordVisible}
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
@@ -747,7 +800,7 @@ export default function RegisterPage() {
                       <Ionicons
                         name={confirmPasswordVisible ? "eye" : "eye-off"}
                         size={22}
-                        color="#9CA3AF"
+                        color={COLORS.textMuted}
                       />
                     </TouchableOpacity>
                   </View>
@@ -809,7 +862,7 @@ export default function RegisterPage() {
                 ))}
 
                 <View style={styles.verificationNotice}>
-                  <Ionicons name="mail" size={18} color="#4F46E5" />
+                  <Ionicons name="mail" size={18} color={COLORS.gold} />
                   <Text style={styles.verificationNoticeText}>
                     A verification email will be sent to{" "}
                     <Text style={{ fontWeight: "800" }}>{email}</Text> after registration.
@@ -822,7 +875,7 @@ export default function RegisterPage() {
             <View style={styles.buttonRow}>
               {currentStep > 1 && (
                 <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                  <Ionicons name="arrow-back" size={18} color="#4F46E5" />
+                  <Ionicons name="arrow-back" size={18} color={COLORS.gold} />
                   <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
               )}
@@ -861,6 +914,36 @@ export default function RegisterPage() {
             </TouchableOpacity>
           </View>
 
+          <Modal animationType="fade" transparent visible={accountCreatedModalVisible}>
+            <View style={styles.modalBackground}>
+              <View style={styles.modalBox}>
+                <View style={styles.emailIcon}>
+                  <Ionicons name="checkmark-circle" size={50} color="#10B981" />
+                </View>
+                <Text style={styles.modalText}>Account Created!</Text>
+                <Text style={styles.modalSubText}>
+                  Your account has been successfully created. To activate your account, please verify the email that will be sent to:
+                </Text>
+                <View style={styles.emailChip}>
+                  <Ionicons name="mail" size={14} color="#f59e0b" />
+                  <Text style={styles.emailChipText}>{email}</Text>
+                </View>
+                <Text style={styles.modalInstructions}>
+                  A verification email has been sent to your inbox. Click the activation link in that email to verify your account and complete your registration.
+                </Text>
+                <Text style={styles.modalNote}>
+                  Didn't receive it? You can resend the email on the next screen.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.closeButton, { width: "100%" }]}
+                  onPress={handleAccountCreatedClose}
+                >
+                  <Text style={styles.closeButtonText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
           <Modal animationType="fade" transparent visible={modalVisible}>
             <View style={styles.modalBackground}>
               <View style={styles.modalBox}>
@@ -870,13 +953,13 @@ export default function RegisterPage() {
                 <Text style={styles.modalText}>Verify Your Email</Text>
                 <Text style={styles.modalSubText}>
                   We've sent an{" "}
-                  <Text style={{ fontWeight: "800", color: "#4F46E5" }}>
+                  <Text style={{ fontWeight: "800", color: COLORS.gold }}>
                     Account Activation email
                   </Text>{" "}
                   to:
                 </Text>
                 <View style={styles.emailChip}>
-                  <Ionicons name="mail" size={14} color="#4F46E5" />
+                  <Ionicons name="mail" size={14} color={COLORS.gold} />
                   <Text style={styles.emailChipText}>{email}</Text>
                 </View>
                 <Text style={styles.modalInstructions}>
@@ -894,7 +977,7 @@ export default function RegisterPage() {
                     disabled={isCheckingVerification}
                   >
                     {isCheckingVerification ? (
-                      <ActivityIndicator color="#4F46E5" size="small" />
+                      <ActivityIndicator color={COLORS.text} size="small" />
                     ) : (
                       <Text style={styles.secondaryButtonText}>Resend Email</Text>
                     )}
@@ -920,6 +1003,63 @@ export default function RegisterPage() {
               </View>
             </View>
           </Modal>
+
+          <Modal
+            animationType="fade"
+            transparent
+            visible={selectionModal !== null}
+            onRequestClose={() => setSelectionModal(null)}
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.selectionModalBox}>
+                <Text style={styles.modalText}>
+                  {selectionModal === "suffix" ? "Choose Suffix" : "Choose Purok"}
+                </Text>
+                <View style={styles.selectionList}>
+                  {(selectionModal === "suffix" ? SUFFIX_OPTIONS : PUROK_OPTIONS).map((option) => {
+                    const isSelected =
+                      selectionModal === "suffix" ? suffix === option.value : purok === option.value;
+
+                    return (
+                      <TouchableOpacity
+                        key={`${selectionModal}-${option.value || "none"}`}
+                        style={[
+                          styles.selectionOption,
+                          isSelected && styles.selectionOptionActive,
+                        ]}
+                        onPress={() => {
+                          if (selectionModal === "suffix") {
+                            setSuffix(option.value);
+                          } else {
+                            setPurok(option.value);
+                          }
+                          setSelectionModal(null);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.selectionOptionText,
+                            isSelected && styles.selectionOptionTextActive,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color={COLORS.gold} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TouchableOpacity
+                  style={[styles.secondaryButton, styles.selectionCancelButton]}
+                  onPress={() => setSelectionModal(null)}
+                >
+                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -929,149 +1069,166 @@ export default function RegisterPage() {
 // ── STYLES (unchanged) ───────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: "#F3F4F6", paddingBottom: 40 },
-  bannerSection: { backgroundColor: "#4F46E5" },
+  container: { flexGrow: 1, backgroundColor: COLORS.bg, paddingBottom: 40 },
+  bannerSection: { backgroundColor: COLORS.bg },
   banner: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 24, alignItems: "center" },
   logo: { width: 80, height: 80, marginBottom: 16 },
   appName: {
     fontSize: 20, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase",
-    color: "#fff", marginBottom: 16, opacity: 0.95,
+    color: COLORS.text, marginBottom: 16, opacity: 0.95,
   },
-  bannerGreeting: { fontSize: 30, fontWeight: "800", color: "#fff", marginBottom: 8 },
+  bannerGreeting: { fontSize: 30, fontWeight: "800", color: COLORS.text, marginBottom: 8 },
   bannerSubtitle: {
-    fontSize: 14, color: "#E0E7FF", fontWeight: "500",
-    textAlign: "center", paddingHorizontal: 20,
+    fontSize: 14, color: COLORS.text, fontWeight: "500",
+    textAlign: "center", paddingHorizontal: 20, lineHeight: 22,
   },
   tabContainer: {
-    flexDirection: "row", backgroundColor: "#fff",
+    flexDirection: "row", backgroundColor: COLORS.surface,
     borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8,
   },
   tabActive: {
     flex: 1, paddingVertical: 16, borderBottomWidth: 3,
-    borderBottomColor: "#4F46E5", alignItems: "center",
+    borderBottomColor: COLORS.gold, alignItems: "center",
   },
-  tabActiveText: { fontSize: 16, fontWeight: "800", color: "#1F2937" },
+  tabActiveText: { fontSize: 16, fontWeight: "800", color: COLORS.gold },
   tabInactive: {
     flex: 1, paddingVertical: 16, borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB", alignItems: "center",
+    borderBottomColor: COLORS.textDim, alignItems: "center",
   },
-  tabInactiveText: { fontSize: 16, fontWeight: "600", color: "#9CA3AF" },
+  tabInactiveText: { fontSize: 16, fontWeight: "600", color: COLORS.textMuted },
   formCard: {
-    marginHorizontal: 16, marginTop: 20, marginBottom: 40, backgroundColor: "#fff",
+    marginHorizontal: 16, marginTop: 20, marginBottom: 40, backgroundColor: COLORS.surface,
     borderRadius: 20, paddingHorizontal: 24, paddingTop: 32, paddingBottom: 40,
     elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06, shadowRadius: 12,
+    shadowOpacity: 0.08, shadowRadius: 12,
   },
   stepCounter: { marginBottom: 24 },
-  stepLabel: { fontSize: 13, fontWeight: "800", color: "#4F46E5", marginBottom: 8 },
-  progressBar: { height: 6, backgroundColor: "#E5E7EB", borderRadius: 3, overflow: "hidden" },
-  progressFill: { height: 6, backgroundColor: "#4F46E5", borderRadius: 3 },
+  stepLabel: { fontSize: 13, fontWeight: "800", color: COLORS.gold, marginBottom: 8 },
+  progressBar: { height: 6, backgroundColor: COLORS.surfaceAlt, borderRadius: 3, overflow: "hidden" },
+  progressFill: { height: 6, backgroundColor: COLORS.gold, borderRadius: 3 },
   section: { marginBottom: 20 },
   sectionTitle: {
-    fontSize: 16, fontWeight: "800", color: "#1F2937", marginBottom: 16,
-    borderLeftWidth: 4, borderLeftColor: "#4F46E5", paddingLeft: 12,
+    fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 16,
+    borderLeftWidth: 4, borderLeftColor: COLORS.gold, paddingLeft: 12,
   },
   inputGroup: { marginBottom: 16 },
-  inputLabel: { fontSize: 13, fontWeight: "700", color: "#374151", marginBottom: 8, marginLeft: 4 },
+  inputLabel: { fontSize: 13, fontWeight: "700", color: COLORS.textMuted, marginBottom: 8, marginLeft: 4 },
   input: {
     width: "100%", paddingHorizontal: 16, height: 56, borderWidth: 1,
-    borderColor: "#E5E7EB", borderRadius: 16, backgroundColor: "#F9FAFB",
-    fontSize: 16, color: "#1F2937", justifyContent: "center",
+    borderColor: COLORS.goldBorder, borderRadius: 16, backgroundColor: COLORS.elevated,
+    fontSize: 16, color: COLORS.text, justifyContent: "center",
   },
   passwordContainer: {
     flexDirection: "row", alignItems: "center", borderWidth: 1,
-    borderColor: "#E5E7EB", borderRadius: 16, backgroundColor: "#F9FAFB",
+    borderColor: COLORS.goldBorder, borderRadius: 16, backgroundColor: COLORS.elevated,
     paddingHorizontal: 12, height: 56,
   },
-  passwordInput: { flex: 1, fontSize: 16, color: "#1F2937" },
-  errorText: { color: "#EF4444", fontSize: 12, marginTop: 4, fontWeight: "600", marginLeft: 4 },
-  pickerContainer: {
-    borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 16,
-    backgroundColor: "#F9FAFB", overflow: "hidden",
+  passwordInput: { flex: 1, fontSize: 16, color: COLORS.text },
+  errorText: { color: COLORS.red, fontSize: 12, marginTop: 4, fontWeight: "600", marginLeft: 4 },
+  selectField: {
+    minHeight: 56,
+    backgroundColor: COLORS.elevated,
+    borderWidth: 1,
+    borderColor: COLORS.goldBorder,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectFieldText: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "600",
+    flex: 1,
+  },
+  selectFieldPlaceholder: {
+    color: COLORS.textMuted,
   },
   rowBtns: { flexDirection: "row", gap: 12 },
   smallBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 16, borderWidth: 1,
-    borderColor: "#E5E7EB", backgroundColor: "#F9FAFB", alignItems: "center",
+    borderColor: COLORS.border, backgroundColor: COLORS.surfaceAlt, alignItems: "center",
   },
-  smallBtnActive: { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" },
-  smallBtnText: { fontWeight: "700", color: "#374151", fontSize: 16 },
+  smallBtnActive: { borderColor: COLORS.gold, backgroundColor: COLORS.goldDim },
+  smallBtnText: { fontWeight: "700", color: COLORS.text, fontSize: 16 },
   addressCard: {
-    backgroundColor: "#F5F3FF", borderRadius: 16, padding: 16,
-    marginBottom: 16, borderWidth: 1, borderColor: "#DDD6FE",
+    backgroundColor: COLORS.surfaceAlt, borderRadius: 16, padding: 16,
+    marginBottom: 16, borderWidth: 1, borderColor: COLORS.border,
   },
-  addressCardTitle: { fontSize: 14, fontWeight: "800", color: "#4F46E5", marginBottom: 14 },
+  addressCardTitle: { fontSize: 14, fontWeight: "800", color: COLORS.gold, marginBottom: 14 },
   addressPreview: {
-    flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EEF2FF",
+    flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.surface,
     paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, marginTop: 4,
   },
-  addressPreviewText: { fontSize: 13, fontWeight: "600", color: "#4F46E5", flex: 1, flexWrap: "wrap" },
+  addressPreviewText: { fontSize: 13, fontWeight: "600", color: COLORS.text, flex: 1, flexWrap: "wrap" },
   infoBanner: {
     flexDirection: "row", alignItems: "flex-start", gap: 8,
-    backgroundColor: "#EEF2FF", padding: 12, borderRadius: 12, marginBottom: 16,
+    backgroundColor: COLORS.surfaceAlt, padding: 12, borderRadius: 12, marginBottom: 16,
+    borderWidth: 1, borderColor: COLORS.border,
   },
   infoBannerText: {
-    fontSize: 12, color: "#4338CA", fontWeight: "600",
+    fontSize: 12, color: COLORS.textMuted, fontWeight: "600",
     flex: 1, flexWrap: "wrap", lineHeight: 18,
   },
   reviewItem: {
-    backgroundColor: "#F9FAFB", paddingHorizontal: 16, paddingVertical: 12,
-    marginBottom: 12, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: "#4F46E5",
+    backgroundColor: COLORS.surfaceAlt, paddingHorizontal: 16, paddingVertical: 12,
+    marginBottom: 12, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: COLORS.gold,
   },
-  reviewLabel: { fontSize: 12, fontWeight: "700", color: "#9CA3AF", marginBottom: 4 },
-  reviewValue: { fontSize: 16, fontWeight: "700", color: "#1F2937" },
+  reviewLabel: { fontSize: 12, fontWeight: "700", color: COLORS.textMuted, marginBottom: 4 },
+  reviewValue: { fontSize: 16, fontWeight: "700", color: COLORS.text },
   verificationNotice: {
     flexDirection: "row", alignItems: "flex-start", gap: 10,
-    backgroundColor: "#EEF2FF", padding: 14, borderRadius: 16,
-    marginTop: 4, borderWidth: 1, borderColor: "#C7D2FE",
+    backgroundColor: COLORS.surfaceAlt, padding: 14, borderRadius: 16,
+    marginTop: 4, borderWidth: 1, borderColor: COLORS.border,
   },
-  verificationNoticeText: { fontSize: 13, color: "#3730A3", flex: 1, lineHeight: 20 },
+  verificationNoticeText: { fontSize: 13, color: COLORS.textMuted, flex: 1, lineHeight: 20 },
   buttonRow: { flexDirection: "row", gap: 12, marginTop: 28 },
   backButton: {
     flex: 1, flexDirection: "row", paddingVertical: 16, paddingHorizontal: 16,
-    borderRadius: 16, borderWidth: 2, borderColor: "#4F46E5", backgroundColor: "#fff",
+    borderRadius: 16, borderWidth: 2, borderColor: COLORS.gold, backgroundColor: COLORS.surface,
     alignItems: "center", justifyContent: "center", gap: 6,
   },
-  backButtonText: { color: "#4F46E5", fontSize: 15, fontWeight: "800" },
+  backButtonText: { color: COLORS.gold, fontSize: 15, fontWeight: "800" },
   nextButton: {
     flex: 1, flexDirection: "row", paddingVertical: 16, paddingHorizontal: 16,
-    borderRadius: 16, backgroundColor: "#4F46E5", alignItems: "center",
-    justifyContent: "center", gap: 6, shadowColor: "#4F46E5",
+    borderRadius: 16, backgroundColor: COLORS.gold, alignItems: "center",
+    justifyContent: "center", gap: 6, shadowColor: COLORS.gold,
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  nextButtonText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  nextButtonText: { color: COLORS.bg, fontSize: 15, fontWeight: "800" },
   submitButton: {
     flex: 1, flexDirection: "row", paddingVertical: 16, paddingHorizontal: 16,
-    borderRadius: 16, backgroundColor: "#10B981", alignItems: "center",
-    justifyContent: "center", gap: 6, shadowColor: "#10B981",
+    borderRadius: 16, backgroundColor: COLORS.gold, alignItems: "center",
+    justifyContent: "center", gap: 6, shadowColor: COLORS.gold,
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  submitButtonText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-  switchText: { textAlign: "center", color: "#6B7280", marginTop: 20, fontSize: 14, fontWeight: "500" },
-  switchLink: { color: "#4F46E5", fontWeight: "800" },
+  submitButtonText: { color: COLORS.bg, fontSize: 15, fontWeight: "800" },
+  switchText: { textAlign: "center", color: COLORS.textMuted, marginTop: 20, fontSize: 14, fontWeight: "500" },
+  switchLink: { color: COLORS.gold, fontWeight: "800" },
   modalBackground: {
     flex: 1, justifyContent: "center", alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.55)", padding: 18,
   },
-  modalBox: { width: "100%", maxWidth: 420, padding: 30, backgroundColor: "#fff", borderRadius: 22, alignItems: "center" },
+  modalBox: { width: "100%", maxWidth: 420, padding: 30, backgroundColor: COLORS.surface, borderRadius: 22, alignItems: "center" },
   emailIcon: {
-    width: 70, height: 70, borderRadius: 35, backgroundColor: "#4F46E5",
+    width: 70, height: 70, borderRadius: 35, backgroundColor: COLORS.gold,
     justifyContent: "center", alignItems: "center", marginBottom: 20,
   },
-  modalText: { fontSize: 22, fontWeight: "800", marginBottom: 8, color: "#1F2937" },
-  modalSubText: { textAlign: "center", color: "#6B7280", marginBottom: 12, fontSize: 14, lineHeight: 22 },
+  modalText: { fontSize: 22, fontWeight: "800", marginBottom: 8, color: COLORS.text },
+  modalSubText: { textAlign: "center", color: COLORS.textMuted, marginBottom: 12, fontSize: 14, lineHeight: 22 },
   emailChip: {
-    flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EEF2FF",
+    flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.surfaceAlt,
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginBottom: 16,
   },
-  emailChipText: { fontSize: 14, fontWeight: "700", color: "#4F46E5" },
-  modalInstructions: { textAlign: "center", color: "#374151", fontSize: 14, lineHeight: 22, marginBottom: 8 },
-  modalNote: { textAlign: "center", color: "#9CA3AF", fontSize: 12, marginBottom: 24 },
+  emailChipText: { fontSize: 14, fontWeight: "700", color: COLORS.text },
+  modalInstructions: { textAlign: "center", color: COLORS.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 8 },
+  modalNote: { textAlign: "center", color: COLORS.textMuted, fontSize: 12, marginBottom: 24 },
   closeButton: {
-    backgroundColor: "#4F46E5", paddingHorizontal: 40, paddingVertical: 16,
+    backgroundColor: COLORS.gold, paddingHorizontal: 40, paddingVertical: 16,
     borderRadius: 16, width: "100%", alignItems: "center",
   },
-  closeButtonText: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  closeButtonText: { color: COLORS.bg, fontSize: 16, fontWeight: "800" },
   modalActionsRow: {
     width: "100%",
     flexDirection: "row",
@@ -1082,22 +1239,60 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     borderRadius: 16,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: COLORS.border,
     alignItems: "center",
     justifyContent: "center",
   },
   secondaryButtonText: {
-    color: "#4F46E5",
+    color: COLORS.text,
     fontSize: 15,
     fontWeight: "800",
   },
   modalButtonLeft: { flex: 1 },
   modalButtonRight: { flex: 1 },
   modalSecondaryAction: { marginTop: 0 },
-  strengthBarBg: { height: 4, backgroundColor: "#E5E7EB", borderRadius: 2, overflow: "hidden" },
+  selectionModalBox: {
+    width: "100%",
+    maxWidth: 420,
+    padding: 24,
+    backgroundColor: COLORS.surface,
+    borderRadius: 22,
+  },
+  selectionList: {
+    marginTop: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  selectionOption: {
+    minHeight: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceAlt,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectionOptionActive: {
+    borderColor: COLORS.gold,
+    backgroundColor: COLORS.goldDim,
+  },
+  selectionOptionText: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  selectionOptionTextActive: {
+    color: COLORS.goldLight,
+  },
+  selectionCancelButton: {
+    width: "100%",
+  },
+  strengthBarBg: { height: 4, backgroundColor: COLORS.surfaceAlt, borderRadius: 2, overflow: "hidden" },
   strengthBarFill: { height: 4, borderRadius: 2 },
-  strengthLabel: { fontSize: 11, fontWeight: "700" },
+  strengthLabel: { fontSize: 11, fontWeight: "700", color: COLORS.text },
   matchRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
 });

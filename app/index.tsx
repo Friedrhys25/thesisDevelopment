@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,44 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [disabledModalVisible, setDisabledModalVisible] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user && !loading) {
+        // Check if employee to route accordingly
+        const employeeDoc = await getDoc(doc(firestore, "employee", user.uid));
+        if (employeeDoc.exists()) {
+          console.log("✅ Persistent login - routing to employee dashboard");
+          router.replace("/employee/dashboard");
+        } else {
+          const userDoc = await getDoc(doc(firestore, "users", user.uid));
+          if (userDoc.exists()) {
+            if (!user.emailVerified) {
+              await signOut(auth);
+              Alert.alert("Email Not Verified", "Your email address has not been verified yet. Please check your inbox for the verification link.");
+              setCheckingAuth(false);
+              return;
+            }
+            const userData = userDoc.data();
+            if (userData.disabled === true) {
+              await signOut(auth);
+              setDisabledModalVisible(true);
+              setCheckingAuth(false);
+              return;
+            }
+            console.log("✅ Persistent login - routing to home");
+            router.replace("/(tabs)/home");
+          } else {
+            setCheckingAuth(false);
+          }
+        }
+      } else {
+        setCheckingAuth(false);
+      }
+    });
+    return unsubscribe;
+  }, [loading]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -162,10 +200,15 @@ const handleLogin = async () => {
   return (
     <>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      {checkingAuth ? (
+        <View style={{ flex: 1, backgroundColor: '#0b1a3d', justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#f59e0b" />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -202,7 +245,7 @@ const handleLogin = async () => {
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail" size={20} color="#4F46E5" style={styles.inputIcon} />
+              <Ionicons name="mail" size={20} color="#f59e0b" style={styles.inputIcon} />
               <TextInput
                 placeholder="Enter your email"
                 value={email}
@@ -211,7 +254,7 @@ const handleLogin = async () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!loading}
-                placeholderTextColor="#ccc"
+                placeholderTextColor="#8895bb"
                 style={styles.input}
               />
             </View>
@@ -221,7 +264,7 @@ const handleLogin = async () => {
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed" size={20} color="#4F46E5" style={styles.inputIcon} />
+              <Ionicons name="lock-closed" size={20} color="#f59e0b" style={styles.inputIcon} />
               <TextInput
                 placeholder="Enter your password"
                 value={password}
@@ -230,7 +273,7 @@ const handleLogin = async () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!loading}
-                placeholderTextColor="#ccc"
+                placeholderTextColor="#8895bb"
                 style={styles.input}
               />
               <TouchableOpacity
@@ -240,7 +283,7 @@ const handleLogin = async () => {
                 <Ionicons
                   name={showPassword ? "eye" : "eye-off"}
                   size={18}
-                  color="#999"
+                  color="#f59e0b"
                 />
               </TouchableOpacity>
             </View>
@@ -279,6 +322,7 @@ const handleLogin = async () => {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+      )}
 
     {/* Disabled Account Modal */}
     <Modal visible={disabledModalVisible} transparent animationType="fade" onRequestClose={() => setDisabledModalVisible(false)}>
@@ -295,21 +339,22 @@ const handleLogin = async () => {
         </View>
       </View>
     </Modal>
-    </>
-  );
-}
+        
+      </>
+    );
+  }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#0b1a3d",
   },
   scrollContent: {
     flexGrow: 1,
   },
   
   bannerSection: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#0b1a3d",
   },
 
   banner: {
@@ -349,7 +394,7 @@ const styles = StyleSheet.create({
 
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: "#fff",
+    backgroundColor: "#0f1e45",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 8,
@@ -358,32 +403,32 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     borderBottomWidth: 3,
-    borderBottomColor: "#4F46E5",
+    borderBottomColor: "#f59e0b",
     alignItems: "center",
   },
   tabActiveText: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#1F2937",
+    color: "#f59e0b",
   },
   tabInactive: {
     flex: 1,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: "#4a5880",
     alignItems: "center",
   },
   tabInactiveText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#9CA3AF",
+    color: "#8895bb",
   },
 
   formCard: {
     marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 40,
-    backgroundColor: "#fff",
+    backgroundColor: "#0f1e45",
     borderRadius: 20,
     paddingHorizontal: 24,
     paddingTop: 32,
@@ -401,27 +446,28 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#374151",
+    color: "#e8eeff",
     marginBottom: 8,
     marginLeft: 4,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#162254",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#f59e0b",
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 56,
   },
   inputIcon: {
     marginRight: 12,
+    color: "#f59e0b",
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#1F2937",
+    color: "#e8eeff",
     paddingVertical: 0,
   },
 
@@ -433,12 +479,12 @@ const styles = StyleSheet.create({
   },
   forgotLink: {
     fontSize: 15,
-    color: "#4F46E5",
+    color: "#f59e0b",
     fontWeight: "700",
   },
 
   actionButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#f59e0b",
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 28,
@@ -446,14 +492,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
-    shadowColor: "#4F46E5",
+    shadowColor: "#f59e0b",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 5,
   },
   actionButtonDisabled: {
-    backgroundColor: "#A5B4FC",
+    backgroundColor: "#fbbf24",
     shadowOpacity: 0.1,
   },
   actionButtonText: {
@@ -473,12 +519,12 @@ const styles = StyleSheet.create({
   },
   signupBaseText: {
     fontSize: 14,
-    color: "#6B7280",
+    color: "#8895bb",
     fontWeight: "500",
   },
   signupLinkText: {
     fontSize: 14,
-    color: "#4F46E5",
+    color: "#f59e0b",
     fontWeight: "800",
   },
 
@@ -490,7 +536,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   disabledModal: {
-    backgroundColor: "#fff",
+    backgroundColor: "#0f1e45",
     borderRadius: 20,
     padding: 24,
     marginHorizontal: 32,
@@ -504,19 +550,19 @@ const styles = StyleSheet.create({
   disabledTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#333",
+    color: "#e8eeff",
     marginTop: 16,
     marginBottom: 8,
   },
   disabledMessage: {
     fontSize: 16,
-    color: "#666",
+    color: "#8895bb",
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 24,
   },
   disabledButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#f59e0b",
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
