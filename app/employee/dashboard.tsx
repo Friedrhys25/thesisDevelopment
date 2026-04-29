@@ -380,18 +380,7 @@ export default function EmployeeDashboard() {
                     <Text style={[styles.idBadgeText, { color: idInfo.color }]}>{idInfo.text}</Text>
                   </View>
                 </View>
-                <View style={styles.infoRowContainer}>
-                  <View style={styles.infoRowLeft}>
-                    <View style={[styles.infoIcon, { backgroundColor: `${COLORS.success}15` }]}>
-                      <Ionicons name="radio-button-on" size={16} color={COLORS.success} />
-                    </View>
-                    <Text style={styles.infoLabel}>Status</Text>
-                  </View>
-                  <View style={[styles.idBadge, { backgroundColor: `${COLORS.success}18` }]}>
-                    <View style={[styles.idDot, { backgroundColor: COLORS.success }]} />
-                    <Text style={[styles.idBadgeText, { color: COLORS.success }]}>Active</Text>
-                  </View>
-                </View>
+                <InfoRow icon="time" label="Shift" value={userData?.shift ? (userData.shift.charAt(0).toUpperCase() + userData.shift.slice(1)) : "Not assigned"} />
               </View>
             </View>
           </View>

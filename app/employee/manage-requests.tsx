@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -72,6 +73,8 @@ export default function ManageRequests() {
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
   const [cardToResolve, setCardToResolve] = useState<ComplaintCard | null>(null);
   const [idStatus, setIdStatus] = useState<string>("Pending");
+  const [resolutionPhoto, setResolutionPhoto] = useState<string | null>(null);
+  const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -219,14 +222,28 @@ export default function ManageRequests() {
     }
   };
 
-  const handleResolve = (card: ComplaintCard) => {
+  const handleResolve = async (card: ComplaintCard) => {
     if (!card.userId || !card.complaintKey) return;
+    try {
+      const complaintRef = doc(firestore, "users", card.userId, "userComplaints", card.complaintKey);
+      const complaintSnap = await getDoc(complaintRef);
+      if (complaintSnap.exists()) {
+        const data = complaintSnap.data();
+        setEvidencePhoto(data.evidencePhoto || null);
+      }
+    } catch (error) {
+      console.error("Error fetching evidence photo:", error);
+    }
     setCardToResolve(card);
     setResolveModalVisible(true);
   };
 
   const confirmResolve = async () => {
     if (!cardToResolve) return;
+    if (!resolutionPhoto) {
+      Alert.alert("Required Photo", "Please upload a resolution photo before resolving the complaint.");
+      return;
+    }
     setResolving(true);
     try {
       const user = auth.currentUser;
@@ -235,7 +252,7 @@ export default function ManageRequests() {
       // 1. Update complaint status to resolved
       await updateDoc(
         doc(firestore, "users", cardToResolve.userId!, "userComplaints", cardToResolve.complaintKey!),
-        { status: "resolved", resolvedAt: serverTimestamp() }
+        { status: "resolved", resolvedAt: serverTimestamp(), resolutionPhoto }
       );
 
       // 2. Get deployed tanods from the complaint or from activeDeployment
@@ -287,12 +304,42 @@ export default function ManageRequests() {
 
       setResolveModalVisible(false);
       setCardToResolve(null);
+      setResolutionPhoto(null);
+      setEvidencePhoto(null);
       Alert.alert("Success", "Complaint has been marked as resolved.");
     } catch (error) {
       console.error("Error resolving complaint:", error);
       Alert.alert("Error", "Failed to resolve complaint. Please try again.");
     } finally {
       setResolving(false);
+    }
+  };
+
+  const pickImageFromGallery = async () => {
+    const r = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (r.granted === false) {
+      Alert.alert("Permission Required", "Media library access needed.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.3, base64: true });
+    if (!result.canceled) {
+      const selectedImage = result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : null;
+      setResolutionPhoto(selectedImage);
+    }
+  };
+
+  const takePhoto = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Camera access needed.");
+        return;
+      }
+    }
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.3, base64: true });
+    if (!result.canceled) {
+      const selectedImage = result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : null;
+      setResolutionPhoto(selectedImage);
     }
   };
 
@@ -588,12 +635,38 @@ export default function ManageRequests() {
                 </Text>
               </View>
             )}
+            <View style={styles.photoSection}>
+              {evidencePhoto && (
+                <>
+                  <Text style={styles.photoLabel}>Evidence Photo</Text>
+                  <Image source={{ uri: evidencePhoto }} style={styles.selectedPhoto} />
+                </>
+              )}
+              <Text style={styles.photoLabel}>Resolution Photo (Required)</Text>
+              {resolutionPhoto ? (
+                <Image source={{ uri: resolutionPhoto }} style={styles.selectedPhoto} />
+              ) : (
+                <Text style={styles.noPhotoText}>No photo selected</Text>
+              )}
+              <View style={styles.photoButtons}>
+                <TouchableOpacity style={styles.photoBtn} onPress={pickImageFromGallery}>
+                  <Ionicons name="images" size={20} color="#4a90e2" />
+                  <Text style={styles.photoBtnText}>Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoBtn} onPress={takePhoto}>
+                  <Ionicons name="camera" size={20} color="#4a90e2" />
+                  <Text style={styles.photoBtnText}>Camera</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             <View style={styles.resolveModalButtons}>
               <TouchableOpacity
                 style={styles.resolveModalCancelBtn}
                 onPress={() => {
                   setResolveModalVisible(false);
                   setCardToResolve(null);
+                  setResolutionPhoto(null);
+                  setEvidencePhoto(null);
                 }}
                 disabled={resolving}
               >
@@ -798,6 +871,45 @@ const styles = StyleSheet.create({
     color: "#bbb",
     marginTop: 8,
     textAlign: "center",
+  },
+  photoSection: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  photoLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 10,
+  },
+  selectedPhoto: {
+    width: 200,
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  noPhotoText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 10,
+  },
+  photoButtons: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  photoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  photoBtnText: {
+    marginLeft: 5,
+    fontSize: 14,
+    color: "#4a90e2",
+    fontWeight: "600",
   },
   spacer: {
     height: 20,

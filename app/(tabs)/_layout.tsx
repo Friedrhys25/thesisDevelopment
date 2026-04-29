@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   // Ambient glow behind bar
   outerGlow: {
     position:     "absolute",
-    height:       72,
+    height:       60,
     borderRadius: 999,
     backgroundColor: C.gold,
     opacity:      0.12,

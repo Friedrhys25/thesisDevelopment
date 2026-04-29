@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -25,6 +26,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [disabledModalVisible, setDisabledModalVisible] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -48,15 +50,6 @@ const handleLogin = async () => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log("✅ Login successful!");
 
-    if (!userCredential.user.emailVerified) {
-      await signOut(auth);
-      Alert.alert(
-        "Email Not Verified",
-        "Your email address has not been verified yet. Please check your inbox for the verification link."
-      );
-      return;
-    }
-
     // 🔐 Check if user is employee to route accordingly
     const employeeDoc = await getDoc(doc(firestore, "employee", userCredential.user.uid));
 
@@ -66,6 +59,20 @@ const handleLogin = async () => {
     } else {
       const userDoc = await getDoc(doc(firestore, "users", userCredential.user.uid));
       if (userDoc.exists()) {
+        if (!userCredential.user.emailVerified) {
+          await signOut(auth);
+          Alert.alert(
+            "Email Not Verified",
+            "Your email address has not been verified yet. Please check your inbox for the verification link."
+          );
+          return;
+        }
+        const userData = userDoc.data();
+        if (userData.disabled === true) {
+          await signOut(auth);
+          setDisabledModalVisible(true);
+          return;
+        }
         console.log("✅ Regular user login - routing to home");
         router.replace("/(tabs)/home");
       } else {
@@ -272,6 +279,22 @@ const handleLogin = async () => {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+
+    {/* Disabled Account Modal */}
+    <Modal visible={disabledModalVisible} transparent animationType="fade" onRequestClose={() => setDisabledModalVisible(false)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.disabledModal}>
+          <Ionicons name="warning" size={60} color="#ff9800" />
+          <Text style={styles.disabledTitle}>Account Disabled</Text>
+          <Text style={styles.disabledMessage}>
+            This account has been disabled. For more information, please contact support at test@gmail.com
+          </Text>
+          <TouchableOpacity style={styles.disabledButton} onPress={() => setDisabledModalVisible(false)}>
+            <Text style={styles.disabledButtonText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
     </>
   );
 }
@@ -457,5 +480,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#4F46E5",
     fontWeight: "800",
+  },
+
+  // Disabled Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  disabledModal: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 32,
+    alignItems: "center",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  disabledTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#333",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  disabledMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  disabledButton: {
+    backgroundColor: "#4F46E5",
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  disabledButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

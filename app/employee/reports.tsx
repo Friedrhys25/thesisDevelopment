@@ -26,6 +26,7 @@ export default function Reports() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [activeCount, setActiveCount] = useState(0);
   const [chartMode, setChartMode] = useState<ChartMode>("bar");
+  const [viewMode, setViewMode] = useState<"reports" | "analytics">("analytics");
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -143,159 +144,194 @@ export default function Reports() {
             <Text style={styles.subtitle}>Track performance and trends</Text>
           </View>
 
-      {/* Summary Stats */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Summary</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Ionicons name="mail" size={28} color="#4a90e2" />
-            <Text style={styles.statValue}>{totalCount}</Text>
-            <Text style={styles.statLabel}>Total Received</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Ionicons name="checkmark-circle" size={28} color="#4caf50" />
-            <Text style={[styles.statValue, { color: "#4caf50" }]}>{resolvedCount}</Text>
-            <Text style={styles.statLabel}>Resolved</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Ionicons name="time" size={28} color="#ff9800" />
-            <Text style={[styles.statValue, { color: "#ff9800" }]}>{activeCount}</Text>
-            <Text style={styles.statLabel}>Active</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Chart Mode Selector */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Chart Style</Text>
-        <View style={styles.chartModeRow}>
-          {chartModes.map((mode) => (
+          <View style={styles.viewModeContainer}>
             <TouchableOpacity
-              key={mode.key}
-              style={[styles.chartModeBtn, chartMode === mode.key && styles.chartModeBtnActive]}
-              onPress={() => setChartMode(mode.key)}
+              style={[styles.viewModeBtn, viewMode === "reports" && styles.viewModeBtnActive]}
+              onPress={() => setViewMode("reports")}
             >
-              <Ionicons name={mode.icon as any} size={18} color={chartMode === mode.key ? "#fff" : "#4a90e2"} />
-              <Text style={[styles.chartModeText, chartMode === mode.key && styles.chartModeTextActive]}>
-                {mode.label}
-              </Text>
+              <Text style={[styles.viewModeText, viewMode === "reports" && styles.viewModeTextActive]}>Reports</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+            <TouchableOpacity
+              style={[styles.viewModeBtn, viewMode === "analytics" && styles.viewModeBtnActive]}
+              onPress={() => setViewMode("analytics")}
+            >
+              <Text style={[styles.viewModeText, viewMode === "analytics" && styles.viewModeTextActive]}>Analytics</Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* Weekly Trends */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Weekly Complaint Trends</Text>
-        <View style={styles.chartContainer}>
-          {weeklyData.some((v) => v > 0) ? (
-            chartMode === "bar" ? (
-              <BarChart
-                data={{ labels: weekLabels, datasets: [{ data: weeklyData }] }}
-                width={screenWidth - 24}
-                height={200}
-                chartConfig={chartConfig}
-                fromZero
-                showValuesOnTopOfBars
-                yAxisLabel=""
-                yAxisSuffix=""
-                style={styles.chart}
-              />
-            ) : (
-              <LineChart
-                data={{ labels: weekLabels, datasets: [{ data: weeklyData }] }}
-                width={screenWidth - 24}
-                height={200}
-                chartConfig={chartMode === "area" ? areaChartConfig : chartConfig}
-                bezier={chartMode === "area"}
-                fromZero
-                style={styles.chart}
-              />
-            )
-          ) : (
-            <Text style={styles.noDataText}>No data for the last 4 weeks</Text>
-          )}
-        </View>
-      </View>
-
-      {/* Complaints per Purok */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Complaints per Purok</Text>
-        <View style={styles.chartContainer}>
-          {purokLabels.length > 0 ? (
-            <>
-              {chartMode === "bar" ? (
-                <BarChart
-                  data={{
-                    labels: purokLabels.map((p) => `P${p}`),
-                    datasets: [{ data: purokValues }],
-                  }}
-                  width={screenWidth - 24}
-                  height={220}
-                  chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})` }}
-                  fromZero
-                  showValuesOnTopOfBars
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  style={styles.chart}
-                />
-              ) : (
-                <LineChart
-                  data={{
-                    labels: purokLabels.map((p) => `P${p}`),
-                    datasets: [{ data: purokValues }],
-                  }}
-                  width={screenWidth - 24}
-                  height={220}
-                  chartConfig={{
-                    ...chartConfig,
-                    color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-                    ...(chartMode === "area" ? { fillShadowGradient: "#4caf50", fillShadowGradientOpacity: 0.3 } : {}),
-                  }}
-                  bezier={chartMode === "area"}
-                  fromZero
-                  style={styles.chart}
-                />
-              )}
-              {/* Purok detail list */}
-              <View style={styles.purokList}>
-                {purokLabels.map((purok) => (
-                  <View key={purok} style={styles.purokRow}>
-                    <View style={[styles.purokDot, { backgroundColor: "#4caf50" }]} />
-                    <Text style={styles.purokLabel}>Purok {purok}</Text>
-                    <Text style={styles.purokValue}>{purokCounts[purok]} complaints</Text>
+          {viewMode === "reports" ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Deployment History</Text>
+              {history.filter(h => h.status === "resolved").map((entry, index) => (
+                <View key={index} style={styles.historyCard}>
+                  <View style={styles.historyHeader}>
+                    <Ionicons name="checkmark-circle" size={20} color="#4caf50" />
+                    <Text style={styles.historyTitle}>{entry.type}</Text>
                   </View>
-                ))}
+                  <Text style={styles.historyDetail}>Location: Purok {entry.incidentPurok}</Text>
+                  <Text style={styles.historyDetail}>Deployed: {entry.deployedAt ? new Date(entry.deployedAt).toLocaleString() : "N/A"}</Text>
+                  <Text style={styles.historyDetail}>Resolved: {entry.resolvedAt ? new Date(entry.resolvedAt).toLocaleString() : "N/A"}</Text>
+                </View>
+              ))}
+              {history.filter(h => h.status === "resolved").length === 0 && <Text style={styles.noDataText}>No resolved complaints in history</Text>}
+            </View>
+          ) : (
+            <>
+              {/* Summary Stats */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Summary</Text>
+                <View style={styles.statsContainer}>
+                  <View style={styles.statBox}>
+                    <Ionicons name="mail" size={28} color="#4a90e2" />
+                    <Text style={styles.statValue}>{totalCount}</Text>
+                    <Text style={styles.statLabel}>Total Received</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Ionicons name="checkmark-circle" size={28} color="#4caf50" />
+                    <Text style={[styles.statValue, { color: "#4caf50" }]}>{resolvedCount}</Text>
+                    <Text style={styles.statLabel}>Resolved</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Ionicons name="time" size={28} color="#ff9800" />
+                    <Text style={[styles.statValue, { color: "#ff9800" }]}>{activeCount}</Text>
+                    <Text style={styles.statLabel}>Active</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Chart Mode Selector */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Chart Style</Text>
+                <View style={styles.chartModeRow}>
+                  {chartModes.map((mode) => (
+                    <TouchableOpacity
+                      key={mode.key}
+                      style={[styles.chartModeBtn, chartMode === mode.key && styles.chartModeBtnActive]}
+                      onPress={() => setChartMode(mode.key)}
+                    >
+                      <Ionicons name={mode.icon as any} size={18} color={chartMode === mode.key ? "#fff" : "#4a90e2"} />
+                      <Text style={[styles.chartModeText, chartMode === mode.key && styles.chartModeTextActive]}>
+                        {mode.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Weekly Trends */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Weekly Complaint Trends</Text>
+                <View style={styles.chartContainer}>
+                  {weeklyData.some((v) => v > 0) ? (
+                    chartMode === "bar" ? (
+                      <BarChart
+                        data={{ labels: weekLabels, datasets: [{ data: weeklyData }] }}
+                        width={screenWidth - 24}
+                        height={200}
+                        chartConfig={chartConfig}
+                        fromZero
+                        showValuesOnTopOfBars
+                        yAxisLabel=""
+                        yAxisSuffix=""
+                        style={styles.chart}
+                      />
+                    ) : (
+                      <LineChart
+                        data={{ labels: weekLabels, datasets: [{ data: weeklyData }] }}
+                        width={screenWidth - 24}
+                        height={200}
+                        chartConfig={chartMode === "area" ? areaChartConfig : chartConfig}
+                        bezier={chartMode === "area"}
+                        fromZero
+                        style={styles.chart}
+                      />
+                    )
+                  ) : (
+                    <Text style={styles.noDataText}>No data for the last 4 weeks</Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Complaints per Purok */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Complaints per Purok</Text>
+                <View style={styles.chartContainer}>
+                  {purokLabels.length > 0 ? (
+                    <>
+                      {chartMode === "bar" ? (
+                        <BarChart
+                          data={{
+                            labels: purokLabels.map((p) => `P${p}`),
+                            datasets: [{ data: purokValues }],
+                          }}
+                          width={screenWidth - 24}
+                          height={220}
+                          chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})` }}
+                          fromZero
+                          showValuesOnTopOfBars
+                          yAxisLabel=""
+                          yAxisSuffix=""
+                          style={styles.chart}
+                        />
+                      ) : (
+                        <LineChart
+                          data={{
+                            labels: purokLabels.map((p) => `P${p}`),
+                            datasets: [{ data: purokValues }],
+                          }}
+                          width={screenWidth - 24}
+                          height={220}
+                          chartConfig={{
+                            ...chartConfig,
+                            color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
+                            ...(chartMode === "area" ? { fillShadowGradient: "#4caf50", fillShadowGradientOpacity: 0.3 } : {}),
+                          }}
+                          bezier={chartMode === "area"}
+                          fromZero
+                          style={styles.chart}
+                        />
+                      )}
+                      {/* Purok detail list */}
+                      <View style={styles.purokList}>
+                        {purokLabels.map((purok) => (
+                          <View key={purok} style={styles.purokRow}>
+                            <View style={[styles.purokDot, { backgroundColor: "#4caf50" }]} />
+                            <Text style={styles.purokLabel}>Purok {purok}</Text>
+                            <Text style={styles.purokValue}>{purokCounts[purok]} complaints</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.noDataText}>No purok data available</Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Complaint Type Breakdown */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Complaint Type Breakdown</Text>
+                <View style={styles.categoryBox}>
+                  {typeLabels.length > 0 ? (
+                    typeLabels.map((type, index) => {
+                      const colors = ["#4a90e2", "#e74c3c", "#ff9800", "#4caf50", "#9c27b0", "#00bcd4", "#795548", "#607d8b", "#f44336", "#3f51b5", "#009688", "#ff5722", "#cddc39"];
+                      return (
+                        <View key={type} style={styles.categoryRow}>
+                          <View style={[styles.categoryDot, { backgroundColor: colors[index % colors.length] }]} />
+                          <Text style={styles.categoryLabel}>{type}</Text>
+                          <Text style={styles.categoryValue}>{typeCounts[type]}</Text>
+                        </View>
+                      );
+                    })
+                  ) : (
+                    <Text style={styles.noDataText}>No complaint data yet</Text>
+                  )}
+                </View>
               </View>
             </>
-          ) : (
-            <Text style={styles.noDataText}>No purok data available</Text>
           )}
-        </View>
-      </View>
 
-      {/* Complaint Type Breakdown */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Complaint Type Breakdown</Text>
-        <View style={styles.categoryBox}>
-          {typeLabels.length > 0 ? (
-            typeLabels.map((type, index) => {
-              const colors = ["#4a90e2", "#e74c3c", "#ff9800", "#4caf50", "#9c27b0", "#00bcd4", "#795548", "#607d8b", "#f44336", "#3f51b5", "#009688", "#ff5722", "#cddc39"];
-              return (
-                <View key={type} style={styles.categoryRow}>
-                  <View style={[styles.categoryDot, { backgroundColor: colors[index % colors.length] }]} />
-                  <Text style={styles.categoryLabel}>{type}</Text>
-                  <Text style={styles.categoryValue}>{typeCounts[type]}</Text>
-                </View>
-              );
-            })
-          ) : (
-            <Text style={styles.noDataText}>No complaint data yet</Text>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.spacer} />
+          <View style={styles.spacer} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -466,6 +502,58 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#2c3e50",
+  },
+  viewModeContainer: {
+    flexDirection: "row",
+    backgroundColor: "#f0f0f0",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 8,
+    padding: 4,
+  },
+  viewModeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 6,
+  },
+  viewModeBtnActive: {
+    backgroundColor: "#4a90e2",
+  },
+  viewModeText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+  },
+  viewModeTextActive: {
+    color: "#fff",
+  },
+  historyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  historyTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginLeft: 8,
+  },
+  historyDetail: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 4,
   },
   spacer: {
     height: 20,

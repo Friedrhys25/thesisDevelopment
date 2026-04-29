@@ -95,6 +95,7 @@ interface NotificationItem {
   incidentPurok?: string;
   incidentLocation?: string;
   evidencePhoto?: string;
+  resolutionPhoto?: string;
   hasUpdate?: boolean;
   isUrgent?: boolean;
   deployedTanodUid?: string;
@@ -109,14 +110,14 @@ const AnimatedCard = ({ children, onPress, disabled, style }: any) => {
 
   const handlePressIn = () => {
     Animated.parallel([
-      Animated.spring(scale,    { toValue: 0.97, useNativeDriver: true }),
+      Animated.spring(scale,    { toValue: 0.97, useNativeDriver: false }),
       Animated.timing(glowAnim, { toValue: 1, duration: 150, useNativeDriver: false }),
     ]).start();
   };
 
   const handlePressOut = () => {
     Animated.parallel([
-      Animated.spring(scale,    { toValue: 1, useNativeDriver: true }),
+      Animated.spring(scale,    { toValue: 1, useNativeDriver: false }),
       Animated.timing(glowAnim, { toValue: 0, duration: 200, useNativeDriver: false }),
     ]).start();
   };
@@ -294,7 +295,7 @@ export default function App() {
           firebaseKey: ds.id, id: v.id || Date.now(), message: v.message, label: v.label, type: v.type,
           timestamp: v.timestamp instanceof Timestamp ? v.timestamp.toDate().toLocaleString() : v.timestamp,
           rawTimestamp: v.timestamp, purok: v.purok, status: v.status,
-          incidentPurok: v.incidentPurok, incidentLocation: v.incidentLocation, evidencePhoto: v.evidencePhoto,
+          incidentPurok: v.incidentPurok, incidentLocation: v.incidentLocation, evidencePhoto: v.evidencePhoto, resolutionPhoto: v.resolutionPhoto,
           hasUpdate: v.hasUpdate || false, isUrgent: v.isUrgent || false,
           deployedTanodUid: v.deployedTanodUid || null, deployedTanods: v.deployedTanods || [], hasFeedback: v.hasFeedback || false,
         });
@@ -786,6 +787,14 @@ export default function App() {
                     <Image source={{ uri: selectedComplaint.evidencePhoto }} style={styles.detailPhoto} resizeMode="cover" />
                   )}
 
+                  {/* Resolution Photo */}
+                  {selectedComplaint.status === "resolved" && selectedComplaint.resolutionPhoto && (
+                    <>
+                      <Text style={styles.detailLabel}>Resolution Photo:</Text>
+                      <Image source={{ uri: selectedComplaint.resolutionPhoto }} style={styles.detailPhoto} resizeMode="cover" />
+                    </>
+                  )}
+
                   {/* Badges */}
                   <View style={{ flexDirection: "row", gap: 10, marginBottom: 18 }}>
                     <Badge label={selectedComplaint.label.toUpperCase()} color={getLabelColor(selectedComplaint.label)} />
@@ -837,7 +846,7 @@ export default function App() {
                 <FormLabel>Incident Purok *</FormLabel>
                 <View style={styles.pickerWrap}>
                   <Picker selectedValue={incidentPurok} onValueChange={setIncidentPurok} style={styles.picker} dropdownIconColor={COLORS.gold}>
-                    {[1,2,3,4,5,6].map((n) => <Picker.Item key={n} label={`Purok ${n}`} value={`${n}`} color={COLORS.text} />)}
+                    {[1,2,3,4,5,6].map((n) => <Picker.Item key={n} label={`Purok ${n}`} value={`${n}`} color="#000000" />)}
                   </Picker>
                 </View>
 
@@ -940,30 +949,64 @@ export default function App() {
 
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {viewingFeedback
-                  ? (feedbackComplaint?.deployedTanods || []).map((t, i) => {
-                      const ex = viewingTanodRatings[t.uid] || { rating: 0, comment: "" };
-                      return (
-                        <View key={t.uid} style={[styles.tanodRatingBlock, i > 0 && { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 20, marginTop: 20 }]}>
-                          <Text style={styles.tanodName}>👮 {t.name}</Text>
-                          <StarRow rating={ex.rating} />
-                          {ex.comment ? (
-                            <View style={styles.remarkBox}>
-                              <Text style={styles.remarkLabel}>REMARK</Text>
-                              <Text style={styles.remarkText}>{ex.comment}</Text>
-                            </View>
-                          ) : <Text style={styles.noRemark}>No remark provided</Text>}
+                  ? (
+                    <>
+                      {feedbackComplaint?.resolutionPhoto && (
+                        <View style={{ marginBottom: 20 }}>
+                          <Text style={styles.formLabel}>Resolution Photo</Text>
+                          <Image source={{ uri: feedbackComplaint.resolutionPhoto }} style={styles.detailPhoto} resizeMode="cover" />
                         </View>
-                      );
-                    })
+                      )}
+                      {(feedbackComplaint?.deployedTanods || []).map((t, i) => {
+                        const ex = viewingTanodRatings[t.uid] || { rating: 0, comment: "" };
+                        return (
+                          <View key={t.uid} style={[styles.tanodRatingBlock, i > 0 && { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 20, marginTop: 20 }]}>
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                              {tanodAvatars[t.uid]?.avatar ? (
+                                <Image source={{ uri: tanodAvatars[t.uid].avatar }} style={styles.tanodAvatar} />
+                              ) : (
+                                <View style={styles.tanodAvatarPlaceholder}>
+                                  <Ionicons name="shield" size={13} color={COLORS.gold} />
+                                </View>
+                              )}
+                              <Text style={styles.tanodName}>{t.name}</Text>
+                            </View>
+                            <StarRow rating={ex.rating} />
+                            {ex.comment ? (
+                              <View style={styles.remarkBox}>
+                                <Text style={styles.remarkLabel}>REMARK</Text>
+                                <Text style={styles.remarkText}>{ex.comment}</Text>
+                              </View>
+                            ) : <Text style={styles.noRemark}>No remark provided</Text>}
+                          </View>
+                        );
+                      })}
+                    </>
+                  )
                   : (
                     <>
+                      {feedbackComplaint?.resolutionPhoto && (
+                        <View style={{ marginBottom: 20 }}>
+                          <Text style={styles.formLabel}>Resolution Photo</Text>
+                          <Image source={{ uri: feedbackComplaint.resolutionPhoto }} style={styles.detailPhoto} resizeMode="cover" />
+                        </View>
+                      )}
                       <Text style={styles.feedbackIntro}>Rate each tanod who responded to your complaint</Text>
                       {(feedbackComplaint?.deployedTanods || []).map((t, i) => {
                         const entry = tanodRatings[t.uid] || { rating: 0, comment: "" };
                         const labels = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
                         return (
                           <View key={t.uid} style={[styles.tanodRatingBlock, i > 0 && { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 20, marginTop: 20 }]}>
-                            <Text style={styles.tanodName}>👮 {t.name}</Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                              {tanodAvatars[t.uid]?.avatar ? (
+                                <Image source={{ uri: tanodAvatars[t.uid].avatar }} style={styles.tanodAvatar} />
+                              ) : (
+                                <View style={styles.tanodAvatarPlaceholder}>
+                                  <Ionicons name="shield" size={13} color={COLORS.gold} />
+                                </View>
+                              )}
+                              <Text style={styles.tanodName}>{t.name}</Text>
+                            </View>
                             <View style={{ alignItems: "center", marginBottom: 10 }}>
                               <StarRow rating={entry.rating} onRate={(s) => setTanodRatings((p) => ({ ...p, [t.uid]: { ...p[t.uid], rating: s } }))} />
                               {entry.rating > 0 && <Text style={styles.ratingLabel}>{labels[entry.rating]}</Text>}
