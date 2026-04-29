@@ -1,33 +1,47 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Image,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View
+  Animated,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
 
 const COLORS = {
-  bg: "#FFFFFF",
-  card: "#FFFFFF",
-  text: "#111827",
-  muted: "#6B7280",
-  border: "#E5E7EB",
-  primary: "#F16F24",
-  primaryDark: "#F16F24",
-  accent: "#FBE451",
-  danger: "#EF4444",
+  bg: "#080f26",
+  surface: "#0f1e45",
+  surfaceAlt: "#0d1a3c",
+  elevated: "#162254",
+
+  text: "#E8EEFF",
+  textMuted: "#8895BB",
+  textDim: "#4A5880",
+
+  gold: "#f59e0b",
+  goldLight: "#fbbf24",
+  goldDim: "rgba(245,158,11,0.15)",
+  goldBorder: "rgba(245,158,11,0.3)",
+
+  blue: "#1447c0",
+  blueMid: "#1E56D8",
+  blueLight: "rgba(20,71,192,0.3)",
+  red: "#ce1126",
+  redLight: "rgba(206,17,38,0.22)",
+  success: "#10b981",
+
+  border: "rgba(255,255,255,0.06)",
+  borderGold: "rgba(245,158,11,0.2)",
 };
 
 interface Service {
@@ -39,16 +53,78 @@ interface Service {
   description?: string;
 }
 
+type Official = {
+  name: string;
+  position: string;
+  picture: string;
+};
+
+function StatPill({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: number | string;
+  color: string;
+}) {
+  return (
+    <View style={styles.statPill}>
+      <Ionicons name={icon} size={16} color={color} />
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
+}
+
+function SkeletonCard({ width }: { width: "48%" | "100%" }) {
+  const pulse = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.68, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.35, duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulse]);
+
+  return (
+    <Animated.View style={[styles.serviceCard, { width, opacity: pulse }]}>
+      <View style={styles.serviceCardHeader}>
+        <View style={[styles.serviceIconWrap, { backgroundColor: COLORS.surface, borderColor: COLORS.border }]} />
+        <View style={styles.skeletonArrow} />
+      </View>
+      <View style={styles.serviceCardBody}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonLineShort} />
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [officials, setOfficials] = useState<{ name: string; position: string; picture: string }[]>([]);
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const [officials, setOfficials] = useState<Official[]>([]);
+
+  const getPositionRank = (position: string) => {
+    const p = position.toLowerCase();
+    if (p.includes("captain") || p.includes("punong")) return 0;
+    if (p.includes("secretary")) return 1;
+    if (p.includes("treasurer")) return 2;
+    if (p.includes("kagawad")) return 3;
+    if (p.includes("sk")) return 4;
+    return 5;
+  };
 
   const fetchUserName = async () => {
     const uid = auth.currentUser?.uid;
@@ -56,6 +132,7 @@ export default function HomePage() {
       setLoading(false);
       return;
     }
+
     try {
       const userDocRef = doc(firestore, "users", uid);
       const snapshot = await getDoc(userDocRef);
@@ -69,21 +146,6 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUserName();
-    fetchOfficials();
-  }, []);
-
-  const getPositionRank = (position: string) => {
-    const p = position.toLowerCase();
-    if (p.includes("captain") || p.includes("punong")) return 0;
-    if (p.includes("secretary")) return 1;
-    if (p.includes("treasurer")) return 2;
-    if (p.includes("kagawad")) return 3;
-    if (p.includes("sk")) return 4;
-    return 5;
   };
 
   const fetchOfficials = async () => {
@@ -104,6 +166,11 @@ export default function HomePage() {
     }
   };
 
+  useEffect(() => {
+    fetchUserName();
+    fetchOfficials();
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchUserName();
@@ -117,413 +184,537 @@ export default function HomePage() {
         id: 1,
         name: "Complaints",
         icon: "alert-circle",
-        color: COLORS.primary,
+        color: COLORS.gold,
         route: "/complain",
-        description: "Report issues in the barangay",
+        description: "Report issues around the barangay and track updates.",
       },
       {
         id: 2,
         name: "Emergency",
         icon: "medical",
-        color: COLORS.danger, // Keep emergency distinct for quick recognition
+        color: COLORS.red,
         route: "/emergency",
-        description: "Get urgent help fast",
+        description: "Access urgent numbers and fast-response options.",
       },
       {
         id: 4,
         name: "Profile",
         icon: "person",
-        color: COLORS.primary,
+        color: COLORS.blueMid,
         route: "/profile",
-        description: "View your account details",
+        description: "Review your account details and personal information.",
       },
       {
         id: 5,
-        name: "FAQS",
+        name: "FAQs",
         icon: "help-circle",
-        color: COLORS.primary,
+        color: COLORS.success,
         route: "/FAQS",
-        description: "Find quick answers",
+        description: "Read quick answers to common barangay service questions.",
       },
     ],
     []
   );
 
   const handleServiceClick = (id: number) => {
-    const route = services.find((s) => s.id === id)?.route;
-    if (route) router.push(route as any);
-    else console.warn("No route found for this service");
+    const route = services.find((service) => service.id === id)?.route;
+    if (route) {
+      router.push(route as any);
+    } else {
+      console.warn("No route found for this service");
+    }
   };
 
-  const parallaxTranslate = scrollY.interpolate({
-    inputRange: [-100, 0, 300],
-    outputRange: [-50, 0, 120],
-    extrapolate: "clamp",
-  });
-
   const cardWidth = width >= 380 ? "48%" : "100%";
-  const headerTitleSize = width >= 380 ? 24 : 20;
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <View style={[styles.parallaxContainer, { paddingTop: insets.top }]}>
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: COLORS.primaryDark }]} />
-          <View style={styles.headerContent}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Barangay Services</Text>
-            </View>
-            <Skeleton style={{ width: 180, height: 28, borderRadius: 6, marginBottom: 8, backgroundColor: "rgba(255,255,255,0.4)" }} />
-            <Skeleton style={{ width: 250, height: 16, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.4)" }} />
-          </View>
-        </View>
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
-        >
-          <View style={styles.content}>
-            <Skeleton style={{ width: 200, height: 20, borderRadius: 4, marginBottom: 8 }} />
-            <Skeleton style={{ width: 220, height: 14, borderRadius: 4, marginBottom: 16 }} />
-            <View style={styles.grid}>
-              {[1, 2, 3, 4, 5].map((idx) => (
-                <View key={idx} style={[styles.card, { width: cardWidth }]}>
-                  <View style={styles.cardHeader}>
-                    <Skeleton style={styles.iconBox} />
-                    <Skeleton style={{ width: 20, height: 20, borderRadius: 10 }} />
-                  </View>
-                  <View style={styles.cardBody}>
-                    <Skeleton style={{ width: "80%", height: 18, borderRadius: 4, marginBottom: 6 }} />
-                    <Skeleton style={{ width: "60%", height: 12, borderRadius: 4 }} />
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  const quickStats = {
+    services: services.length,
+    officials: officials.length,
+    support: "24/7",
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <Animated.ScrollView
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: Platform.OS !== "web" }
-        )}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#fff"
-            colors={[COLORS.primary]}
-          />
-        }
+
+      <LinearGradient
+        colors={["#07122f", "#0b1a3d", "#11306b"]}
+        locations={[0, 0.55, 1]}
+        style={[styles.header, { paddingTop: insets.top + 12 }]}
       >
-        <View style={[styles.parallaxContainer, { paddingTop: insets.top }]}>
-          <Animated.View
-            style={[
-              styles.parallaxBackground,
-              { transform: [{ translateY: parallaxTranslate }] },
-            ]}
-          >
+        <View style={styles.headerRing} />
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerEyebrow}>BARANGAY SAN ROQUE</Text>
+            <Text style={styles.headerTitle}>
+              {loading ? "Loading Home" : `Hello, ${userName ?? "User"}`}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              Access barangay services, updates, and emergency support from one place.
+            </Text>
+          </View>
+          <View style={styles.headerLogoWrap}>
             <Image
               source={require("../../assets/images/sanroquelogoo.png")}
-              style={styles.parallaxLogo}
+              style={styles.headerLogo}
               resizeMode="contain"
             />
-          </Animated.View>
-          <View style={styles.overlay} />
-          <View style={styles.headerContent}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Barangay Services</Text>
-            </View>
-            <Text style={[styles.headerText, { fontSize: headerTitleSize }]}>
-              Hello, {userName}
-            </Text>
-            <Text style={styles.subtitle}>
-              Your voice matters. Connect with us anytime!
-            </Text>
           </View>
         </View>
 
-        <View style={styles.content}>
-          <Text style={styles.sectionTitle}>What would you like?</Text>
-          <Text style={styles.sectionSubtitle}>Choose a service to get started</Text>
+        <View style={styles.statsStrip}>
+          <StatPill icon="apps-outline" label="Services" value={quickStats.services} color={COLORS.gold} />
+          <View style={styles.statDivider} />
+          <StatPill icon="people-outline" label="Officials" value={quickStats.officials} color={COLORS.blueMid} />
+          <View style={styles.statDivider} />
+          <StatPill icon="time-outline" label="Support" value={quickStats.support} color={COLORS.success} />
+        </View>
+
+        <View style={[styles.headerAccentLine, { backgroundColor: COLORS.gold }]} />
+      </LinearGradient>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 110 }]}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />
+        }
+      >
+        <View style={styles.noticeBox}>
+          <View style={styles.noticeIconWrap}>
+            <Ionicons name="sparkles-outline" size={18} color={COLORS.gold} />
+          </View>
+          <Text style={styles.noticeText}>
+            Start with a service card below, check barangay leadership updates, or head to Emergency for urgent assistance.
+          </Text>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionEyebrow}>SERVICES</Text>
+          <Text style={styles.sectionTitle}>What would you like to do?</Text>
+        </View>
+
+        {loading ? (
           <View style={styles.grid}>
-            {services.map((service) => (
-              <TouchableOpacity
-                key={service.id}
-                style={[
-                  styles.card,
-                  { width: cardWidth },
-                  activeCard === service.id && styles.activeCard,
-                ]}
-                onPressIn={() => setActiveCard(service.id)}
-                onPressOut={() => setActiveCard(null)}
-                onPress={() => handleServiceClick(service.id)}
-                activeOpacity={0.9}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={[styles.iconBox, { backgroundColor: `${service.color}1A` }]}>
-                    <Ionicons name={service.icon} size={26} color={service.color} />
-                  </View>
-                  <Ionicons name="arrow-forward" size={20} color="#D1D5DB" />
-                </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>{service.name}</Text>
-                  {service.description && (
-                    <Text style={styles.cardDesc}>{service.description}</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
+            {[1, 2, 3, 4].map((id) => (
+              <SkeletonCard key={id} width={cardWidth} />
             ))}
           </View>
-        </View>
+        ) : (
+          <View style={styles.grid}>
+            {services.map((service) => {
+              const isActive = activeCard === service.id;
 
-        <View style={[styles.content, { marginTop: 20 }]}>
-          <View style={styles.featureCard}>
-            <Text style={styles.featureIcon}>TIP</Text>
-            <Text style={styles.featureTitle}>Did you know?</Text>
-            <Text style={styles.featureText}>
-              You can track the status of your complaints and receive real-time
-              updates through our platform.
-            </Text>
-          </View>
-        </View>
-
-        {/* Barangay Officials Section */}
-        {officials.length > 0 && (
-          <View style={[styles.content, { marginTop: 20 }]}>
-            <Text style={styles.sectionTitle}>Barangay Officials</Text>
-            <Text style={styles.sectionSubtitle}>The leaders of Barangay San Roque</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
-              {officials.map((official, index) => (
-                <View key={index} style={styles.officialCard}>
-                  {official.picture ? (
-                    <Image source={{ uri: official.picture }} style={styles.officialAvatar} />
-                  ) : (
-                    <View style={[styles.officialAvatar, styles.officialAvatarPlaceholder]}>
-                      <Ionicons name="person" size={28} color={COLORS.muted} />
+              return (
+                <Pressable
+                  key={service.id}
+                  onPressIn={() => setActiveCard(service.id)}
+                  onPressOut={() => setActiveCard(null)}
+                  onPress={() => handleServiceClick(service.id)}
+                  style={[
+                    styles.serviceCard,
+                    { width: cardWidth },
+                    isActive && {
+                      borderColor: service.color,
+                      backgroundColor: `${service.color}14`,
+                      transform: [{ scale: 0.98 }],
+                    },
+                  ]}
+                >
+                  <View style={styles.serviceCardHeader}>
+                    <View
+                      style={[
+                        styles.serviceIconWrap,
+                        {
+                          backgroundColor: `${service.color}20`,
+                          borderColor: `${service.color}40`,
+                        },
+                      ]}
+                    >
+                      <Ionicons name={service.icon} size={25} color={service.color} />
                     </View>
-                  )}
-                  <Text style={styles.officialPosition} numberOfLines={2}>{official.position}</Text>
-                  <Text style={styles.officialName} numberOfLines={2}>{official.name}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            <View style={styles.thanksContainer}>
-              <Ionicons name="heart" size={16} color={COLORS.primary} />
-              <Text style={styles.thanksText}>
-                Thank you to the Barangay Officials of San Roque for supporting this project
-              </Text>
-            </View>
+                    <Ionicons name="arrow-forward" size={18} color={COLORS.textDim} />
+                  </View>
+                  <View style={styles.serviceCardBody}>
+                    <Text style={styles.serviceTitle}>{service.name}</Text>
+                    {service.description ? (
+                      <Text style={styles.serviceDescription}>{service.description}</Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
         )}
-      </Animated.ScrollView>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionEyebrow}>DISCOVER</Text>
+          <Text style={styles.sectionTitle}>Platform Highlight</Text>
+        </View>
+
+        <View style={styles.reminderCard}>
+          <View style={styles.reminderHeader}>
+            <Text style={styles.reminderTitle}>Did you know?</Text>
+            <View style={styles.reminderBadge}>
+              <Ionicons name="flash-outline" size={13} color={COLORS.gold} />
+              <Text style={styles.reminderBadgeText}>TIP</Text>
+            </View>
+          </View>
+          <View style={styles.reminderDivider} />
+          <Text style={styles.reminderText}>
+            You can submit a complaint, revisit your account, and check emergency contacts without leaving the same service hub.
+          </Text>
+        </View>
+
+        {officials.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionEyebrow}>LEADERSHIP</Text>
+              <Text style={styles.sectionTitle}>Barangay Officials</Text>
+            </View>
+
+            <View style={styles.officialsCard}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.officialsRow}
+              >
+                {officials.map((official, index) => (
+                  <View key={`${official.name}-${index}`} style={styles.officialCard}>
+                    {official.picture ? (
+                      <Image source={{ uri: official.picture }} style={styles.officialAvatar} />
+                    ) : (
+                      <View style={[styles.officialAvatar, styles.officialAvatarPlaceholder]}>
+                        <Ionicons name="person" size={28} color={COLORS.textDim} />
+                      </View>
+                    )}
+                    <Text style={styles.officialPosition} numberOfLines={2}>
+                      {official.position}
+                    </Text>
+                    <Text style={styles.officialName} numberOfLines={2}>
+                      {official.name}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.thanksContainer}>
+                <Ionicons name="heart" size={15} color={COLORS.gold} />
+                <Text style={styles.thanksText}>
+                  Thank you to the officials of Barangay San Roque for supporting this platform.
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.bg },
-  parallaxContainer: {
-    height: 210,
-    position: "relative",
-    overflow: "hidden",
-    justifyContent: "flex-end",
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
-  },
-  parallaxBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.primaryDark,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  parallaxLogo: {
-    width: 250,
-    height: 250,
-  },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.18)" },
-  headerContent: { paddingHorizontal: 18, paddingBottom: 18, paddingTop: 10 },
-  badge: {
-    alignSelf: "flex-start",
-    backgroundColor: COLORS.accent,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginBottom: 10,
-  },
-  badgeText: { color: COLORS.text, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
-  headerText: { color: "#fff", fontWeight: "800" },
-  subtitle: { color: "rgba(255,255,255,0.9)", fontSize: 16, fontWeight: "600" },
 
-  content: {
-    backgroundColor: COLORS.card,
-    marginHorizontal: 18,
-    marginTop: 16,
-    borderRadius: 20,
-    padding: 18,
+  header: { paddingHorizontal: 22, paddingBottom: 20, overflow: "hidden" },
+  headerRing: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
     borderWidth: 1,
-    borderColor: "rgba(229,231,235,0.65)",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
+    borderColor: "rgba(245,158,11,0.08)",
+    top: -80,
+    right: -60,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
-  sectionSubtitle: { fontSize: 16, color: COLORS.muted, marginBottom: 16 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
+    gap: 16,
+  },
+  headerEyebrow: {
+    color: "rgba(245,158,11,0.7)",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 2.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 20,
+    maxWidth: 260,
+  },
+  headerLogoWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: COLORS.borderGold,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  headerLogo: {
+    width: 42,
+    height: 42,
+  },
+  statsStrip: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statPill: { flex: 1, alignItems: "center" },
+  statLabel: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginTop: 4,
+    textTransform: "uppercase",
+  },
+  statValue: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: COLORS.border,
+    alignSelf: "stretch",
+    marginHorizontal: 8,
+  },
+  headerAccentLine: { height: 1, opacity: 0.3, marginTop: 16 },
+
+  scroll: { paddingHorizontal: 18, paddingTop: 18 },
+
+  noticeBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: COLORS.goldDim,
+    borderWidth: 1,
+    borderColor: COLORS.goldBorder,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 16,
+  },
+  noticeIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(245,158,11,0.18)",
+    borderWidth: 1,
+    borderColor: COLORS.goldBorder,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noticeText: {
+    flex: 1,
+    color: COLORS.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
+  },
+
+  sectionHeader: { marginBottom: 14, marginTop: 6 },
+  sectionEyebrow: {
+    color: COLORS.textDim,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 2.5,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  sectionTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
+    marginBottom: 10,
   },
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 6,
+  serviceCard: {
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(229,231,235,0.6)",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 2,
-    justifyContent: "space-between",
-    minHeight: 140,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 4,
+    minHeight: 170,
   },
-  activeCard: { transform: [{ scale: 0.96 }] },
-  cardHeader: {
+  serviceCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  serviceIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 10,
   },
-  cardBody: { marginTop: 16 },
-  cardTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text, marginBottom: 4 },
-  cardDesc: {
-    color: COLORS.muted,
-    fontSize: 14,
+  serviceCardBody: {
+    marginTop: 8,
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  serviceTitle: {
+    color: COLORS.text,
+    fontWeight: "900",
+    fontSize: 16,
+    marginBottom: 6,
+  },
+  serviceDescription: {
+    color: COLORS.textMuted,
+    fontWeight: "500",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  skeletonArrow: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.elevated,
+  },
+  skeletonTitle: {
+    width: "72%",
+    height: 18,
+    borderRadius: 4,
+    backgroundColor: COLORS.elevated,
+    marginBottom: 8,
+  },
+  skeletonLineShort: {
+    width: "88%",
+    height: 13,
+    borderRadius: 4,
+    backgroundColor: COLORS.elevated,
+  },
+
+  reminderCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 22,
+    padding: 18,
+    marginTop: 6,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: COLORS.borderGold,
+  },
+  reminderHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  reminderTitle: { color: COLORS.text, fontSize: 16, fontWeight: "900" },
+  reminderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: COLORS.goldDim,
+    borderWidth: 1,
+    borderColor: COLORS.goldBorder,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  reminderBadgeText: {
+    color: COLORS.gold,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  reminderDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
+  reminderText: {
+    color: COLORS.textMuted,
+    fontSize: 13,
     lineHeight: 20,
     fontWeight: "500",
   },
 
-  featureCard: {
-    backgroundColor: "rgba(251, 228, 81, 0.15)",
-    borderRadius: 18,
-    padding: 22,
-    alignItems: "center",
+  officialsCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderColor: COLORS.border,
+    marginBottom: 4,
   },
-  featureIcon: {
-    fontSize: 14,
-    marginBottom: 8,
-    letterSpacing: 2,
-    color: COLORS.primary,
-    fontWeight: "800",
-  },
-  featureTitle: { fontSize: 16, fontWeight: "800", color: COLORS.text },
-  featureText: {
-    fontSize: 14,
-    color: "#4B5563",
-    textAlign: "center",
-    marginTop: 6,
-    lineHeight: 20,
+  officialsRow: {
+    paddingHorizontal: 2,
+    gap: 8,
   },
   officialCard: {
     alignItems: "center",
-    width: 110,
-    marginHorizontal: 8,
-    paddingVertical: 12,
+    width: 116,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   officialAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    marginBottom: 8,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    marginBottom: 10,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.goldBorder,
   },
   officialAvatarPlaceholder: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: COLORS.elevated,
     justifyContent: "center",
     alignItems: "center",
   },
   officialPosition: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "800",
+    color: COLORS.gold,
     textAlign: "center",
     lineHeight: 14,
-    marginBottom: 2,
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   officialName: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: COLORS.text,
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 17,
   },
   thanksContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 16,
-    paddingTop: 12,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     gap: 6,
+    paddingHorizontal: 10,
   },
   thanksText: {
     fontSize: 12,
-    color: COLORS.muted,
+    color: COLORS.textMuted,
     textAlign: "center",
-    fontStyle: "italic",
     flex: 1,
+    lineHeight: 18,
   },
 });
-
-// ===============================
-// REUSABLE SKELETON COMPONENT
-// ===============================
-function Skeleton({ style }: { style: any }) {
-  const pulseAnim = useRef(new Animated.Value(0.5)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.5,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [pulseAnim]);
-
-  return (
-    <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: "#E5E7EB" }]} />
-  );
-}

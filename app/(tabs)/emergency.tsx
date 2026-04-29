@@ -156,23 +156,25 @@ function Emergency911Button() {
       <View style={s.sosCardDivider} />
 
       <View style={s.sosButtonArea}>
-        <Animated.View style={[s.sosGlow, { backgroundColor: glowColor }]} />
-        <PulseRing color={COLORS.red} delay={0} />
-        <PulseRing color={COLORS.red} delay={700} />
+        <View style={s.sosButtonStage}>
+          <Animated.View style={[s.sosGlow, { backgroundColor: glowColor }]} />
+          <PulseRing color={COLORS.red} delay={0} />
+          <PulseRing color={COLORS.red} delay={700} />
 
-        <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
-          <Animated.View style={{ transform: [{ scale: scaleAnim }], shadowColor: COLORS.red, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.55, shadowRadius: 20, elevation: 14 }}>
-            <LinearGradient
-              colors={["#7a000e", "#ce1126", "#ff2040"]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.sosButtonInner}
-            >
-              <Ionicons name="call" size={36} color="#fff" />
-              <Text style={s.sosButtonLabel}>911</Text>
-              <Text style={s.sosButtonHint}>hold to call</Text>
-            </LinearGradient>
-          </Animated.View>
-        </Pressable>
+          <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }], shadowColor: COLORS.red, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.55, shadowRadius: 20, elevation: 14 }}>
+              <LinearGradient
+                colors={["#7a000e", "#ce1126", "#ff2040"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={s.sosButtonInner}
+              >
+                <Ionicons name="call" size={36} color="#fff" />
+                <Text style={s.sosButtonLabel}>911</Text>
+                <Text style={s.sosButtonHint}>hold to call</Text>
+              </LinearGradient>
+            </Animated.View>
+          </Pressable>
+        </View>
 
         <View style={s.progressTrack}>
           <Animated.View style={[s.progressFill, { width: progressW }]} />
@@ -291,7 +293,7 @@ export default function EmergencyPage() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 110 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
       >
         {/* Notice */}
@@ -427,6 +429,7 @@ const s = StyleSheet.create({
   sosDangerBadgeText: { color: COLORS.red, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
   sosCardDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 16 },
   sosButtonArea:  { alignItems: "center", paddingVertical: 10, position: "relative" },
+  sosButtonStage: { width: 180, height: 180, alignItems: "center", justifyContent: "center", position: "relative" },
   sosGlow:        { position: "absolute", width: 110, height: 110, borderRadius: 55 },
   sosButtonInner: { width: 110, height: 110, borderRadius: 55, justifyContent: "center", alignItems: "center", gap: 1 },
   sosButtonLabel: { color: "#fff", fontSize: 20, fontWeight: "900", letterSpacing: 3 },

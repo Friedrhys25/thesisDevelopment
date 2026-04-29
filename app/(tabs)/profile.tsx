@@ -73,6 +73,26 @@ type UserData = {
 };
 type EditingField = "address" | "phone" | null;
 
+function HeaderStat({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <View style={s.headerStatPill}>
+      <Ionicons name={icon} size={16} color={color} />
+      <Text style={s.headerStatLabel}>{label}</Text>
+      <Text style={s.headerStatValue}>{value}</Text>
+    </View>
+  );
+}
+
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 function Skeleton({ style }: { style: any }) {
   const pulse = useRef(new Animated.Value(0.3)).current;
@@ -296,9 +316,31 @@ export default function ProfilePage() {
         <LinearGradient colors={["#0b1a3d", "#111f50"]} style={[s.header, { paddingTop: insets.top + 12 }]}>
           <View style={s.headerRing} />
           <View style={s.headerRow}>
-            <Skeleton style={{ width: 100, height: 12, borderRadius: 4 }} />
-            <Text style={s.headerTitle}>My Profile</Text>
-            <Skeleton style={{ width: 40, height: 40, borderRadius: 20 }} />
+            <View style={{ flex: 1 }}>
+              <Skeleton style={{ width: 118, height: 12, borderRadius: 4, marginBottom: 8 }} />
+              <Skeleton style={{ width: 150, height: 28, borderRadius: 8 }} />
+              <Skeleton style={{ width: 210, height: 12, borderRadius: 6, marginTop: 10 }} />
+            </View>
+            <Skeleton style={{ width: 48, height: 48, borderRadius: 16 }} />
+          </View>
+          <View style={s.headerStatsStrip}>
+            <View style={s.headerStatPill}>
+              <Skeleton style={{ width: 16, height: 16, borderRadius: 8 }} />
+              <Skeleton style={{ width: 40, height: 10, borderRadius: 4, marginTop: 4 }} />
+              <Skeleton style={{ width: 64, height: 18, borderRadius: 6, marginTop: 4 }} />
+            </View>
+            <View style={s.headerStatDivider} />
+            <View style={s.headerStatPill}>
+              <Skeleton style={{ width: 16, height: 16, borderRadius: 8 }} />
+              <Skeleton style={{ width: 44, height: 10, borderRadius: 4, marginTop: 4 }} />
+              <Skeleton style={{ width: 54, height: 18, borderRadius: 6, marginTop: 4 }} />
+            </View>
+            <View style={s.headerStatDivider} />
+            <View style={s.headerStatPill}>
+              <Skeleton style={{ width: 16, height: 16, borderRadius: 8 }} />
+              <Skeleton style={{ width: 38, height: 10, borderRadius: 4, marginTop: 4 }} />
+              <Skeleton style={{ width: 48, height: 18, borderRadius: 6, marginTop: 4 }} />
+            </View>
           </View>
           <View style={s.avatarSection}>
             <Skeleton style={s.avatar} />
@@ -347,11 +389,39 @@ export default function ProfilePage() {
         <View style={s.headerRing} />
 
         <View style={s.headerRow}>
-          <Text style={s.headerEyebrow}>BARANGAY SAN ROQUE</Text>
-          <Text style={s.headerTitle}>My Profile</Text>
-          <View style={s.headerIconWrap}>
-            <Ionicons name="person" size={22} color={COLORS.gold} />
+          <View style={{ flex: 1 }}>
+            <Text style={s.headerEyebrow}>BARANGAY SAN ROQUE</Text>
+            <Text style={s.headerTitle}>My Profile</Text>
+            <Text style={s.headerSubtitle}>
+              Manage your account details, identification status, and security settings.
+            </Text>
           </View>
+          <View style={s.headerIconWrap}>
+            <Ionicons name="person" size={24} color={COLORS.gold} />
+          </View>
+        </View>
+
+        <View style={s.headerStatsStrip}>
+          <HeaderStat
+            icon="shield-checkmark-outline"
+            label="ID Status"
+            value={userData.idstatus}
+            color={getStatusColor(userData.idstatus)}
+          />
+          <View style={s.headerStatDivider} />
+          <HeaderStat
+            icon="home-outline"
+            label="Residency"
+            value={userData.residencyStatus || "Resident"}
+            color={COLORS.blueMid}
+          />
+          <View style={s.headerStatDivider} />
+          <HeaderStat
+            icon="location-outline"
+            label="Purok"
+            value={userData.purok ? `#${userData.purok}` : "N/A"}
+            color={COLORS.gold}
+          />
         </View>
 
         {/* Avatar section */}
@@ -621,10 +691,16 @@ const s = StyleSheet.create({
   // Header — mirrors complain.tsx
   header:          { paddingHorizontal: 22, paddingBottom: 24, overflow: "hidden" },
   headerRing:      { position: "absolute", width: 260, height: 260, borderRadius: 130, borderWidth: 1, borderColor: "rgba(245,158,11,0.08)", top: -80, right: -60 },
-  headerRow:       { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
-  headerEyebrow:   { color: "rgba(245,158,11,0.65)", fontSize: 9, fontWeight: "800", letterSpacing: 2.5, textTransform: "uppercase" },
-  headerTitle:     { color: "#fff", fontSize: 20, fontWeight: "900" },
-  headerIconWrap:  { width: 44, height: 44, borderRadius: 14, backgroundColor: COLORS.goldDim, borderWidth: 1, borderColor: COLORS.goldBorder, justifyContent: "center", alignItems: "center" },
+  headerRow:       { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, gap: 16 },
+  headerEyebrow:   { color: "rgba(245,158,11,0.65)", fontSize: 9, fontWeight: "800", letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 4 },
+  headerTitle:     { color: "#fff", fontSize: 28, fontWeight: "900", letterSpacing: -0.5, marginBottom: 8 },
+  headerSubtitle:  { color: COLORS.textMuted, fontSize: 13, fontWeight: "600", lineHeight: 20, maxWidth: 260 },
+  headerIconWrap:  { width: 48, height: 48, borderRadius: 16, backgroundColor: COLORS.goldDim, borderWidth: 1, borderColor: COLORS.goldBorder, justifyContent: "center", alignItems: "center", marginTop: 2 },
+  headerStatsStrip:{ flexDirection: "row", backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 18, paddingVertical: 14, paddingHorizontal: 10, borderWidth: 1, borderColor: COLORS.border, marginBottom: 18 },
+  headerStatPill:  { flex: 1, alignItems: "center" },
+  headerStatLabel: { color: COLORS.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 1, marginTop: 4, textTransform: "uppercase" },
+  headerStatValue: { color: "#fff", fontSize: 16, fontWeight: "900", textAlign: "center", marginTop: 2 },
+  headerStatDivider:{ width: 1, backgroundColor: COLORS.border, alignSelf: "stretch", marginHorizontal: 8 },
   headerAccentLine:{ height: 1, opacity: 0.3, marginTop: 22 },
 
   // Avatar section

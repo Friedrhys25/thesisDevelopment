@@ -65,7 +65,7 @@ function CustomTabBar({ state, navigation }: any) {
   return (
     <View style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 14) }]}>
       {/* Ambient blue glow */}
-      <Animated.View style={[styles.outerGlow, { width: barWidth + 24, opacity: glowOpacity }]} />
+      <Animated.View style={[styles.outerGlow, { width: barWidth, opacity: glowOpacity }]} />
 
       <View style={[styles.bar, { width: barWidth }]}>
         {/* Gold rim accent on top edge */}
@@ -152,6 +152,7 @@ const styles = StyleSheet.create({
 
   outerGlow: {
     position:        "absolute",
+    alignSelf:       "center",
     height:          72,
     borderRadius:    999,
     backgroundColor: C.blue,

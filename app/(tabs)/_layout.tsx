@@ -67,7 +67,7 @@ function CustomTabBar({ state, navigation }: any) {
   return (
     <View style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 14) }]}>
       {/* Outer glow ring */}
-      <Animated.View style={[styles.outerGlow, { width: barWidth + 24, opacity: glowOpacity }]} />
+      <Animated.View style={[styles.outerGlow, { width: barWidth, opacity: glowOpacity }]} />
 
       <View style={[styles.bar, { width: barWidth }]}>
         {/* Sliding indicator */}
@@ -159,12 +159,13 @@ const styles = StyleSheet.create({
   // Ambient glow behind bar
   outerGlow: {
     position:     "absolute",
+    alignSelf:    "center",
     height:       60,
     borderRadius: 999,
     backgroundColor: C.gold,
     opacity:      0.12,
-    // blur-like effect via shadow on Android too
     shadowColor:  C.gold,
+    // blur-like effect via shadow on Android too
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 24,
