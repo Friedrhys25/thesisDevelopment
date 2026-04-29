@@ -19,16 +19,16 @@ const TAB_ITEMS = [
   { name: "profile",         icon: "person-outline",     active: "person",    label: "Profile"   },
 ];
 
-// ── Employee palette: same dark navy base, Philippine blue accent ─────────────
+// ── Palette matches splash + complaints redesign ───────────────────────────────
 const C = {
-  blue:       "#1E56D8",
-  blueDim:    "rgba(30,86,216,0.2)",
-  blueBorder: "rgba(30,86,216,0.4)",
-  navy:       "#0b1a3d",
-  navyLight:  "#0f2050",
-  inactive:   "rgba(255,255,255,0.38)",
-  goldBorder: "rgba(245,158,11,0.2)",   // subtle gold rim — ties to splash
-  gold:       "#f59e0b",
+  gold:        "#f59e0b",
+  goldDim:     "rgba(245,158,11,0.18)",
+  goldBorder:  "rgba(245,158,11,0.35)",
+  navy:        "#0b1a3d",
+  navyLight:   "#0f2050",
+  inactive:    "rgba(255,255,255,0.38)",
+  border:      "rgba(255,255,255,0.07)",
+  glow:        "rgba(245,158,11,0.22)",
 };
 
 function CustomTabBar({ state, navigation }: any) {
@@ -36,13 +36,13 @@ function CustomTabBar({ state, navigation }: any) {
   const { width } = useWindowDimensions();
   const currentIndex = state.index;
 
-  const tabCount     = state.routes.length;
-  const barWidth     = Math.min(460, Math.max(280, width - 28));
-  const itemWidth    = barWidth / tabCount;
-  const indicatorPad = 6;
-  const indicatorW   = itemWidth - indicatorPad * 2;
+  const tabCount          = state.routes.length;
+  const barWidth          = Math.min(540, Math.max(300, width - 28));
+  const itemWidth         = barWidth / tabCount;
+  const indicatorPad      = 6;
+  const indicatorW        = itemWidth - indicatorPad * 2;
 
-  const motion      = useRef(new Animated.Value(currentIndex)).current;
+  const motion = useRef(new Animated.Value(currentIndex)).current;
   const glowOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -64,21 +64,23 @@ function CustomTabBar({ state, navigation }: any) {
 
   return (
     <View style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 14) }]}>
-      {/* Ambient blue glow */}
+      {/* Outer glow ring */}
       <Animated.View style={[styles.outerGlow, { width: barWidth, opacity: glowOpacity }]} />
 
       <View style={[styles.bar, { width: barWidth }]}>
-        {/* Gold rim accent on top edge */}
-        <View style={styles.topAccent} />
-
         {/* Sliding indicator */}
         <Animated.View
           style={[
             styles.indicator,
-            { width: indicatorW, left: indicatorPad, transform: [{ translateX }] },
+            {
+              width:     indicatorW,
+              left:      indicatorPad,
+              transform: [{ translateX }],
+            },
           ]}
         />
 
+        {/* Tabs */}
         {state.routes.map((route: any, index: number) => {
           const active = currentIndex === index;
           const item   = TAB_ITEMS.find((t) => t.name.toLowerCase() === route.name.toLowerCase()) || {
@@ -116,8 +118,9 @@ function CustomTabBar({ state, navigation }: any) {
                 <Ionicons
                   name={active ? item.active as any : item.icon as any}
                   size={22}
-                  color={active ? C.blue : C.inactive}
+                  color={active ? C.gold : C.inactive}
                 />
+                {/* Active dot */}
                 {active && <View style={styles.activeDot} />}
               </Animated.View>
             </Pressable>
@@ -144,24 +147,26 @@ export default function EmployeeLayout() {
 
 const styles = StyleSheet.create({
   wrapper: {
-    position:   "absolute",
-    alignSelf:  "center",
+    position:  "absolute",
+    alignSelf: "center",
     alignItems: "center",
-    zIndex:     100,
+    zIndex:    100,
   },
 
+  // Ambient glow behind bar
   outerGlow: {
-    position:        "absolute",
-    alignSelf:       "center",
-    height:          72,
-    borderRadius:    999,
-    backgroundColor: C.blue,
-    opacity:         0.1,
-    shadowColor:     C.blue,
-    shadowOffset:    { width: 0, height: 0 },
-    shadowOpacity:   0.8,
-    shadowRadius:    28,
-    elevation:       0,
+    position:     "absolute",
+    alignSelf:    "center",
+    height:       60,
+    borderRadius: 999,
+    backgroundColor: C.gold,
+    opacity:      0.12,
+    shadowColor:  C.gold,
+    // blur-like effect via shadow on Android too
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 24,
+    elevation:    0,
   },
 
   bar: {
@@ -169,10 +174,11 @@ const styles = StyleSheet.create({
     borderRadius:    999,
     backgroundColor: C.navy,
     borderWidth:     1,
-    borderColor:     C.blueBorder,
+    borderColor:     C.goldBorder,
     flexDirection:   "row",
     alignItems:      "center",
     overflow:        "hidden",
+    // Deep shadow
     shadowColor:     "#000",
     shadowOffset:    { width: 0, height: 12 },
     shadowOpacity:   0.5,
@@ -180,25 +186,15 @@ const styles = StyleSheet.create({
     elevation:       20,
   },
 
-  // Thin gold line at the very top of the bar — ties employee bar to app theme
-  topAccent: {
-    position:        "absolute",
-    top:             0,
-    left:            32,
-    right:           32,
-    height:          1,
-    backgroundColor: C.gold,
-    opacity:         0.3,
-  },
-
+  // Sliding gold highlight
   indicator: {
     position:        "absolute",
     top:             8,
     bottom:          8,
     borderRadius:    14,
-    backgroundColor: C.blueDim,
+    backgroundColor: C.goldDim,
     borderWidth:     1,
-    borderColor:     C.blueBorder,
+    borderColor:     C.goldBorder,
   },
 
   tab: {
@@ -208,11 +204,12 @@ const styles = StyleSheet.create({
     zIndex:         10,
   },
 
+  // Small gold dot under active icon
   activeDot: {
     marginTop:       4,
     width:           4,
     height:          4,
     borderRadius:    2,
-    backgroundColor: C.blue,
+    backgroundColor: C.gold,
   },
 });

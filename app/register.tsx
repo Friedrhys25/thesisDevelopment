@@ -18,10 +18,12 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   ActivityIndicator,
+  Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -140,6 +142,19 @@ export default function RegisterPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const [tabWidth, setTabWidth] = useState(0);
+  // Start at 1 since Sign Up is the active tab on this screen
+  const slideAnim = useRef(new Animated.Value(1)).current;
+
+  const animateTab = (toValue: number) => {
+    Animated.timing(slideAnim, {
+      toValue,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -257,8 +272,6 @@ export default function RegisterPage() {
     return { exists: !snap.empty, uniqueKey };
   };
 
-  // ── REGISTER ───────────────────────────────────────────────────────────────
-
   const handleRegister = async () => {
     if (!email || !password || !firstName || !lastName || !birthday || !houseStreet) {
       Alert.alert("Missing Fields", "Please fill in all required fields.");
@@ -268,7 +281,6 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // 1) Duplicate check
       let exists = false;
       let uniqueKey = "";
       try {
@@ -296,25 +308,19 @@ export default function RegisterPage() {
         return;
       }
 
-      // 2) Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 3) Set display name BEFORE sending verification email
-      //    so %DISPLAY_NAME% in the Firebase email template shows their real name
       await updateProfile(user, {
         displayName: `${capitalizeWords(firstName)} ${capitalizeWords(lastName)}`,
       });
 
-      // 4) Send verification email
       await sendEmailVerification(user);
 
-      // 5) Build full address string
       const fullAddress = [houseStreet.trim(), subdivision.trim(), `Purok ${purok}`]
         .filter(Boolean)
         .join(", ");
 
-      // 6) Save profile
       try {
         await setDoc(doc(firestore, "users", user.uid), {
           firstName: capitalizeWords(firstName),
@@ -463,12 +469,66 @@ export default function RegisterPage() {
               <Text style={styles.bannerSubtitle}>Join us and start making a difference</Text>
             </View>
 
-            <View style={styles.tabContainer}>
-              <TouchableOpacity onPress={() => router.push("/")} style={styles.tabInactive}>
-                <Text style={styles.tabInactiveText}>Log In</Text>
+            {/* Tab Navigation */}
+            <View
+              style={styles.tabContainer}
+              onLayout={(e) => setTabWidth(e.nativeEvent.layout.width / 2)}
+            >
+              {/* Dim base line */}
+              <View style={styles.tabBaseLine} />
+
+              {/* Animated sliding indicator */}
+              <Animated.View
+                style={[
+                  styles.tabIndicator,
+                  {
+                    transform: [{
+                      translateX: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, tabWidth],
+                      }),
+                    }],
+                  },
+                ]}
+              />
+
+              <TouchableOpacity
+                onPress={() => {
+                  animateTab(0);
+                  setTimeout(() => router.push("/"), 200);
+                }}
+                style={styles.tabBase}
+                activeOpacity={1}
+              >
+                <Animated.Text
+                  style={[
+                    styles.tabText,
+                    {
+                      color: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [COLORS.gold, COLORS.textMuted],
+                      }),
+                    },
+                  ]}
+                >
+                  Log In
+                </Animated.Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.tabActive}>
-                <Text style={styles.tabActiveText}>Sign Up</Text>
+
+              <TouchableOpacity style={styles.tabBase} activeOpacity={1}>
+                <Animated.Text
+                  style={[
+                    styles.tabText,
+                    {
+                      color: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [COLORS.textMuted, COLORS.gold],
+                      }),
+                    },
+                  ]}
+                >
+                  Sign Up
+                </Animated.Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -528,12 +588,7 @@ export default function RegisterPage() {
                     activeOpacity={0.85}
                     onPress={() => setSelectionModal("suffix")}
                   >
-                    <Text
-                      style={[
-                        styles.selectFieldText,
-                        !suffix && styles.selectFieldPlaceholder,
-                      ]}
-                    >
+                    <Text style={[styles.selectFieldText, !suffix && styles.selectFieldPlaceholder]}>
                       {getSuffixLabel()}
                     </Text>
                     <Ionicons name="chevron-down" size={18} color={COLORS.gold} />
@@ -633,9 +688,7 @@ export default function RegisterPage() {
                       activeOpacity={0.85}
                       onPress={() => setSelectionModal("purok")}
                     >
-                      <Text style={styles.selectFieldText}>
-                        {getPurokLabel()}
-                      </Text>
+                      <Text style={styles.selectFieldText}>{getPurokLabel()}</Text>
                       <Ionicons name="chevron-down" size={18} color={COLORS.gold} />
                     </TouchableOpacity>
                   </View>
@@ -664,9 +717,7 @@ export default function RegisterPage() {
                     onChangeText={(t) => setNumber(t.replace(/[^0-9]/g, ""))}
                   />
                   {number.length > 0 && (!number.startsWith("09") || number.length !== 11) && (
-                    <Text style={styles.errorText}>
-                      Must start with 09 and be exactly 11 digits
-                    </Text>
+                    <Text style={styles.errorText}>Must start with 09 and be exactly 11 digits</Text>
                   )}
                   {number.length === 11 && number.startsWith("09") && (
                     <View style={styles.matchRow}>
@@ -682,19 +733,13 @@ export default function RegisterPage() {
                   <Text style={styles.inputLabel}>Are you a renter in the Barangay?</Text>
                   <View style={styles.rowBtns}>
                     <TouchableOpacity
-                      style={[
-                        styles.smallBtn,
-                        residencyStatus === "resident" && styles.smallBtnActive,
-                      ]}
+                      style={[styles.smallBtn, residencyStatus === "resident" && styles.smallBtnActive]}
                       onPress={() => setResidencyStatus("resident")}
                     >
                       <Text style={styles.smallBtnText}>Resident</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[
-                        styles.smallBtn,
-                        residencyStatus === "renter" && styles.smallBtnActive,
-                      ]}
+                      style={[styles.smallBtn, residencyStatus === "renter" && styles.smallBtnActive]}
                       onPress={() => setResidencyStatus("renter")}
                     >
                       <Text style={styles.smallBtnText}>Renter</Text>
@@ -771,12 +816,7 @@ export default function RegisterPage() {
                           ]}
                         />
                       </View>
-                      <Text
-                        style={[
-                          styles.strengthLabel,
-                          { color: getPasswordStrength(password).color },
-                        ]}
-                      >
+                      <Text style={[styles.strengthLabel, { color: getPasswordStrength(password).color }]}>
                         {getPasswordStrength(password).label}
                       </Text>
                     </View>
@@ -794,9 +834,7 @@ export default function RegisterPage() {
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
                     />
-                    <TouchableOpacity
-                      onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
-                    >
+                    <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
                       <Ionicons
                         name={confirmPasswordVisible ? "eye" : "eye-off"}
                         size={22}
@@ -807,22 +845,12 @@ export default function RegisterPage() {
                   {confirmPassword.length > 0 && (
                     <View style={styles.matchRow}>
                       <Ionicons
-                        name={
-                          password === confirmPassword ? "checkmark-circle" : "close-circle"
-                        }
+                        name={password === confirmPassword ? "checkmark-circle" : "close-circle"}
                         size={16}
                         color={password === confirmPassword ? "#10B981" : "#EF4444"}
                       />
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: "600",
-                          color: password === confirmPassword ? "#10B981" : "#EF4444",
-                        }}
-                      >
-                        {password === confirmPassword
-                          ? "Passwords match"
-                          : "Passwords do not match"}
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: password === confirmPassword ? "#10B981" : "#EF4444" }}>
+                        {password === confirmPassword ? "Passwords match" : "Passwords do not match"}
                       </Text>
                     </View>
                   )}
@@ -837,23 +865,16 @@ export default function RegisterPage() {
                 {[
                   {
                     label: "Full Name",
-                    value: `${capitalizeWords(firstName)} ${
-                      middleName ? capitalizeWords(middleName) + " " : ""
-                    }${capitalizeWords(lastName)}${suffix ? " " + suffix : ""}`,
+                    value: `${capitalizeWords(firstName)} ${middleName ? capitalizeWords(middleName) + " " : ""}${capitalizeWords(lastName)}${suffix ? " " + suffix : ""}`,
                   },
                   { label: "Birthday", value: birthday },
                   { label: "Email", value: email },
                   {
                     label: "Address",
-                    value: [houseStreet.trim(), subdivision.trim(), `Purok ${purok}`]
-                      .filter(Boolean)
-                      .join(", "),
+                    value: [houseStreet.trim(), subdivision.trim(), `Purok ${purok}`].filter(Boolean).join(", "),
                   },
                   { label: "Contact Number", value: number },
-                  {
-                    label: "Residency Status",
-                    value: residencyStatus === "resident" ? "Resident" : "Renter",
-                  },
+                  { label: "Residency Status", value: residencyStatus === "resident" ? "Resident" : "Renter" },
                 ].map((item) => (
                   <View key={item.label} style={styles.reviewItem}>
                     <Text style={styles.reviewLabel}>{item.label}</Text>
@@ -906,7 +927,13 @@ export default function RegisterPage() {
               )}
             </View>
 
-            <TouchableOpacity onPress={() => router.push("/")}>
+            <TouchableOpacity
+              onPress={() => {
+                animateTab(0);
+                setTimeout(() => router.push("/"), 200);
+              }}
+              activeOpacity={1}
+            >
               <Text style={styles.switchText}>
                 Already have an account?{" "}
                 <Text style={styles.switchLink}>Log in</Text>
@@ -914,6 +941,7 @@ export default function RegisterPage() {
             </TouchableOpacity>
           </View>
 
+          {/* Account Created Modal */}
           <Modal animationType="fade" transparent visible={accountCreatedModalVisible}>
             <View style={styles.modalBackground}>
               <View style={styles.modalBox}>
@@ -931,19 +959,15 @@ export default function RegisterPage() {
                 <Text style={styles.modalInstructions}>
                   A verification email has been sent to your inbox. Click the activation link in that email to verify your account and complete your registration.
                 </Text>
-                <Text style={styles.modalNote}>
-                  Didn't receive it? You can resend the email on the next screen.
-                </Text>
-                <TouchableOpacity
-                  style={[styles.closeButton, { width: "100%" }]}
-                  onPress={handleAccountCreatedClose}
-                >
+                <Text style={styles.modalNote}>Didn't receive it? You can resend the email on the next screen.</Text>
+                <TouchableOpacity style={[styles.closeButton, { width: "100%" }]} onPress={handleAccountCreatedClose}>
                   <Text style={styles.closeButtonText}>Next</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </Modal>
 
+          {/* Verify Email Modal */}
           <Modal animationType="fade" transparent visible={modalVisible}>
             <View style={styles.modalBackground}>
               <View style={styles.modalBox}>
@@ -953,23 +977,16 @@ export default function RegisterPage() {
                 <Text style={styles.modalText}>Verify Your Email</Text>
                 <Text style={styles.modalSubText}>
                   We've sent an{" "}
-                  <Text style={{ fontWeight: "800", color: COLORS.gold }}>
-                    Account Activation email
-                  </Text>{" "}
-                  to:
+                  <Text style={{ fontWeight: "800", color: COLORS.gold }}>Account Activation email</Text>{" "}to:
                 </Text>
                 <View style={styles.emailChip}>
                   <Ionicons name="mail" size={14} color={COLORS.gold} />
                   <Text style={styles.emailChipText}>{email}</Text>
                 </View>
                 <Text style={styles.modalInstructions}>
-                  Please open the email and click the activation link to complete your
-                  registration. After clicking the link, use the buttons below to
-                  confirm verification or resend the email.
+                  Please open the email and click the activation link to complete your registration. After clicking the link, use the buttons below to confirm verification or resend the email.
                 </Text>
-                <Text style={styles.modalNote}>
-                  Didn't receive it? Check your spam/junk folder.
-                </Text>
+                <Text style={styles.modalNote}>Didn't receive it? Check your spam/junk folder.</Text>
                 <View style={styles.modalActionsRow}>
                   <TouchableOpacity
                     style={[styles.secondaryButton, styles.modalButtonLeft]}
@@ -994,16 +1011,14 @@ export default function RegisterPage() {
                     )}
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={[styles.closeButton, styles.modalSecondaryAction]}
-                  onPress={handleSuccessClose}
-                >
+                <TouchableOpacity style={[styles.closeButton, styles.modalSecondaryAction]} onPress={handleSuccessClose}>
                   <Text style={styles.closeButtonText}>Go to Login</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </Modal>
 
+          {/* Selection Modal */}
           <Modal
             animationType="fade"
             transparent
@@ -1019,34 +1034,20 @@ export default function RegisterPage() {
                   {(selectionModal === "suffix" ? SUFFIX_OPTIONS : PUROK_OPTIONS).map((option) => {
                     const isSelected =
                       selectionModal === "suffix" ? suffix === option.value : purok === option.value;
-
                     return (
                       <TouchableOpacity
                         key={`${selectionModal}-${option.value || "none"}`}
-                        style={[
-                          styles.selectionOption,
-                          isSelected && styles.selectionOptionActive,
-                        ]}
+                        style={[styles.selectionOption, isSelected && styles.selectionOptionActive]}
                         onPress={() => {
-                          if (selectionModal === "suffix") {
-                            setSuffix(option.value);
-                          } else {
-                            setPurok(option.value);
-                          }
+                          if (selectionModal === "suffix") setSuffix(option.value);
+                          else setPurok(option.value);
                           setSelectionModal(null);
                         }}
                       >
-                        <Text
-                          style={[
-                            styles.selectionOptionText,
-                            isSelected && styles.selectionOptionTextActive,
-                          ]}
-                        >
+                        <Text style={[styles.selectionOptionText, isSelected && styles.selectionOptionTextActive]}>
                           {option.label}
                         </Text>
-                        {isSelected && (
-                          <Ionicons name="checkmark-circle" size={18} color={COLORS.gold} />
-                        )}
+                        {isSelected && <Ionicons name="checkmark-circle" size={18} color={COLORS.gold} />}
                       </TouchableOpacity>
                     );
                   })}
@@ -1066,7 +1067,7 @@ export default function RegisterPage() {
   );
 }
 
-// ── STYLES (unchanged) ───────────────────────────────────────────────────────
+// ── STYLES ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, backgroundColor: COLORS.bg, paddingBottom: 40 },
@@ -1082,20 +1083,46 @@ const styles = StyleSheet.create({
     fontSize: 14, color: COLORS.text, fontWeight: "500",
     textAlign: "center", paddingHorizontal: 20, lineHeight: 22,
   },
+
+  // Tab styles
   tabContainer: {
-    flexDirection: "row", backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8,
+    flexDirection: "row",
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    position: "relative",
+    overflow: "hidden",
   },
-  tabActive: {
-    flex: 1, paddingVertical: 16, borderBottomWidth: 3,
-    borderBottomColor: COLORS.gold, alignItems: "center",
+  tabBaseLine: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: COLORS.textDim,
   },
-  tabActiveText: { fontSize: 16, fontWeight: "800", color: COLORS.gold },
-  tabInactive: {
-    flex: 1, paddingVertical: 16, borderBottomWidth: 1,
-    borderBottomColor: COLORS.textDim, alignItems: "center",
+  tabIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    width: "50%",
+    height: 3,
+    backgroundColor: COLORS.gold,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    zIndex: 1,
   },
-  tabInactiveText: { fontSize: 16, fontWeight: "600", color: COLORS.textMuted },
+  tabBase: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
   formCard: {
     marginHorizontal: 16, marginTop: 20, marginBottom: 40, backgroundColor: COLORS.surface,
     borderRadius: 20, paddingHorizontal: 24, paddingTop: 32, paddingBottom: 40,
@@ -1126,25 +1153,12 @@ const styles = StyleSheet.create({
   passwordInput: { flex: 1, fontSize: 16, color: COLORS.text },
   errorText: { color: COLORS.red, fontSize: 12, marginTop: 4, fontWeight: "600", marginLeft: 4 },
   selectField: {
-    minHeight: 56,
-    backgroundColor: COLORS.elevated,
-    borderWidth: 1,
-    borderColor: COLORS.goldBorder,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    minHeight: 56, backgroundColor: COLORS.elevated, borderWidth: 1,
+    borderColor: COLORS.goldBorder, borderRadius: 16, paddingHorizontal: 16,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
   },
-  selectFieldText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: "600",
-    flex: 1,
-  },
-  selectFieldPlaceholder: {
-    color: COLORS.textMuted,
-  },
+  selectFieldText: { color: COLORS.text, fontSize: 16, fontWeight: "600", flex: 1 },
+  selectFieldPlaceholder: { color: COLORS.textMuted },
   rowBtns: { flexDirection: "row", gap: 12 },
   smallBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 16, borderWidth: 1,
@@ -1167,10 +1181,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceAlt, padding: 12, borderRadius: 12, marginBottom: 16,
     borderWidth: 1, borderColor: COLORS.border,
   },
-  infoBannerText: {
-    fontSize: 12, color: COLORS.textMuted, fontWeight: "600",
-    flex: 1, flexWrap: "wrap", lineHeight: 18,
-  },
+  infoBannerText: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", flex: 1, flexWrap: "wrap", lineHeight: 18 },
   reviewItem: {
     backgroundColor: COLORS.surfaceAlt, paddingHorizontal: 16, paddingVertical: 12,
     marginBottom: 12, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: COLORS.gold,
@@ -1229,68 +1240,27 @@ const styles = StyleSheet.create({
     borderRadius: 16, width: "100%", alignItems: "center",
   },
   closeButtonText: { color: COLORS.bg, fontSize: 16, fontWeight: "800" },
-  modalActionsRow: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 16,
-  },
+  modalActionsRow: { width: "100%", flexDirection: "row", gap: 12, marginBottom: 16 },
   secondaryButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 1, paddingVertical: 16, borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1,
+    borderColor: COLORS.border, alignItems: "center", justifyContent: "center",
   },
-  secondaryButtonText: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "800",
-  },
+  secondaryButtonText: { color: COLORS.text, fontSize: 15, fontWeight: "800" },
   modalButtonLeft: { flex: 1 },
   modalButtonRight: { flex: 1 },
   modalSecondaryAction: { marginTop: 0 },
-  selectionModalBox: {
-    width: "100%",
-    maxWidth: 420,
-    padding: 24,
-    backgroundColor: COLORS.surface,
-    borderRadius: 22,
-  },
-  selectionList: {
-    marginTop: 12,
-    marginBottom: 16,
-    gap: 10,
-  },
+  selectionModalBox: { width: "100%", maxWidth: 420, padding: 24, backgroundColor: COLORS.surface, borderRadius: 22 },
+  selectionList: { marginTop: 12, marginBottom: 16, gap: 10 },
   selectionOption: {
-    minHeight: 54,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surfaceAlt,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    minHeight: 54, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceAlt, paddingHorizontal: 16,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
   },
-  selectionOptionActive: {
-    borderColor: COLORS.gold,
-    backgroundColor: COLORS.goldDim,
-  },
-  selectionOptionText: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  selectionOptionTextActive: {
-    color: COLORS.goldLight,
-  },
-  selectionCancelButton: {
-    width: "100%",
-  },
+  selectionOptionActive: { borderColor: COLORS.gold, backgroundColor: COLORS.goldDim },
+  selectionOptionText: { color: COLORS.text, fontSize: 15, fontWeight: "700" },
+  selectionOptionTextActive: { color: COLORS.goldLight },
+  selectionCancelButton: { width: "100%" },
   strengthBarBg: { height: 4, backgroundColor: COLORS.surfaceAlt, borderRadius: 2, overflow: "hidden" },
   strengthBarFill: { height: 4, borderRadius: 2 },
   strengthLabel: { fontSize: 11, fontWeight: "700", color: COLORS.text },
