@@ -19,16 +19,15 @@ const TAB_ITEMS = [
   { name: "profile",         icon: "person-outline",     active: "person",    label: "Profile"   },
 ];
 
-// ── Palette matches splash + complaints redesign ───────────────────────────────
 const C = {
-  gold:        "#f59e0b",
-  goldDim:     "rgba(245,158,11,0.18)",
-  goldBorder:  "rgba(245,158,11,0.35)",
-  navy:        "#0b1a3d",
-  navyLight:   "#0f2050",
-  inactive:    "rgba(255,255,255,0.38)",
-  border:      "rgba(255,255,255,0.07)",
-  glow:        "rgba(245,158,11,0.22)",
+  gold:        "#D97706",
+  goldDim:     "rgba(217,119,6,0.1)",
+  goldBorder:  "rgba(217,119,6,0.25)",
+  bar:         "#FFFFFF",
+  text:        "#0F172A",
+  inactive:    "#94A3B8",
+  border:      "#E2E8F0",
+  shadow:      "rgba(15,23,42,0.12)",
 };
 
 function CustomTabBar({ state, navigation }: any) {
@@ -153,37 +152,28 @@ const styles = StyleSheet.create({
     zIndex:    100,
   },
 
-  // Ambient glow behind bar
   outerGlow: {
     position:     "absolute",
     alignSelf:    "center",
     height:       60,
     borderRadius: 999,
-    backgroundColor: C.gold,
-    opacity:      0.12,
-    shadowColor:  C.gold,
-    // blur-like effect via shadow on Android too
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 24,
-    elevation:    0,
+    backgroundColor: "transparent",
   },
 
   bar: {
     height:          60,
     borderRadius:    999,
-    backgroundColor: C.navy,
+    backgroundColor: C.bar,
     borderWidth:     1,
-    borderColor:     C.goldBorder,
+    borderColor:     C.border,
     flexDirection:   "row",
     alignItems:      "center",
     overflow:        "hidden",
-    // Deep shadow
-    shadowColor:     "#000",
-    shadowOffset:    { width: 0, height: 12 },
-    shadowOpacity:   0.5,
-    shadowRadius:    20,
-    elevation:       20,
+    shadowColor:     C.shadow,
+    shadowOffset:    { width: 0, height: 8 },
+    shadowOpacity:   1,
+    shadowRadius:    24,
+    elevation:       12,
   },
 
   // Sliding gold highlight

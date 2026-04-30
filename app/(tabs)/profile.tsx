@@ -8,7 +8,7 @@ import {
   signOut,
   updatePassword,
 } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -30,6 +30,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
+import { savePushTokenToFirestore, showLocalNotification } from "../../utils/notifications";
 
 // ── Palette — exact mirror of complain.tsx ────────────────────────────────────
 const COLORS = {
@@ -203,7 +204,34 @@ export default function ProfilePage() {
     setRefreshing(false);
   };
 
-  useEffect(() => { refreshProfile().finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    refreshProfile().finally(() => setLoading(false));
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    savePushTokenToFirestore("users");
+
+    let prevIdStatus: string | null = null;
+    const unsub = onSnapshot(doc(firestore, "users", user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const currentIdStatus = data.idstatus || "Pending";
+        
+        if (prevIdStatus !== null && prevIdStatus !== currentIdStatus) {
+          showLocalNotification(
+            "ID Verification Update",
+            `Your ID status is now: ${currentIdStatus}`,
+            { screen: "profile" }
+          );
+          setUserData((p: any) => ({ ...p, idstatus: currentIdStatus, declineMessage: data.declineMessage || "" }));
+        }
+        prevIdStatus = currentIdStatus;
+      }
+    });
+
+    return () => unsub();
+  }, []);
 
   const getStatusColor = (s: string) =>
     ({ Verified: COLORS.success, Denied: COLORS.danger, declined: COLORS.danger }[s] ?? COLORS.gold);
