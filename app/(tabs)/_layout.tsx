@@ -67,8 +67,9 @@ function CustomTabBar({ state, navigation }: any) {
   return (
     <View style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 14) }]}>
       {/* Outer glow ring */}
-      <Animated.View style={[styles.outerGlow, { width: barWidth, opacity: glowOpacity }]} />
-
+      <Animated.View style={[styles.outerGlowOuter, { width: barWidth + 40, opacity: glowOpacity }]} />
+      <Animated.View style={[styles.outerGlowMid,   { width: barWidth + 20, opacity: glowOpacity }]} />
+      <Animated.View style={[styles.outerGlow,       { width: barWidth,      opacity: glowOpacity }]} />
       <View style={[styles.bar, { width: barWidth }]}>
         {/* Sliding indicator */}
         <Animated.View
@@ -157,19 +158,26 @@ const styles = StyleSheet.create({
   },
 
   // Ambient glow behind bar
+  outerGlowOuter: {
+  position:        "absolute",
+  alignSelf:       "center",
+  height:          70,
+  borderRadius:    999,
+  backgroundColor: "rgba(245,158,11,0.04)",
+  },
+  outerGlowMid: {
+    position:        "absolute",
+    alignSelf:       "center",
+    height:          65,
+    borderRadius:    999,
+    backgroundColor: "rgba(245,158,11,0.07)",
+  },
   outerGlow: {
-    position:     "absolute",
-    alignSelf:    "center",
-    height:       60,
-    borderRadius: 999,
-    backgroundColor: C.gold,
-    opacity:      0.12,
-    shadowColor:  C.gold,
-    // blur-like effect via shadow on Android too
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 24,
-    elevation:    0,
+    position:        "absolute",
+    alignSelf:       "center",
+    height:          60,
+    borderRadius:    999,
+    backgroundColor: "rgba(245,158,11,0.14)",
   },
 
   bar: {
@@ -182,11 +190,11 @@ const styles = StyleSheet.create({
     alignItems:      "center",
     overflow:        "hidden",
     // Deep shadow
-    shadowColor:     "#000",
-    shadowOffset:    { width: 0, height: 12 },
-    shadowOpacity:   0.5,
-    shadowRadius:    20,
-    elevation:       20,
+    shadowColor:   C.gold,        // ← change from "#000" to gold
+    shadowOffset:  { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius:  16,
+    elevation:     18, 
   },
 
   // Sliding gold highlight

@@ -20,9 +20,9 @@ const TAB_ITEMS = [
 ];
 
 const C = {
-  gold:        "#D97706",
-  goldDim:     "rgba(217,119,6,0.1)",
-  goldBorder:  "rgba(217,119,6,0.25)",
+  gold:        "#1a1a1a",           // active icon color → near-black
+  goldDim:     "rgba(0,0,0,0.08)",  // indicator fill
+  goldBorder:  "rgba(0,0,0,0.18)", // indicator border
   bar:         "#FFFFFF",
   text:        "#0F172A",
   inactive:    "#94A3B8",
@@ -63,9 +63,11 @@ function CustomTabBar({ state, navigation }: any) {
 
   return (
     <View style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 14) }]}>
-      {/* Outer glow ring */}
-      <Animated.View style={[styles.outerGlow, { width: barWidth, opacity: glowOpacity }]} />
-
+{/* Replace single outerGlow with layered dark glow */}
+      <Animated.View style={[styles.outerGlowOuter, { width: barWidth + 40, opacity: glowOpacity }]} />
+      <Animated.View style={[styles.outerGlowMid,   { width: barWidth + 20, opacity: glowOpacity }]} />
+      <Animated.View style={[styles.outerGlow,       { width: barWidth,      opacity: glowOpacity }]} />
+      
       <View style={[styles.bar, { width: barWidth }]}>
         {/* Sliding indicator */}
         <Animated.View
@@ -152,12 +154,26 @@ const styles = StyleSheet.create({
     zIndex:    100,
   },
 
+  outerGlowOuter: {
+    position:        "absolute",
+    alignSelf:       "center",
+    height:          70,
+    borderRadius:    999,
+    backgroundColor: "rgba(0,0,0,0.03)",
+  },
+  outerGlowMid: {
+    position:        "absolute",
+    alignSelf:       "center",
+    height:          65,
+    borderRadius:    999,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
   outerGlow: {
-    position:     "absolute",
-    alignSelf:    "center",
-    height:       60,
-    borderRadius: 999,
-    backgroundColor: "transparent",
+    position:        "absolute",
+    alignSelf:       "center",
+    height:          60,
+    borderRadius:    999,
+    backgroundColor: "rgba(0,0,0,0.07)",
   },
 
   bar: {
@@ -169,11 +185,11 @@ const styles = StyleSheet.create({
     flexDirection:   "row",
     alignItems:      "center",
     overflow:        "hidden",
-    shadowColor:     C.shadow,
-    shadowOffset:    { width: 0, height: 8 },
-    shadowOpacity:   1,
-    shadowRadius:    24,
-    elevation:       12,
+    shadowColor:   C.gold,        // ← change from "#000" to gold
+    shadowOffset:  { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius:  16,
+    elevation:     18, 
   },
 
   // Sliding gold highlight
