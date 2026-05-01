@@ -452,6 +452,14 @@ export default function ProfilePage() {
           />
         </View>
 
+        <View style={[s.headerAccentLine, { backgroundColor: COLORS.gold }]} />
+      </LinearGradient>
+
+      <ScrollView
+        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 130 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfile} tintColor={COLORS.gold} />}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Avatar section */}
         <View style={s.avatarSection}>
           <TouchableOpacity onPress={handleAvatarUpload} style={s.avatarWrap}>
@@ -481,14 +489,6 @@ export default function ProfilePage() {
           </View>
         </View>
 
-        <View style={[s.headerAccentLine, { backgroundColor: COLORS.gold }]} />
-      </LinearGradient>
-
-      <ScrollView
-        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 130 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfile} tintColor={COLORS.gold} />}
-        showsVerticalScrollIndicator={false}
-      >
         {/* ── PERSONAL DETAILS ── */}
         <View style={s.card}>
           <View style={s.cardTitleRow}>
@@ -732,7 +732,7 @@ const s = StyleSheet.create({
   headerAccentLine:{ height: 1, opacity: 0.3, marginTop: 22 },
 
   // Avatar section
-  avatarSection:       { alignItems: "center", gap: 6 },
+  avatarSection:       { alignItems: "center", gap: 6, marginBottom: 24 },
   avatarWrap:          { position: "relative", marginBottom: 4 },
   avatar:              { width: 100, height: 100, borderRadius: 50, borderWidth: 2.5, borderColor: COLORS.gold },
   avatarPlaceholder:   { backgroundColor: COLORS.elevated, justifyContent: "center", alignItems: "center" },

@@ -118,10 +118,10 @@ export default function HomePage() {
 
   const getPositionRank = (position: string) => {
     const p = position.toLowerCase();
-    if (p.includes("captain") || p.includes("punong")) return 0;
-    if (p.includes("secretary")) return 1;
-    if (p.includes("treasurer")) return 2;
-    if (p.includes("kagawad")) return 3;
+    if (p.includes("kapitan") || p.includes("punong")) return 0;
+    if (p.includes("kagawad")) return 1;
+    if (p.includes("secretary")) return 2;
+    if (p.includes("treasurer")) return 3;
     if (p.includes("sk")) return 4;
     return 5;
   };

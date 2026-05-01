@@ -84,10 +84,10 @@ export default function EmployeeDashboard() {
       const list = snap.docs.map((entry) => ({ name: entry.data().name || "", position: entry.data().position || "", picture: entry.data().picture || "" }));
       const rank = (pos: string) => {
         const l = pos.toLowerCase();
-        if (l.includes("captain") || l.includes("punong")) return 0;
-        if (l.includes("secretary")) return 1;
-        if (l.includes("treasurer")) return 2;
-        if (l.includes("kagawad")) return 3;
+        if (l.includes("kapitan") || l.includes("punong")) return 0;
+        if (l.includes("kagawad")) return 1;
+        if (l.includes("secretary")) return 2;
+        if (l.includes("treasurer")) return 3;
         if (l.includes("sk")) return 4;
         return 5;
       };

@@ -187,6 +187,19 @@ export default function RegisterPage() {
   const getPurokLabel = () =>
     PUROK_OPTIONS.find((option) => option.value === purok)?.label ?? "Purok 1";
 
+  const isAllSameDigits = (phone: string) => /^(.)\\1{10}$/.test(phone);
+  
+  const hasTooManyRepeatingPatterns = (phone: string) => {
+    const digitPart = phone.slice(2);
+    const patterns = digitPart.match(/(.)\\1{2,}/g) || [];
+    return patterns.length > 1 || (patterns.length === 1 && patterns[0].length > 5);
+  };
+  
+  const isKnownFakeSequence = (phone: string) => {
+    const fakes = ["09000000000", "09111111111", "09123456789", "09999999999"];
+    return fakes.includes(phone);
+  };
+
   const validateStep1 = () => {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert("Missing Fields", "Please fill in First Name and Last Name.");
@@ -216,6 +229,27 @@ export default function RegisterPage() {
       Alert.alert(
         "Invalid Contact Number",
         "Contact number must start with '09' and be exactly 11 digits."
+      );
+      return false;
+    }
+    if (isAllSameDigits(number)) {
+      Alert.alert(
+        "Invalid Contact Number",
+        "Contact number cannot have all the same digits."
+      );
+      return false;
+    }
+    if (isKnownFakeSequence(number)) {
+      Alert.alert(
+        "Invalid Contact Number",
+        "This appears to be a test or invalid number. Please enter a real contact number."
+      );
+      return false;
+    }
+    if (hasTooManyRepeatingPatterns(number)) {
+      Alert.alert(
+        "Invalid Contact Number",
+        "Contact number has too many repeating digit patterns. Please enter a valid number."
       );
       return false;
     }
@@ -750,12 +784,7 @@ export default function RegisterPage() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Account Information</Text>
 
-                <View style={styles.infoBanner}>
-                  <Ionicons name="information-circle" size={16} color={COLORS.gold} />
-                  <Text style={styles.infoBannerText}>
-                    Accepted domains: {ALLOWED_DOMAINS.join(" · ")}
-                  </Text>
-                </View>
+
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Email *</Text>
