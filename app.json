@@ -2,7 +2,7 @@
   "expo": {
     "name": "talk2us",
     "slug": "talk2us",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/main_icon.png",
     "scheme": "talk2us",
@@ -17,6 +17,7 @@
       }
     },
     "android": {
+      "versionCode": 2,
       "package": "com.victoria.talk2us2026",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
