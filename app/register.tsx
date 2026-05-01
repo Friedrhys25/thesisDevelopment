@@ -413,7 +413,7 @@ export default function RegisterPage() {
 
   const handleSuccessClose = () => {
     setModalVisible(false);
-    router.replace("/");
+    router.back();
   };
 
   const handleAccountCreatedClose = () => {
@@ -527,7 +527,7 @@ export default function RegisterPage() {
               />
 
               <TouchableOpacity
-                onPress={() => router.replace("/")}
+                onPress={() => router.back()}
                 style={styles.tabBase}
                 activeOpacity={1}
               >
@@ -954,7 +954,7 @@ export default function RegisterPage() {
             </View>
 
             <TouchableOpacity
-              onPress={() => router.replace("/")}
+              onPress={() => router.back()}
               activeOpacity={1}
             >
               <Text style={styles.switchText}>

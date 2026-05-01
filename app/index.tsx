@@ -271,7 +271,7 @@ export default function LoginPage() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => router.replace("/register")}
+                  onPress={() => router.push("/register")}
                   style={styles.tabBase}
                   activeOpacity={1}
                 >
@@ -363,7 +363,7 @@ export default function LoginPage() {
               <View style={styles.signupContainer}>
                 <Text style={styles.signupBaseText}>Don't have an account? </Text>
                 <TouchableOpacity
-                  onPress={() => router.replace("/register")}
+                  onPress={() => router.push("/register")}
                   disabled={loading}
                   activeOpacity={1}
                 >

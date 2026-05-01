@@ -22,9 +22,33 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0b1a3d" } }}>
-      <Stack.Screen name="index" options={{ animation: "none" }} />
-      <Stack.Screen name="register" options={{ animation: "none" }} />
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: "#0b1a3d" },
+        // Smooth horizontal slide — works well on both Android and iOS
+        animation: "slide_from_right",
+        animationDuration: 280,
+        gestureEnabled: true,
+        gestureDirection: "horizontal",
+        // Prevent the white flash on Android during transitions
+        animationTypeForReplace: "push",
+      }}
+    >
+      <Stack.Screen
+        name="index"
+        options={{
+          animation: "slide_from_left",
+          animationDuration: 280,
+        }}
+      />
+      <Stack.Screen
+        name="register"
+        options={{
+          animation: "slide_from_right",
+          animationDuration: 280,
+        }}
+      />
       <Stack.Screen name="modal" options={{ presentation: "modal" }} />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="employee" />
