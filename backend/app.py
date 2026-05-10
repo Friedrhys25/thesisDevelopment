@@ -468,7 +468,7 @@ def send_phone_otp():
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         print("Phone OTP send error:", repr(e))
-        return jsonify({"error": "Failed to send verification code."}), 500
+        return jsonify({"error": f"Failed to send verification code: {str(e)}"}), 500
 
 
 @app.route("/api/phone/check-otp", methods=["POST"])
@@ -537,7 +537,7 @@ def check_phone_otp():
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         print("Phone OTP verify error:", repr(e))
-        return jsonify({"error": "Failed to verify OTP code."}), 500
+        return jsonify({"error": f"Failed to verify OTP code: {str(e)}"}), 500
 
 # ---------------------------
 # Firebase Admin + Push Notifications
