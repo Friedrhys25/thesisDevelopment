@@ -16,7 +16,13 @@ env_path = Path(__file__).with_name(".env")
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
-CORS(app)
+# Allow browser clients (Expo web, localhost) to call the API with Authorization header.
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
 
 # ---------------------------
 # Load trained models
