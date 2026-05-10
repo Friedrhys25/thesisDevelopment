@@ -24,6 +24,16 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "http://192.168.68.12
 
 const normalizeLocalPhone = (value: string) => value.replace(/[^0-9]/g, "").trim();
 
+const parseBackendResponse = async (response: Response) => {
+  const raw = await response.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { error: raw };
+  }
+};
+
 const getPhoneVerificationMeta = (status?: string) => {
   if ((status || "").toLowerCase() === "verified") {
     return { label: "Verified", color: C.success, bg: C.successDim, icon: "checkmark-circle" as const };
@@ -221,7 +231,7 @@ export default function EmployeeProfile() {
         },
         body: JSON.stringify({ phoneNumber: phone, collectionName: "employee" }),
       });
-      const data = await response.json();
+      const data = await parseBackendResponse(response);
       if (!response.ok) throw new Error(data.error || "Failed to send verification code.");
       setShowPhoneVerify(true);
       Alert.alert("OTP Sent", `A verification code was sent to ${phone}.`);
@@ -252,7 +262,7 @@ export default function EmployeeProfile() {
         },
         body: JSON.stringify({ phoneNumber: phone, code: otpCode.trim(), collectionName: "employee" }),
       });
-      const data = await response.json();
+      const data = await parseBackendResponse(response);
       if (!response.ok) throw new Error(data.error || "Failed to verify OTP.");
       setUserData((p:any) => ({ ...p, numberVerificationStatus: "verified" }));
       setShowPhoneVerify(false);
