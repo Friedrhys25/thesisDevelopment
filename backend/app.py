@@ -724,15 +724,18 @@ def start_firestore_listeners(db):
 # Initialize Firebase Admin + Start Listeners (runs under both flask dev server and gunicorn)
 # ---------------------------
 _admin_db = init_firebase_admin()
-if _admin_db:
+_enable_listeners = os.getenv("ENABLE_FIRESTORE_LISTENERS", "false").strip().lower() == "true"
+if _admin_db and _enable_listeners:
     _listener_thread = threading.Thread(
         target=start_firestore_listeners,
         args=(_admin_db,),
         daemon=True,
     )
     _listener_thread.start()
-else:
+elif not _admin_db:
     print("⚠️  Running without push notifications (no service account key)")
+else:
+    print("ℹ️  Firestore listeners disabled (ENABLE_FIRESTORE_LISTENERS=false)")
 
 
 # ---------------------------
