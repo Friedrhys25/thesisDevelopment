@@ -71,8 +71,19 @@ type UserData = {
   age: string; memberSince: string; id_verification: string;
   avatar: string; idstatus: "Pending" | "Denied" | "declined" | "Verified";
   declineMessage: string; residencyStatus: string;
+  numberVerificationStatus: "verified" | "unverified";
 };
 type EditingField = "address" | "phone" | null;
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "http://192.168.68.126:5000";
+
+const normalizeLocalPhone = (value: string) => value.replace(/[^0-9]/g, "").trim();
+
+const getPhoneVerificationMeta = (status?: string) => {
+  if ((status || "").toLowerCase() === "verified") {
+    return { label: "Verified", color: COLORS.success, bg: "rgba(16,185,129,0.15)", icon: "checkmark-circle" as const };
+  }
+  return { label: "Unverified", color: COLORS.gold, bg: COLORS.goldDim, icon: "time-outline" as const };
+};
 
 function HeaderStat({
   icon,
@@ -175,11 +186,15 @@ export default function ProfilePage() {
   const [showCurrentPw,    setShowCurrentPw]    = useState(false);
   const [showNewPw,        setShowNewPw]        = useState(false);
   const [showConfirmPw,    setShowConfirmPw]    = useState(false);
+  const [showPhoneVerify,  setShowPhoneVerify]  = useState(false);
+  const [otpCode,          setOtpCode]          = useState("");
+  const [isSendingOtp,     setIsSendingOtp]     = useState(false);
+  const [isVerifyingOtp,   setIsVerifyingOtp]   = useState(false);
 
   const [userData, setUserData] = useState<UserData>({
     firstName: "", middleName: "", lastName: "", email: "", phone: "",
     address: "", purok: "", age: "", memberSince: "", id_verification: "",
-    avatar: "", idstatus: "Pending", declineMessage: "", residencyStatus: "",
+    avatar: "", idstatus: "Pending", declineMessage: "", residencyStatus: "", numberVerificationStatus: "unverified",
   });
 
   const refreshProfile = async () => {
@@ -198,6 +213,7 @@ export default function ProfilePage() {
           id_verification: d.idImage || "", avatar: d.avatar || "",
           idstatus: d.idstatus || "Pending", declineMessage: d.declineMessage || "",
           residencyStatus: d.residencyStatus || "",
+          numberVerificationStatus: d.numberVerificationStatus || "unverified",
         });
       }
     } catch (e) { console.error(e); }
@@ -224,8 +240,14 @@ export default function ProfilePage() {
             `Your ID status is now: ${currentIdStatus}`,
             { screen: "profile" }
           );
-          setUserData((p: any) => ({ ...p, idstatus: currentIdStatus, declineMessage: data.declineMessage || "" }));
         }
+        setUserData((p: any) => ({
+          ...p,
+          phone: data.number || p.phone,
+          idstatus: currentIdStatus,
+          declineMessage: data.declineMessage || "",
+          numberVerificationStatus: data.numberVerificationStatus || "unverified",
+        }));
         prevIdStatus = currentIdStatus;
       }
     });
@@ -301,12 +323,91 @@ export default function ProfilePage() {
       if (isEditing === "phone" && !/^\d{11}$/.test(value)) { Alert.alert("Validation Error", "Mobile number must be exactly 11 digits."); return; }
       if (isEditing === "address" && !value) { Alert.alert("Validation Error", "Address cannot be empty."); return; }
       const key = isEditing === "phone" ? "number" : "address";
-      await updateDoc(doc(firestore, "users", auth.currentUser.uid), { [key]: value });
-      setUserData((p) => ({ ...p, ...(isEditing === "address" ? { address: value } : { phone: value }) }));
+      const updates: any = { [key]: value };
+      const normalizedOldPhone = normalizeLocalPhone(userData.phone);
+      const normalizedNewPhone = normalizeLocalPhone(value);
+      if (isEditing === "phone" && normalizedNewPhone !== normalizedOldPhone) {
+        updates.numberVerificationStatus = "unverified";
+        updates.numberVerifiedAt = null;
+      }
+      await updateDoc(doc(firestore, "users", auth.currentUser.uid), updates);
+      setUserData((p) => ({
+        ...p,
+        ...(isEditing === "address"
+          ? { address: value }
+          : {
+              phone: value,
+              numberVerificationStatus: normalizedNewPhone !== normalizedOldPhone ? "unverified" : p.numberVerificationStatus,
+            }),
+      }));
       Alert.alert("Success", `${isEditing === "address" ? "Address" : "Phone"} updated!`);
       setIsEditing(null); setEditValue("");
     } catch { Alert.alert("Error", `Failed to update ${isEditing}.`); }
     finally { setIsSaving(false); }
+  };
+
+  const sendPhoneOtp = async () => {
+    const user = auth.currentUser;
+    const phone = normalizeLocalPhone(userData.phone);
+    if (!user) return;
+    if (!/^09\d{9}$/.test(phone)) {
+      Alert.alert("Invalid Number", "Use a valid 11-digit mobile number starting with 09.");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`${BACKEND_URL}/api/phone/send-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phoneNumber: phone, collectionName: "users" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to send verification code.");
+      setShowPhoneVerify(true);
+      Alert.alert("OTP Sent", `A verification code was sent to ${phone}.`);
+    } catch (e: any) {
+      Alert.alert("Verification Failed", e.message || "Could not send the verification code.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const verifyPhoneOtp = async () => {
+    const user = auth.currentUser;
+    const phone = normalizeLocalPhone(userData.phone);
+    if (!user) return;
+    if (!otpCode.trim()) {
+      Alert.alert("Missing Code", "Enter the OTP code sent to your phone.");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`${BACKEND_URL}/api/phone/check-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phoneNumber: phone, code: otpCode.trim(), collectionName: "users" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to verify OTP.");
+      setUserData((p) => ({ ...p, numberVerificationStatus: "verified" }));
+      setShowPhoneVerify(false);
+      setOtpCode("");
+      Alert.alert("Verified", "Your mobile number is now verified.");
+    } catch (e: any) {
+      Alert.alert("Invalid OTP", e.message || "The verification code is invalid or expired.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -335,6 +436,7 @@ export default function ProfilePage() {
   const fullName    = `${userData.firstName} ${userData.middleName} ${userData.lastName}`.trim() || "User";
   const fullAddress = userData.purok ? `Purok ${userData.purok}, ${userData.address}` : userData.address;
   const pwStrength  = getPasswordStrength(newPw);
+  const phoneMeta   = getPhoneVerificationMeta(userData.numberVerificationStatus);
 
   // ── LOADING STATE ─────────────────────────────────────────────────────────
   if (loading) {
@@ -501,6 +603,28 @@ export default function ProfilePage() {
 
           <InfoRow icon="mail-outline"     label="Email"            value={userData.email} />
           <InfoRow icon="call-outline"     label="Phone"            value={userData.phone}          actionLabel="Edit" onAction={() => { setEditValue(userData.phone); setIsEditing("phone"); }} />
+          <View style={s.phoneVerificationRow}>
+            <View style={[s.phoneStatusBadge, { backgroundColor: phoneMeta.bg, borderColor: phoneMeta.color + "40" }]}>
+              <Ionicons name={phoneMeta.icon} size={14} color={phoneMeta.color} />
+              <Text style={[s.phoneStatusText, { color: phoneMeta.color }]}>{phoneMeta.label}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={sendPhoneOtp}
+              disabled={userData.numberVerificationStatus === "verified" || isSendingOtp}
+              style={[
+                s.phoneVerifyBtn,
+                userData.numberVerificationStatus === "verified" && s.phoneVerifyBtnDone,
+                (userData.numberVerificationStatus === "verified" || isSendingOtp) && { opacity: 0.85 },
+              ]}
+            >
+              {isSendingOtp ? <ActivityIndicator size="small" color={COLORS.bg} /> : (
+                <>
+                  <Ionicons name={userData.numberVerificationStatus === "verified" ? "checkmark-circle" : "chatbubble-ellipses-outline"} size={14} color={COLORS.bg} />
+                  <Text style={s.phoneVerifyBtnText}>{userData.numberVerificationStatus === "verified" ? "Verified" : "Verify Number"}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
           <InfoRow icon="location-outline" label="Address"          value={fullAddress || "No Address"} actionLabel="Edit" onAction={() => { setEditValue(userData.address); setIsEditing("address"); }} />
           {!!userData.age              && <InfoRow icon="calendar-outline" label="Age"              value={userData.age} />}
           {!!userData.residencyStatus  && <InfoRow icon="home-outline"     label="Residency Status" value={userData.residencyStatus} />}
@@ -620,6 +744,49 @@ export default function ProfilePage() {
                 >
                   <LinearGradient colors={["#f59e0b", "#d97706"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.saveBtn}>
                     {isSaving ? <ActivityIndicator color={COLORS.bg} /> : <Text style={s.saveBtnText}>Save Changes</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      <Modal visible={showPhoneVerify} transparent animationType="slide" onRequestClose={() => { setShowPhoneVerify(false); setOtpCode(""); }}>
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center" }}>
+            <View style={s.formModal}>
+              <View style={s.modalHandle} />
+              <View style={s.modalHeader}>
+                <Text style={s.modalTitle}>Verify Mobile Number</Text>
+                <TouchableOpacity onPress={() => { setShowPhoneVerify(false); setOtpCode(""); }} style={s.closeBtn}>
+                  <Ionicons name="close" size={20} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <Text style={s.phoneVerifyHint}>Enter the OTP sent to {userData.phone}.</Text>
+              <TextInput
+                style={s.formInput}
+                value={otpCode}
+                onChangeText={(v) => setOtpCode(v.replace(/[^0-9]/g, ""))}
+                placeholder="Enter OTP"
+                placeholderTextColor={COLORS.textDim}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+              <TouchableOpacity onPress={sendPhoneOtp} disabled={isSendingOtp} style={s.resendLink}>
+                <Text style={s.resendLinkText}>{isSendingOtp ? "Sending..." : "Resend Code"}</Text>
+              </TouchableOpacity>
+              <View style={s.modalBtnRow}>
+                <TouchableOpacity onPress={() => { setShowPhoneVerify(false); setOtpCode(""); }} disabled={isVerifyingOtp} style={s.cancelBtn}>
+                  <Text style={s.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={verifyPhoneOtp}
+                  disabled={isVerifyingOtp || !otpCode.trim()}
+                  style={[{ flex: 1.4, borderRadius: 16, overflow: "hidden" }, (!otpCode.trim() || isVerifyingOtp) && { opacity: 0.4 }]}
+                >
+                  <LinearGradient colors={["#f59e0b", "#d97706"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.saveBtn}>
+                    {isVerifyingOtp ? <ActivityIndicator color={COLORS.bg} /> : <Text style={s.saveBtnText}>Verify OTP</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -760,6 +927,12 @@ const s = StyleSheet.create({
   infoValue:   { color: COLORS.text, fontSize: 15, fontWeight: "600" },
   editPill:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: COLORS.gold, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   editPillText:{ color: COLORS.bg, fontSize: 12, fontWeight: "800" },
+  phoneVerificationRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  phoneStatusBadge: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  phoneStatusText: { fontSize: 12, fontWeight: "800" },
+  phoneVerifyBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.gold, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  phoneVerifyBtnDone: { backgroundColor: COLORS.success },
+  phoneVerifyBtnText: { color: COLORS.bg, fontSize: 12, fontWeight: "900" },
 
   // ID
   idImage:     { width: "100%", height: 190, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border },
@@ -796,6 +969,9 @@ const s = StyleSheet.create({
   cancelBtnText:{ color: COLORS.textMuted, fontSize: 15, fontWeight: "800" },
   saveBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 16 },
   saveBtnText:  { color: COLORS.bg, fontSize: 15, fontWeight: "900" },
+  phoneVerifyHint: { color: COLORS.textMuted, fontSize: 13, lineHeight: 20, marginBottom: 14 },
+  resendLink: { alignSelf: "flex-start", marginBottom: 16 },
+  resendLinkText: { color: COLORS.gold, fontSize: 13, fontWeight: "800" },
 
   // Alert modal — mirrors complain.tsx successModal
   alertModal:    { width: "88%", maxWidth: 370, borderRadius: 28, overflow: "hidden", borderWidth: 1, borderColor: COLORS.border },

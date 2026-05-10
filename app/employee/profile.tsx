@@ -20,6 +20,17 @@ const C = {
   border: "#E2E8F0", borderStrong: "#CBD5E1",
 };
 
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "http://192.168.68.126:5000";
+
+const normalizeLocalPhone = (value: string) => value.replace(/[^0-9]/g, "").trim();
+
+const getPhoneVerificationMeta = (status?: string) => {
+  if ((status || "").toLowerCase() === "verified") {
+    return { label: "Verified", color: C.success, bg: C.successDim, icon: "checkmark-circle" as const };
+  }
+  return { label: "Unverified", color: C.gold, bg: C.goldDim, icon: "time-outline" as const };
+};
+
 export default function EmployeeProfile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -32,6 +43,10 @@ export default function EmployeeProfile() {
   const [isSaving, setIsSaving] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -55,6 +70,7 @@ export default function EmployeeProfile() {
           memberSince: createdDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
           id_verification: d.idImage || "", avatar: d.avatar || "",
           idstatus: d.idstatus || "Pending", declineMessage: d.declineMessage || "", residencyStatus: d.residencyStatus || "",
+          numberVerificationStatus: d.numberVerificationStatus || "unverified",
         });
       }
     } catch (e) { console.error(e); }
@@ -81,8 +97,14 @@ export default function EmployeeProfile() {
             `Your ID status is now: ${currentIdStatus}`,
             { screen: "profile" }
           );
-          setUserData((p: any) => ({ ...p, idstatus: currentIdStatus, declineMessage: data.declineMessage || "" }));
         }
+        setUserData((p: any) => ({
+          ...p,
+          phone: data.number || p.phone,
+          idstatus: currentIdStatus,
+          declineMessage: data.declineMessage || "",
+          numberVerificationStatus: data.numberVerificationStatus || "unverified",
+        }));
         prevIdStatus = currentIdStatus;
       }
     });
@@ -156,12 +178,91 @@ export default function EmployeeProfile() {
       if (isEditing === "phone" && !/^\d{11}$/.test(value)) { Alert.alert("Validation Error", "Mobile number must be exactly 11 digits."); setIsSaving(false); return; }
       if (isEditing === "address" && !value) { Alert.alert("Validation Error", "Address cannot be empty."); setIsSaving(false); return; }
       const key = isEditing === "phone" ? "number" : "address";
-      await updateDoc(doc(firestore, "employee", auth.currentUser.uid), { [key]: value });
-      setUserData((p:any) => ({ ...p, ...(isEditing === "address" ? { address: value } : { phone: value }) }));
+      const updates: any = { [key]: value };
+      const normalizedOldPhone = normalizeLocalPhone(userData.phone || "");
+      const normalizedNewPhone = normalizeLocalPhone(value);
+      if (isEditing === "phone" && normalizedNewPhone !== normalizedOldPhone) {
+        updates.numberVerificationStatus = "unverified";
+        updates.numberVerifiedAt = null;
+      }
+      await updateDoc(doc(firestore, "employee", auth.currentUser.uid), updates);
+      setUserData((p:any) => ({
+        ...p,
+        ...(isEditing === "address"
+          ? { address: value }
+          : {
+              phone: value,
+              numberVerificationStatus: normalizedNewPhone !== normalizedOldPhone ? "unverified" : p.numberVerificationStatus,
+            }),
+      }));
       Alert.alert("Success", `${isEditing === "address" ? "Address" : "Phone"} updated!`);
       setIsEditing(null); setEditValue("");
     } catch { Alert.alert("Error", `Failed to update ${isEditing}.`); }
     finally { setIsSaving(false); }
+  };
+
+  const sendPhoneOtp = async () => {
+    const user = auth.currentUser;
+    const phone = normalizeLocalPhone(userData.phone || "");
+    if (!user) return;
+    if (!/^09\d{9}$/.test(phone)) {
+      Alert.alert("Invalid Number", "Use a valid 11-digit mobile number starting with 09.");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`${BACKEND_URL}/api/phone/send-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phoneNumber: phone, collectionName: "employee" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to send verification code.");
+      setShowPhoneVerify(true);
+      Alert.alert("OTP Sent", `A verification code was sent to ${phone}.`);
+    } catch (e: any) {
+      Alert.alert("Verification Failed", e.message || "Could not send the verification code.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const verifyPhoneOtp = async () => {
+    const user = auth.currentUser;
+    const phone = normalizeLocalPhone(userData.phone || "");
+    if (!user) return;
+    if (!otpCode.trim()) {
+      Alert.alert("Missing Code", "Enter the OTP code sent to your phone.");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`${BACKEND_URL}/api/phone/check-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phoneNumber: phone, code: otpCode.trim(), collectionName: "employee" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to verify OTP.");
+      setUserData((p:any) => ({ ...p, numberVerificationStatus: "verified" }));
+      setShowPhoneVerify(false);
+      setOtpCode("");
+      Alert.alert("Verified", "Your mobile number is now verified.");
+    } catch (e: any) {
+      Alert.alert("Invalid OTP", e.message || "The verification code is invalid or expired.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -183,6 +284,7 @@ export default function EmployeeProfile() {
 
   const fullName = `${userData.firstName || ""} ${userData.middleName || ""} ${userData.lastName || ""}`.trim() || "User";
   const meta = getStatusMeta(userData.idstatus);
+  const phoneMeta = getPhoneVerificationMeta(userData.numberVerificationStatus);
 
   if (loading) return <SafeAreaView style={st.safe}><View style={st.center}><ActivityIndicator size="large" color={C.gold} /></View></SafeAreaView>;
 
@@ -231,6 +333,19 @@ export default function EmployeeProfile() {
                   <Text style={st.recordValue}>{userData.phone}</Text>
                   <TouchableOpacity onPress={() => { setEditValue(userData.phone); setIsEditing("phone"); }}><Ionicons name="pencil" size={16} color={C.gold} /></TouchableOpacity>
                 </View>
+              </View>
+              <View style={st.verifyRow}>
+                <View style={[st.verifyBadge, { backgroundColor: phoneMeta.bg, borderColor: phoneMeta.color + "33" }]}>
+                  <Ionicons name={phoneMeta.icon} size={13} color={phoneMeta.color} />
+                  <Text style={[st.verifyBadgeText, { color: phoneMeta.color }]}>{phoneMeta.label}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[st.verifyBtn, userData.numberVerificationStatus === "verified" && st.verifyBtnDone]}
+                  onPress={sendPhoneOtp}
+                  disabled={userData.numberVerificationStatus === "verified" || isSendingOtp}
+                >
+                  {isSendingOtp ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={st.verifyBtnText}>{userData.numberVerificationStatus === "verified" ? "Verified" : "Verify Number"}</Text>}
+                </TouchableOpacity>
               </View>
               <View style={st.recordRow}>
                 <View style={st.recordLeft}><Ionicons name="location" size={14} color={C.textMuted} /><Text style={st.recordLabel}>Address</Text></View>
@@ -321,6 +436,38 @@ export default function EmployeeProfile() {
         </View>
       </Modal>
 
+      <Modal visible={showPhoneVerify} transparent animationType="fade">
+        <View style={st.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center" }}>
+            <View style={st.modalContent}>
+              <View style={st.modalHeaderRow}>
+                <Text style={st.modalTitle}>Verify Mobile Number</Text>
+                <TouchableOpacity onPress={() => { setShowPhoneVerify(false); setOtpCode(""); }} style={st.modalClose}><Ionicons name="close" size={20} color={C.textMuted} /></TouchableOpacity>
+              </View>
+              <Text style={st.verifyHint}>Enter the OTP sent to {userData.phone}.</Text>
+              <TextInput
+                style={st.input}
+                value={otpCode}
+                onChangeText={(v) => setOtpCode(v.replace(/[^0-9]/g, ""))}
+                placeholder="Enter OTP"
+                placeholderTextColor={C.textDim}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+              <TouchableOpacity onPress={sendPhoneOtp} disabled={isSendingOtp} style={st.resendBtn}>
+                <Text style={st.resendBtnText}>{isSendingOtp ? "Sending..." : "Resend Code"}</Text>
+              </TouchableOpacity>
+              <View style={st.btnRow}>
+                <TouchableOpacity style={st.btnGhost} onPress={() => { setShowPhoneVerify(false); setOtpCode(""); }} disabled={isVerifyingOtp}><Text style={st.btnGhostText}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={[st.btnPrimary, { flex: 1.5 }, (!otpCode.trim() || isVerifyingOtp) && { opacity: 0.5 }]} onPress={verifyPhoneOtp} disabled={isVerifyingOtp || !otpCode.trim()}>
+                  {isVerifyingOtp ? <ActivityIndicator color="#FFF" /> : <Text style={st.btnPrimaryText}>Verify OTP</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
       {/* PASSWORD MODAL */}
       <Modal visible={showChangePw} transparent animationType="fade">
         <View style={st.modalOverlay}>
@@ -391,6 +538,12 @@ const st = StyleSheet.create({
   recordLeft: { flexDirection: "row", alignItems: "center", gap: 8, width: 100 },
   recordLabel: { fontSize: 13, fontWeight: "700", color: C.textMuted },
   recordValue: { fontSize: 13, fontWeight: "800", color: C.text },
+  verifyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4, paddingBottom: 10 },
+  verifyBadge: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  verifyBadgeText: { fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  verifyBtn: { backgroundColor: C.text, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  verifyBtnDone: { backgroundColor: C.success },
+  verifyBtnText: { color: "#FFF", fontSize: 12, fontWeight: "800" },
 
   cardTitle: { fontSize: 16, fontWeight: "900", color: C.text },
   noticeBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.redLight, padding: 12, borderRadius: 12, marginBottom: 14 },
@@ -412,6 +565,9 @@ const st = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: "900", color: C.text, letterSpacing: -0.5 },
   modalClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.elevated, alignItems: "center", justifyContent: "center" },
   input: { backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: C.text, fontSize: 15, fontWeight: "500" },
+  verifyHint: { fontSize: 13, color: C.textMuted, lineHeight: 20, marginBottom: 14 },
+  resendBtn: { alignSelf: "flex-start", marginTop: 12 },
+  resendBtnText: { fontSize: 13, fontWeight: "800", color: C.gold },
   
   btnRow: { flexDirection: "row", gap: 10, marginTop: 16 },
   btnGhost: { flex: 1, paddingVertical: 14, alignItems: "center", justifyContent: "center", borderRadius: 12 },
