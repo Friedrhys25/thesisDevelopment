@@ -66,7 +66,7 @@ const DEFAULT_CATEGORY = { icon: "call-outline" as keyof typeof Ionicons.glyphMa
 type EmergencyService = {
   id: string; name: string;
   icon: keyof typeof Ionicons.glyphMap;
-  number: string; color: string; category: string;
+  number: string; telephone?: string; color: string; category: string;
 };
 
 // ── Pulse ring ────────────────────────────────────────────────────────────────
@@ -229,7 +229,15 @@ export default function EmergencyPage() {
         const d = doc.data();
         const cat = (d.category || "").toLowerCase();
         const mapped = CATEGORY_MAP[cat] || DEFAULT_CATEGORY;
-        return { id: doc.id, name: d.name || "Unknown", number: d.number || "", category: d.category || "", icon: mapped.icon, color: mapped.color };
+        return {
+          id: doc.id,
+          name: d.name || "Unknown",
+          number: d.number || "",
+          telephone: d.telephone || "",
+          category: d.category || "",
+          icon: mapped.icon,
+          color: mapped.color,
+        };
       });
       setHotlines(data);
     } catch (e) { console.error("Failed to fetch emergency hotlines:", e); }
@@ -239,12 +247,36 @@ export default function EmergencyPage() {
   useEffect(() => { fetchHotlines(); }, [fetchHotlines]);
 
   const handleEmergencyCall = (service: EmergencyService) => {
+    const hasMobile = !!service.number;
+    const hasTelephone = !!service.telephone;
+
+    if (hasMobile && hasTelephone) {
+      Alert.alert(
+        "Choose Number",
+        `Which number do you want to call for ${service.name}?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: `Mobile (${service.number})`, onPress: () => Linking.openURL(`tel:${service.number}`) },
+          { text: `Telephone (${service.telephone})`, onPress: () => Linking.openURL(`tel:${service.telephone}`) },
+        ]
+      );
+      return;
+    }
+
+    const numberToCall = service.number || service.telephone || "";
+    const label = hasMobile ? "mobile number" : "telephone number";
+
+    if (!numberToCall) {
+      Alert.alert("No Contact Number", `${service.name} does not have an available contact number yet.`);
+      return;
+    }
+
     Alert.alert(
       "Call Emergency",
-      `Call ${service.name} at ${service.number}?`,
+      `Call ${service.name} at this ${label}: ${numberToCall}?`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Call Now", style: "destructive", onPress: () => Linking.openURL(`tel:${service.number}`) },
+        { text: "Call Now", style: "destructive", onPress: () => Linking.openURL(`tel:${numberToCall}`) },
       ]
     );
   };
@@ -346,11 +378,12 @@ export default function EmergencyPage() {
                     <Ionicons name={service.icon} size={26} color={service.color} />
                   </View>
                   <Text style={s.hotlineName}>{service.name}</Text>
-                  <Text style={s.hotlineNumber}>{service.number}</Text>
+                  {!!service.number && <Text style={s.hotlineNumber}>Mobile: {service.number}</Text>}
+                  {!!service.telephone && <Text style={s.hotlineNumber}>Tel: {service.telephone}</Text>}
                   <Text style={s.hotlineCategory}>{service.category}</Text>
                   <View style={[s.callBadge, { backgroundColor: service.color }]}>
                     <Ionicons name="call" size={13} color="#fff" />
-                    <Text style={s.callBadgeText}>Call</Text>
+                    <Text style={s.callBadgeText}>{service.telephone ? "Choose" : "Call"}</Text>
                   </View>
                 </Pressable>
               );

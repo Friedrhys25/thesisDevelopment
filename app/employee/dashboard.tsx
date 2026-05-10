@@ -16,6 +16,43 @@ const C = {
   border: "#E2E8F0", borderStrong: "#CBD5E1",
 };
 
+const WEEK_DAYS = [
+  { key: "monday", label: "Monday", short: "MON" },
+  { key: "tuesday", label: "Tuesday", short: "TUE" },
+  { key: "wednesday", label: "Wednesday", short: "WED" },
+  { key: "thursday", label: "Thursday", short: "THU" },
+  { key: "friday", label: "Friday", short: "FRI" },
+  { key: "saturday", label: "Saturday", short: "SAT" },
+  { key: "sunday", label: "Sunday", short: "SUN" },
+] as const;
+
+const toIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getWeekDates = (baseDate = new Date()) => {
+  const current = new Date(baseDate);
+  const jsDay = current.getDay();
+  const distanceToMonday = jsDay === 0 ? -6 : 1 - jsDay;
+  const monday = new Date(current);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(current.getDate() + distanceToMonday);
+
+  return WEEK_DAYS.map((day, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return { ...day, isoDate: toIsoDate(date) };
+  });
+};
+
+const formatShiftLabel = (shift: any) => {
+  if (!shift || typeof shift !== "string") return "No schedule";
+  return `${shift.charAt(0).toUpperCase()}${shift.slice(1)}`;
+};
+
 export default function EmployeeDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -27,6 +64,7 @@ export default function EmployeeDashboard() {
   const [resolvedCount, setResolvedCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [officials, setOfficials] = useState<any[]>([]);
+  const [employeeSchedules, setEmployeeSchedules] = useState<any[]>([]);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -47,10 +85,15 @@ export default function EmployeeDashboard() {
       (snap) => setResolvedCount(snap.docs.filter((entry) => entry.data().status === "resolved").length)
     );
 
+    const unsubSchedules = onSnapshot(
+      query(collection(firestore, "employee", user.uid, "employeeSchedules"), orderBy("date", "asc")),
+      (snap) => setEmployeeSchedules(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })))
+    );
+
     loadData();
     fetchOfficials();
 
-    return () => { unsubEmp(); unsubHistory(); };
+    return () => { unsubEmp(); unsubHistory(); unsubSchedules(); };
   }, []);
 
   useEffect(() => { setTotalComplaints(resolvedCount + activeCount); }, [resolvedCount, activeCount]);
@@ -115,6 +158,21 @@ export default function EmployeeDashboard() {
   const shift = userData?.shift ? `${userData.shift.charAt(0).toUpperCase()}${userData.shift.slice(1)}` : "None";
   const isDeployed = (userData?.deploymentStatus || "") === "deployed";
   const statusMeta = idInfo();
+  const weekSchedule = useMemo(() => {
+    const scheduleMap = new Map(
+      employeeSchedules.map((entry) => [entry.date || entry.id, entry])
+    );
+
+    return getWeekDates().map((day) => {
+      const entry = scheduleMap.get(day.isoDate);
+      return {
+        ...day,
+        isoDate: day.isoDate,
+        value: formatShiftLabel(entry?.shift),
+        hasSchedule: !!entry,
+      };
+    });
+  }, [employeeSchedules]);
 
   if (loading) return (
     <SafeAreaView style={st.safe}><StatusBar barStyle="dark-content" /><View style={st.center}><ActivityIndicator size="large" color={C.gold} /></View></SafeAreaView>
@@ -173,6 +231,29 @@ export default function EmployeeDashboard() {
               <Text style={st.statValue}>{resolvedCount}</Text>
               <Text style={st.statLabel}>RESOLVED</Text>
             </View>
+          </View>
+        </View>
+
+        {/* Weekly Schedule */}
+        <View style={st.section}>
+          <Text style={st.secEye}>WEEKLY SCHEDULE</Text>
+          <View style={st.card}>
+            {weekSchedule.map((day, index) => (
+              <React.Fragment key={day.key}>
+                {index > 0 ? <View style={[st.divider, { marginLeft: 0 }]} /> : null}
+                <View style={st.scheduleRow}>
+                  <View style={st.scheduleDay}>
+                    <Text style={st.scheduleDayShort}>{day.short}</Text>
+                    <Text style={st.scheduleDayLabel}>{day.label}</Text>
+                    <Text style={st.scheduleDate}>{day.isoDate}</Text>
+                  </View>
+                  <View style={[st.scheduleValueWrap, !day.hasSchedule && st.scheduleValueWrapMuted]}>
+                    <Ionicons name={day.hasSchedule ? "calendar-outline" : "remove-circle-outline"} size={14} color={day.hasSchedule ? C.blueMid : C.textDim} />
+                    <Text style={[st.scheduleValue, !day.hasSchedule && st.scheduleValueMuted]}>{day.value}</Text>
+                  </View>
+                </View>
+              </React.Fragment>
+            ))}
           </View>
         </View>
 
@@ -278,6 +359,16 @@ const st = StyleSheet.create({
   recordLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   recordLabel: { fontSize: 13, fontWeight: "700", color: C.textMuted },
   recordValue: { fontSize: 13, fontWeight: "800", color: C.text, flex: 1, textAlign: "right", marginLeft: 20 },
+
+  scheduleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingVertical: 12 },
+  scheduleDay: { flex: 1 },
+  scheduleDayShort: { fontSize: 10, fontWeight: "900", color: C.gold, letterSpacing: 1.4, marginBottom: 4 },
+  scheduleDayLabel: { fontSize: 14, fontWeight: "800", color: C.text },
+  scheduleDate: { fontSize: 11, fontWeight: "600", color: C.textMuted, marginTop: 3 },
+  scheduleValueWrap: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "55%", backgroundColor: C.blueLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  scheduleValueWrapMuted: { backgroundColor: C.surfaceAlt },
+  scheduleValue: { fontSize: 12, fontWeight: "700", color: C.blueMid, textAlign: "right", flexShrink: 1 },
+  scheduleValueMuted: { color: C.textMuted },
 
   officialCard: { width: 120, backgroundColor: C.surface, borderRadius: 16, padding: 14, alignItems: "center", borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
   officialCardCap: { borderColor: C.goldBorder, backgroundColor: C.surface },
