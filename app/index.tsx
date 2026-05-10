@@ -5,8 +5,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  updatePassword,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -179,6 +180,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [disabledModalVisible, setDisabledModalVisible] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [forcePasswordModalVisible, setForcePasswordModalVisible] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(30)).current;
@@ -193,13 +200,37 @@ export default function LoginPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const resetForcedPasswordState = () => {
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setShowNewPassword(false);
+    setShowConfirmNewPassword(false);
+    setPasswordChangeLoading(false);
+  };
+
+  const handleEmployeePostLogin = async (uid: string) => {
+    const employeeDoc = await getDoc(doc(firestore, "employee", uid));
+    if (!employeeDoc.exists()) return false;
+
+    const employeeData = employeeDoc.data();
+    if (employeeData.defaultPassword === true) {
+      resetForcedPasswordState();
+      setForcePasswordModalVisible(true);
+      setCheckingAuth(false);
+      return true;
+    }
+
+    setForcePasswordModalVisible(false);
+    setCheckingAuth(false);
+    router.replace("/employee/dashboard");
+    return true;
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user && !loading) {
-        const employeeDoc = await getDoc(doc(firestore, "employee", user.uid));
-        if (employeeDoc.exists()) {
-          router.replace("/employee/dashboard");
-        } else {
+        const isEmployee = await handleEmployeePostLogin(user.uid);
+        if (!isEmployee) {
           const userDoc = await getDoc(doc(firestore, "users", user.uid));
           if (userDoc.exists()) {
             if (!user.emailVerified) {
@@ -240,10 +271,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const employeeDoc = await getDoc(doc(firestore, "employee", userCredential.user.uid));
-      if (employeeDoc.exists()) {
-        router.replace("/employee/dashboard");
-      } else {
+      const isEmployee = await handleEmployeePostLogin(userCredential.user.uid);
+      if (!isEmployee) {
         const userDoc = await getDoc(doc(firestore, "users", userCredential.user.uid));
         if (userDoc.exists()) {
           if (!userCredential.user.emailVerified) {
@@ -279,6 +308,46 @@ export default function LoginPage() {
       Alert.alert(errorTitle, errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForcedPasswordChange = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Session Expired", "Please sign in again.");
+      setForcePasswordModalVisible(false);
+      return;
+    }
+    if (!newPassword || !confirmNewPassword) {
+      Alert.alert("Missing Fields", "Please enter and confirm your new password.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert("Weak Password", "New password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      Alert.alert("Password Mismatch", "The new password and confirm password do not match.");
+      return;
+    }
+
+    setPasswordChangeLoading(true);
+    try {
+      await updatePassword(user, newPassword);
+      await updateDoc(doc(firestore, "employee", user.uid), { defaultPassword: false });
+      setForcePasswordModalVisible(false);
+      resetForcedPasswordState();
+      Alert.alert("Password Updated", "Your password has been changed successfully.");
+      router.replace("/employee/dashboard");
+    } catch (error: any) {
+      Alert.alert(
+        "Password Change Failed",
+        error?.code === "auth/requires-recent-login"
+          ? "Please sign in again and retry changing your password."
+          : (error?.message || "Unable to change password right now.")
+      );
+    } finally {
+      setPasswordChangeLoading(false);
     }
   };
 
@@ -473,6 +542,87 @@ export default function LoginPage() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={forcePasswordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={[styles.modalIconWrap, { backgroundColor: C.goldDim }]}>
+              <Ionicons name="lock-closed" size={32} color={C.gold} />
+            </View>
+            <Text style={styles.modalTitle}>Change Default Password</Text>
+            <Text style={styles.modalBody}>
+              You must change your default password before accessing the employee dashboard.
+            </Text>
+
+            <View style={styles.forcePwFieldGroup}>
+              <Text style={styles.fieldLabel}>New Password</Text>
+              <InputField
+                icon="key-outline"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry={!showNewPassword}
+                editable={!passwordChangeLoading}
+                rightElement={
+                  <TouchableOpacity
+                    onPress={() => setShowNewPassword((prev) => !prev)}
+                    disabled={passwordChangeLoading}
+                    style={styles.eyeBtn}
+                  >
+                    <Ionicons
+                      name={showNewPassword ? "eye-outline" : "eye-off-outline"}
+                      size={18}
+                      color={C.textSub}
+                    />
+                  </TouchableOpacity>
+                }
+              />
+            </View>
+
+            <View style={styles.forcePwFieldGroup}>
+              <Text style={styles.fieldLabel}>Confirm Password</Text>
+              <InputField
+                icon="shield-checkmark-outline"
+                placeholder="Confirm new password"
+                value={confirmNewPassword}
+                onChangeText={setConfirmNewPassword}
+                secureTextEntry={!showConfirmNewPassword}
+                editable={!passwordChangeLoading}
+                rightElement={
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmNewPassword((prev) => !prev)}
+                    disabled={passwordChangeLoading}
+                    style={styles.eyeBtn}
+                  >
+                    <Ionicons
+                      name={showConfirmNewPassword ? "eye-outline" : "eye-off-outline"}
+                      size={18}
+                      color={C.textSub}
+                    />
+                  </TouchableOpacity>
+                }
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.modalBtn, { width: "100%", alignItems: "center", opacity: passwordChangeLoading ? 0.7 : 1 }]}
+              onPress={handleForcedPasswordChange}
+              disabled={passwordChangeLoading}
+            >
+              {passwordChangeLoading ? (
+                <ActivityIndicator size="small" color={C.bg} />
+              ) : (
+                <Text style={styles.modalBtnText}>Update Password</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -635,6 +785,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   eyeBtn: { padding: 4 },
+  forcePwFieldGroup: { width: "100%", marginBottom: 16 },
 
   // Forgot
   forgotRow: { alignSelf: "flex-end", marginBottom: 24, marginTop: -4 },

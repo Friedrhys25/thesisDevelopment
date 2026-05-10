@@ -53,6 +53,13 @@ const formatShiftLabel = (shift: any) => {
   return `${shift.charAt(0).toUpperCase()}${shift.slice(1)}`;
 };
 
+type LeaderboardEntry = {
+  uid: string;
+  name: string;
+  avatar: string;
+  resolved: number;
+};
+
 export default function EmployeeDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -65,6 +72,47 @@ export default function EmployeeDashboard() {
   const [activeCount, setActiveCount] = useState(0);
   const [officials, setOfficials] = useState<any[]>([]);
   const [employeeSchedules, setEmployeeSchedules] = useState<any[]>([]);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const employeeSnap = await getDocs(collection(firestore, "employee"));
+
+      const rows = await Promise.all(
+        employeeSnap.docs.map(async (employeeDoc) => {
+          const data = employeeDoc.data();
+          const historySnap = await getDocs(collection(firestore, "employee", employeeDoc.id, "deploymentHistory"));
+          const resolved = historySnap.docs.filter((historyDoc) => {
+            const status = String(historyDoc.data().status || "").toLowerCase().trim();
+            return status === "resolved";
+          }).length;
+
+          const fullName = [
+            data.firstName || "",
+            data.lastName || "",
+            data.suffix || "",
+          ].filter(Boolean).join(" ").trim() || data.name || "Unknown Officer";
+
+          return {
+            uid: employeeDoc.id,
+            name: fullName,
+            avatar: data.avatar || "",
+            resolved,
+          };
+        })
+      );
+
+      setLeaderboardEntries(
+        rows
+          .filter((entry) => entry.resolved > 0)
+          .sort((a, b) => b.resolved - a.resolved || a.name.localeCompare(b.name))
+          .slice(0, 5)
+      );
+    } catch (error) {
+      console.error(error);
+      setLeaderboardEntries([]);
+    }
+  }, []);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -92,9 +140,10 @@ export default function EmployeeDashboard() {
 
     loadData();
     fetchOfficials();
+    fetchLeaderboard();
 
     return () => { unsubEmp(); unsubHistory(); unsubSchedules(); };
-  }, []);
+  }, [fetchLeaderboard]);
 
   useEffect(() => { setTotalComplaints(resolvedCount + activeCount); }, [resolvedCount, activeCount]);
 
@@ -143,6 +192,7 @@ export default function EmployeeDashboard() {
     setRefreshing(true);
     await loadData();
     await fetchOfficials();
+    await fetchLeaderboard();
     setRefreshing(false);
   };
 
@@ -254,6 +304,61 @@ export default function EmployeeDashboard() {
                 </View>
               </React.Fragment>
             ))}
+          </View>
+        </View>
+
+        {/* Leaderboard */}
+        <View style={st.section}>
+          <Text style={st.secEye}>RESOLUTION LEADERBOARD</Text>
+          <View style={st.card}>
+            <View style={st.leaderboardHeader}>
+              <View>
+                <Text style={st.leaderboardTitle}>Top Responders</Text>
+                <Text style={st.leaderboardSub}>Most complaints resolved across employees</Text>
+              </View>
+              <View style={st.leaderboardHeaderBadge}>
+                <Ionicons name="trophy" size={13} color={C.gold} />
+                <Text style={st.leaderboardHeaderBadgeText}>LIVE</Text>
+              </View>
+            </View>
+
+            {leaderboardEntries.length === 0 ? (
+              <View style={st.leaderboardEmpty}>
+                <Ionicons name="ribbon-outline" size={24} color={C.textDim} />
+                <Text style={st.leaderboardEmptyText}>No resolved records yet.</Text>
+              </View>
+            ) : (
+              leaderboardEntries.map((entry, index) => {
+                const isTop = index === 0;
+                return (
+                  <View key={entry.uid} style={[st.leaderboardRow, isTop && st.leaderboardRowTop, index < leaderboardEntries.length - 1 && !isTop && st.leaderboardRowBorder]}>
+                    <View style={[st.rankWrap, isTop && st.rankWrapTop]}>
+                      <Text style={[st.rankText, isTop && st.rankTextTop]}>{index + 1}</Text>
+                    </View>
+
+                    {entry.avatar ? (
+                      <Image source={{ uri: entry.avatar }} style={[st.leaderboardAvatar, isTop && st.leaderboardAvatarTop]} />
+                    ) : (
+                      <View style={[st.leaderboardAvatarPlaceholder, isTop && st.leaderboardAvatarPlaceholderTop]}>
+                        <Text style={[st.leaderboardAvatarLetter, isTop && st.leaderboardAvatarLetterTop]}>{entry.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                    )}
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.leaderboardName, isTop && st.leaderboardNameTop]} numberOfLines={1}>{entry.name}</Text>
+                      <Text style={[st.leaderboardMeta, isTop && st.leaderboardMetaTop]}>
+                        {isTop ? "Current leader" : "Resolved complaints"}
+                      </Text>
+                    </View>
+
+                    <View style={[st.scorePill, isTop && st.scorePillTop]}>
+                      {isTop && <Ionicons name="sparkles" size={12} color={C.gold} />}
+                      <Text style={[st.scoreValue, isTop && st.scoreValueTop]}>{entry.resolved}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
         </View>
 
@@ -369,6 +474,35 @@ const st = StyleSheet.create({
   scheduleValueWrapMuted: { backgroundColor: C.surfaceAlt },
   scheduleValue: { fontSize: 12, fontWeight: "700", color: C.blueMid, textAlign: "right", flexShrink: 1 },
   scheduleValueMuted: { color: C.textMuted },
+
+  leaderboardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
+  leaderboardTitle: { fontSize: 18, fontWeight: "900", color: C.text, letterSpacing: -0.3 },
+  leaderboardSub: { fontSize: 12, color: C.textMuted, fontWeight: "600", marginTop: 4 },
+  leaderboardHeaderBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.goldDim, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: C.goldBorder },
+  leaderboardHeaderBadgeText: { fontSize: 10, fontWeight: "900", color: C.gold, letterSpacing: 1.2 },
+  leaderboardEmpty: { paddingVertical: 18, alignItems: "center", justifyContent: "center", gap: 8 },
+  leaderboardEmptyText: { fontSize: 13, fontWeight: "700", color: C.textMuted },
+  leaderboardRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14 },
+  leaderboardRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
+  leaderboardRowTop: { backgroundColor: "#FFFBEB", borderWidth: 1, borderColor: C.goldBorder, borderRadius: 18, paddingHorizontal: 14, marginBottom: 12, shadowColor: C.gold, shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
+  rankWrap: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.surfaceAlt, alignItems: "center", justifyContent: "center" },
+  rankWrapTop: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.gold },
+  rankText: { fontSize: 13, fontWeight: "900", color: C.textMuted },
+  rankTextTop: { fontSize: 20, color: C.bg },
+  leaderboardAvatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: C.border },
+  leaderboardAvatarTop: { width: 54, height: 54, borderRadius: 27, borderWidth: 2, borderColor: C.goldBorder },
+  leaderboardAvatarPlaceholder: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.surfaceAlt, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
+  leaderboardAvatarPlaceholderTop: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.goldDim, borderColor: C.goldBorder, borderWidth: 2 },
+  leaderboardAvatarLetter: { fontSize: 16, fontWeight: "900", color: C.textMuted },
+  leaderboardAvatarLetterTop: { fontSize: 20, color: C.gold },
+  leaderboardName: { fontSize: 15, fontWeight: "800", color: C.text },
+  leaderboardNameTop: { fontSize: 18, fontWeight: "900" },
+  leaderboardMeta: { fontSize: 12, color: C.textMuted, fontWeight: "600", marginTop: 3 },
+  leaderboardMetaTop: { color: C.gold, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.7 },
+  scorePill: { minWidth: 52, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: C.surfaceAlt, alignItems: "center", justifyContent: "center" },
+  scorePillTop: { flexDirection: "row", gap: 6, backgroundColor: "#FFF7ED", borderWidth: 1, borderColor: C.goldBorder, paddingHorizontal: 14 },
+  scoreValue: { fontSize: 16, fontWeight: "900", color: C.text },
+  scoreValueTop: { color: C.gold },
 
   officialCard: { width: 120, backgroundColor: C.surface, borderRadius: 16, padding: 14, alignItems: "center", borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
   officialCardCap: { borderColor: C.goldBorder, backgroundColor: C.surface },

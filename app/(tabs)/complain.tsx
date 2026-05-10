@@ -186,6 +186,7 @@ export default function App() {
   const [complaintModalVisible, setComplaintModalVisible] = useState(false);
   const [detailModalVisible,  setDetailModalVisible]  = useState(false);
   const [selectedComplaint,   setSelectedComplaint]   = useState<NotificationItem | null>(null);
+  const [isEditingComplaint,  setIsEditingComplaint]  = useState(false);
   const [selectedImage,       setSelectedImage]       = useState<string | null>(null);
   const [uploading,           setUploading]           = useState(false);
   const [incidentPurok,       setIncidentPurok]       = useState("1");
@@ -379,6 +380,20 @@ export default function App() {
     return statusUpdates[sk]?.has(c.firebaseKey) || false;
   };
 
+  const resetComplaintForm = () => {
+    setMessage("");
+    setIncidentPurok("1");
+    setIncidentLocation("");
+    setSelectedImage(null);
+    setIsUrgent(false);
+    setIsEditingComplaint(false);
+  };
+
+  const closeComplaintModal = () => {
+    setComplaintModalVisible(false);
+    resetComplaintForm();
+  };
+
   const handleSubmit = async () => {
     if (!message.trim()) { Alert.alert("Error", "Please enter a complaint message"); return; }
     if (!incidentLocation.trim()) { Alert.alert("Error", "Please enter the incident location"); return; }
@@ -397,10 +412,53 @@ export default function App() {
       const newItem: any = { id: Date.now(), message: data.message, label: isUrgent ? "urgent" : String(data.label).toLowerCase().trim(), type: String(data.type).toLowerCase().trim(), timestamp: serverTimestamp(), purok: userPurok, incidentPurok, incidentLocation, status: "pending", isUrgent };
       if (selectedImage) newItem.evidencePhoto = selectedImage;
       await addDoc(ref, newItem);
-      setMessage(""); setIncidentLocation(""); setSelectedImage(null); setIsUrgent(false);
-      setComplaintModalVisible(false); setModalVisible(true);
+      resetComplaintForm();
+      setComplaintModalVisible(false);
+      setModalVisible(true);
     } catch (e: any) { Alert.alert("Error", e.message); }
     finally { setLoading(false); }
+  };
+
+  const handleEditComplaint = (c: NotificationItem) => {
+    setSelectedComplaint(c);
+    setIsEditingComplaint(true);
+    setMessage(c.message || "");
+    setIncidentPurok(c.incidentPurok || "1");
+    setIncidentLocation(c.incidentLocation || "");
+    setSelectedImage(c.evidencePhoto || null);
+    setIsUrgent(Boolean(c.isUrgent));
+    setDetailModalVisible(false);
+    setComplaintModalVisible(true);
+  };
+
+  const handleUpdateComplaint = async () => {
+    if (!selectedComplaint?.firebaseKey) { Alert.alert("Error", "Complaint not found."); return; }
+    if (!message.trim()) { Alert.alert("Error", "Please enter a complaint message"); return; }
+    if (!incidentLocation.trim()) { Alert.alert("Error", "Please enter the incident location"); return; }
+    const user = auth.currentUser;
+    if (!user) { Alert.alert("Error", "Not logged in"); return; }
+    setLoading(true);
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "http://192.168.68.126:5000";
+      const response = await fetch(`${API_URL}/classify`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+      const data = await response.json();
+      await updateDoc(doc(firestore, "users", user.uid, "userComplaints", selectedComplaint.firebaseKey), {
+        message: data.message,
+        label: isUrgent ? "urgent" : String(data.label).toLowerCase().trim(),
+        type: String(data.type).toLowerCase().trim(),
+        incidentPurok,
+        incidentLocation,
+        evidencePhoto: selectedImage || null,
+        isUrgent,
+      });
+      closeComplaintModal();
+      setSelectedComplaint(null);
+      Alert.alert("Updated", "Complaint updated successfully.");
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to update complaint.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openDetailModal = (c: NotificationItem) => {
@@ -704,7 +762,12 @@ export default function App() {
         )}
         <TouchableOpacity
           style={[styles.fab, !isIdApproved && styles.fabDisabled]}
-          onPress={() => isIdApproved && setComplaintModalVisible(true)}
+          onPress={() => {
+            if (!isIdApproved) return;
+            setSelectedComplaint(null);
+            resetComplaintForm();
+            setComplaintModalVisible(true);
+          }}
           disabled={!isIdApproved}
         >
           <LinearGradient
@@ -730,10 +793,16 @@ export default function App() {
                 <Text style={styles.modalTitle}>Complaint Details</Text>
                 <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                   {selectedComplaint?.status?.toLowerCase().replace(/\s+/g, "") === "pending" && (
-                    <TouchableOpacity onPress={() => selectedComplaint && confirmAndDelete(selectedComplaint)} style={styles.deleteBtn}>
-                      <Ionicons name="trash-outline" size={14} color="#fff" />
-                      <Text style={styles.deleteBtnText}>Delete</Text>
-                    </TouchableOpacity>
+                    <>
+                      <TouchableOpacity onPress={() => selectedComplaint && handleEditComplaint(selectedComplaint)} style={styles.editBtn}>
+                        <Ionicons name="create-outline" size={14} color={COLORS.bg} />
+                        <Text style={styles.editBtnText}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => selectedComplaint && confirmAndDelete(selectedComplaint)} style={styles.deleteBtn}>
+                        <Ionicons name="trash-outline" size={14} color="#fff" />
+                        <Text style={styles.deleteBtnText}>Delete</Text>
+                      </TouchableOpacity>
+                    </>
                   )}
                   <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.closeBtn}>
                     <Ionicons name="close" size={20} color={COLORS.textMuted} />
@@ -836,8 +905,8 @@ export default function App() {
             <View style={styles.formModal}>
               <View style={styles.modalHandle} />
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>File a Report</Text>
-                <TouchableOpacity onPress={() => { setComplaintModalVisible(false); setSelectedImage(null); setMessage(""); setIncidentLocation(""); setIsUrgent(false); }} style={styles.closeBtn}>
+                <Text style={styles.modalTitle}>{isEditingComplaint ? "Edit Report" : "File a Report"}</Text>
+                <TouchableOpacity onPress={closeComplaintModal} style={styles.closeBtn}>
                   <Ionicons name="close" size={20} color={COLORS.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -900,12 +969,12 @@ export default function App() {
                   />
                 </View>
 
-                <TouchableOpacity onPress={handleSubmit} disabled={loading} style={{ overflow: "hidden", borderRadius: 16, marginBottom: 20 }}>
+                <TouchableOpacity onPress={isEditingComplaint ? handleUpdateComplaint : handleSubmit} disabled={loading} style={{ overflow: "hidden", borderRadius: 16, marginBottom: 20 }}>
                   <LinearGradient colors={["#f59e0b", "#d97706"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitBtn}>
                     {loading ? <ActivityIndicator color={COLORS.bg} /> : (
                       <>
-                        <Ionicons name="send" size={18} color={COLORS.bg} />
-                        <Text style={styles.submitBtnText}>Submit Report</Text>
+                        <Ionicons name={isEditingComplaint ? "create-outline" : "send"} size={18} color={COLORS.bg} />
+                        <Text style={styles.submitBtnText}>{isEditingComplaint ? "Save Changes" : "Submit Report"}</Text>
                       </>
                     )}
                   </LinearGradient>
@@ -1169,6 +1238,8 @@ const styles = StyleSheet.create({
   modalHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
   modalTitle:    { color: COLORS.text, fontSize: 20, fontWeight: "900" },
   closeBtn:      { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.elevated, justifyContent: "center", alignItems: "center" },
+  editBtn:       { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: COLORS.gold, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  editBtnText:   { color: COLORS.bg, fontSize: 12, fontWeight: "800" },
   deleteBtn:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: COLORS.red, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
   deleteBtnText: { color: "#fff", fontSize: 12, fontWeight: "800" },
 
