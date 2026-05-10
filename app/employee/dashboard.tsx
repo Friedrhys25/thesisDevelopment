@@ -1,762 +1,379 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query } from "firebase/firestore";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
 
-// ─── Design Tokens ───
-const COLORS = {
-  brand: "#4a90e2",
-  brandDark: "#3a7bc8",
-  brandLight: "#e3f2fd",
-  brandMuted: "rgba(74,144,226,0.10)",
-  surface: "#FFFFFF",
-  surface2: "#F7F7F5",
-  border: "rgba(0,0,0,0.08)",
-  text: "#1A1A1A",
-  textMuted: "#6B6B6B",
-  success: "#34C759",
-  danger: "#FF3B30",
-  warning: "#F59E0B",
+// Light theme exactly matching reports.tsx
+const C = {
+  bg: "#F8FAFC", surface: "#FFFFFF", surfaceAlt: "#F1F5F9", elevated: "#E2E8F0",
+  text: "#0F172A", textMuted: "#64748B", textDim: "#94A3B8",
+  gold: "#D97706", goldLight: "#F59E0B", goldDim: "rgba(217,119,6,0.08)", goldBorder: "rgba(217,119,6,0.2)",
+  blue: "#1447c0", blueMid: "#2563EB", blueLight: "rgba(37,99,235,0.08)",
+  red: "#DC2626", success: "#059669", successDim: "rgba(5,150,105,0.08)",
+  border: "#E2E8F0", borderStrong: "#CBD5E1",
 };
 
-// ─── Pressable Card with Animation + Haptics ───
-function PressCard({ children, style, onPress, containerStyle }: { children: React.ReactNode; style?: any; onPress?: () => void; containerStyle?: any }) {
-  const scale = useRef(new Animated.Value(1)).current;
+const WEEK_DAYS = [
+  { key: "monday", label: "Monday", short: "MON" },
+  { key: "tuesday", label: "Tuesday", short: "TUE" },
+  { key: "wednesday", label: "Wednesday", short: "WED" },
+  { key: "thursday", label: "Thursday", short: "THU" },
+  { key: "friday", label: "Friday", short: "FRI" },
+  { key: "saturday", label: "Saturday", short: "SAT" },
+  { key: "sunday", label: "Sunday", short: "SUN" },
+] as const;
 
-  const handlePressIn = () => {
-    Animated.spring(scale, { toValue: 0.955, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
+const toIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
-  const handlePressOut = () => {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 6 }).start();
-  };
+const getWeekDates = (baseDate = new Date()) => {
+  const current = new Date(baseDate);
+  const jsDay = current.getDay();
+  const distanceToMonday = jsDay === 0 ? -6 : 1 - jsDay;
+  const monday = new Date(current);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(current.getDate() + distanceToMonday);
 
-  return (
-    <TouchableOpacity
-      activeOpacity={1}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      onPress={onPress}
-      style={containerStyle}
-    >
-      <Animated.View style={[style, { transform: [{ scale }] }]}>
-        {children}
-      </Animated.View>
-    </TouchableOpacity>
-  );
-}
+  return WEEK_DAYS.map((day, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return { ...day, isoDate: toIsoDate(date) };
+  });
+};
 
-// ─── Stat Tile Component (V3 Stat Grid) ───
-function StatTile({ icon, value, label, color, accent, onPress }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  value: number;
-  label: string;
-  color: string;
-  accent?: boolean;
-  onPress?: () => void;
-}) {
-  return (
-    <PressCard style={[styles.statTile, accent && styles.statTileAccent]} onPress={onPress} containerStyle={{ flex: 1 }}>
-      <View style={[styles.statIconWrap, { backgroundColor: accent ? "rgba(255,255,255,0.25)" : `${color}15` }]}>
-        <Ionicons name={icon} size={18} color={accent ? "#fff" : color} />
-      </View>
-      <Text style={[styles.statValue, accent && { color: "#fff" }]}>{value}</Text>
-      <Text style={[styles.statLabel2, accent && { color: "rgba(255,255,255,0.8)" }]}>{label}</Text>
-    </PressCard>
-  );
-}
-
-// ─── Action Row Component (V2 List Row) ───
-function ActionRow({ icon, iconBg, title, subtitle, onPress }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  iconBg: string;
-  title: string;
-  subtitle: string;
-  onPress?: () => void;
-}) {
-  return (
-    <PressCard style={styles.actionRow} onPress={onPress}>
-      <View style={[styles.actionIcon, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={20} color={COLORS.brand} />
-      </View>
-      <View style={styles.actionContent}>
-        <Text style={styles.actionRowTitle}>{title}</Text>
-        <Text style={styles.actionRowSub}>{subtitle}</Text>
-      </View>
-      <View style={styles.actionArrow}>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-      </View>
-    </PressCard>
-  );
-}
+const formatShiftLabel = (shift: any) => {
+  if (!shift || typeof shift !== "string") return "No schedule";
+  return `${shift.charAt(0).toUpperCase()}${shift.slice(1)}`;
+};
 
 export default function EmployeeDashboard() {
-  const route = useRouter();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [totalComplaints, setTotalComplaints] = useState(0);
   const [resolvedCount, setResolvedCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
-  const [officials, setOfficials] = useState<{ name: string; position: string; picture: string }[]>([]);
+  const [officials, setOfficials] = useState<any[]>([]);
+  const [employeeSchedules, setEmployeeSchedules] = useState<any[]>([]);
 
   useEffect(() => {
     const user = auth.currentUser;
-    if (!user) {
-      route.replace("/");
-      return;
-    }
+    if (!user) { router.replace("/"); return; }
 
-    // Real-time listener on employee doc for ID status + deployment status
-    const empRef = doc(firestore, "employee", user.uid);
-    const unsubEmp = onSnapshot(empRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const empData = snapshot.data();
-        setActiveCount(empData.deploymentStatus === "deployed" ? 1 : 0);
-        setUserData((prev: any) => ({
-          ...prev,
-          ...empData,
-          idstatus: empData.idstatus || prev?.idstatus || "Pending",
-        }));
+    const unsubEmp = onSnapshot(doc(firestore, "employee", user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setActiveCount(data.deploymentStatus === "deployed" ? 1 : 0);
+        setUserData((prev: any) => ({ ...prev, ...data, idstatus: data.idstatus || prev?.idstatus || "Pending" }));
       } else {
         setActiveCount(0);
       }
     });
 
-    // Listen to deployment history for resolved count
-    const historyRef = collection(firestore, "employee", user.uid, "deploymentHistory");
-    const historyQuery = query(historyRef, orderBy("resolvedAt", "desc"));
-    const unsubHistory = onSnapshot(historyQuery, (snapshot) => {
-      const resolved = snapshot.docs.filter((d) => d.data().status === "resolved").length;
-      setResolvedCount(resolved);
-    });
+    const unsubHistory = onSnapshot(
+      query(collection(firestore, "employee", user.uid, "deploymentHistory"), orderBy("resolvedAt", "desc")),
+      (snap) => setResolvedCount(snap.docs.filter((entry) => entry.data().status === "resolved").length)
+    );
 
-    // Initial load from users collection
-    loadEmployeeData();
+    const unsubSchedules = onSnapshot(
+      query(collection(firestore, "employee", user.uid, "employeeSchedules"), orderBy("date", "asc")),
+      (snap) => setEmployeeSchedules(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })))
+    );
+
+    loadData();
     fetchOfficials();
 
-    return () => {
-      unsubEmp();
-      unsubHistory();
-    };
+    return () => { unsubEmp(); unsubHistory(); unsubSchedules(); };
   }, []);
 
-  // Keep total in sync
-  useEffect(() => {
-    setTotalComplaints(resolvedCount + activeCount);
-  }, [resolvedCount, activeCount]);
+  useEffect(() => { setTotalComplaints(resolvedCount + activeCount); }, [resolvedCount, activeCount]);
 
-  const loadEmployeeData = async () => {
+  const loadData = async () => {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        route.replace("/");
-        return;
-      }
-
-      // Load from users collection first
-      const userDoc = await getDoc(doc(firestore, "users", user.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
+      if (!user) { router.replace("/"); return; }
+      const userSnap = await getDoc(doc(firestore, "users", user.uid));
+      if (userSnap.exists()) {
+        const data = userSnap.data();
         if (!data.isEmployee) {
           Alert.alert("Access Denied", "This page is only for employees.");
-          route.replace("/(tabs)/home");
+          router.replace("/(tabs)/home");
           return;
         }
         setUserData((prev: any) => ({ ...data, ...prev }));
       }
-
-      // Also load from employee collection for more details (idstatus lives here)
-      const empDoc = await getDoc(doc(firestore, "employee", user.uid));
-      if (empDoc.exists()) {
-        const empData = empDoc.data();
-        setUserData((prev: any) => ({
-          ...prev,
-          ...empData,
-          idstatus: empData.idstatus || prev?.idstatus || "Pending",
-        }));
+      const employeeSnap = await getDoc(doc(firestore, "employee", user.uid));
+      if (employeeSnap.exists()) {
+        const data = employeeSnap.data();
+        setUserData((prev: any) => ({ ...prev, ...data, idstatus: data.idstatus || prev?.idstatus || "Pending" }));
       }
-    } catch (error) {
-      console.error("Error loading employee data:", error);
-      Alert.alert("Error", "Failed to load employee data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadEmployeeData();
-    await fetchOfficials();
-    setRefreshing(false);
-  };
-
-  const getPositionRank = (position: string) => {
-    const p = position.toLowerCase();
-    if (p.includes("captain") || p.includes("punong")) return 0;
-    if (p.includes("secretary")) return 1;
-    if (p.includes("treasurer")) return 2;
-    if (p.includes("kagawad")) return 3;
-    if (p.includes("sk")) return 4;
-    return 5;
+    } catch (error) { console.error(error); Alert.alert("Error", "Failed to load employee data"); }
+    finally { setLoading(false); }
   };
 
   const fetchOfficials = async () => {
     try {
-      const snapshot = await getDocs(collection(firestore, "officials"));
-      const list = snapshot.docs.map((d) => {
-        const data = d.data();
-        return {
-          name: data.name || "",
-          position: data.position || "",
-          picture: data.picture || "",
-        };
-      });
-      list.sort((a, b) => getPositionRank(a.position) - getPositionRank(b.position));
+      const snap = await getDocs(collection(firestore, "officials"));
+      const list = snap.docs.map((entry) => ({ name: entry.data().name || "", position: entry.data().position || "", picture: entry.data().picture || "" }));
+      const rank = (pos: string) => {
+        const l = pos.toLowerCase();
+        if (l.includes("kapitan") || l.includes("punong")) return 0;
+        if (l.includes("kagawad")) return 1;
+        if (l.includes("secretary")) return 2;
+        if (l.includes("treasurer")) return 3;
+        if (l.includes("sk")) return 4;
+        return 5;
+      };
+      list.sort((a, b) => rank(a.position) - rank(b.position));
       setOfficials(list);
-    } catch (error) {
-      console.error("Error fetching officials:", error);
-    }
+    } catch (error) { console.error(error); }
   };
 
-  const getIdStatusInfo = useCallback(() => {
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    await fetchOfficials();
+    setRefreshing(false);
+  };
+
+  const idInfo = useCallback(() => {
     const status = (userData?.idstatus || "").toLowerCase();
-    if (status === "verified" || status === "approved") return { text: "Verified", icon: "✅", color: COLORS.success };
-    if (status === "denied") return { text: "Denied", icon: "❌", color: COLORS.danger };
-    return { text: "Pending", icon: "⏳", color: COLORS.warning };
+    if (status === "verified" || status === "approved") return { text: "Verified", color: C.success, bg: C.successDim, icon: "shield-checkmark" as const };
+    if (status === "denied") return { text: "Denied", color: C.red, bg: "rgba(220,38,38,0.08)", icon: "close-circle" as const };
+    return { text: "Pending", color: C.gold, bg: C.goldDim, icon: "time" as const };
   }, [userData?.idstatus]);
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.brand} />
-      </View>
+  const firstName = userData?.firstName ?? "Officer";
+  const fullName = `${userData?.firstName ?? ""} ${userData?.middleName ? `${userData.middleName} ` : ""}${userData?.lastName ?? ""}`.trim() || "Not provided";
+  const shift = userData?.shift ? `${userData.shift.charAt(0).toUpperCase()}${userData.shift.slice(1)}` : "None";
+  const isDeployed = (userData?.deploymentStatus || "") === "deployed";
+  const statusMeta = idInfo();
+  const weekSchedule = useMemo(() => {
+    const scheduleMap = new Map(
+      employeeSchedules.map((entry) => [entry.date || entry.id, entry])
     );
-  }
 
-  const idInfo = getIdStatusInfo();
+    return getWeekDates().map((day) => {
+      const entry = scheduleMap.get(day.isoDate);
+      return {
+        ...day,
+        isoDate: day.isoDate,
+        value: formatShiftLabel(entry?.shift),
+        hasSchedule: !!entry,
+      };
+    });
+  }, [employeeSchedules]);
+
+  if (loading) return (
+    <SafeAreaView style={st.safe}><StatusBar barStyle="dark-content" /><View style={st.center}><ActivityIndicator size="large" color={C.gold} /></View></SafeAreaView>
+  );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.brand]} tintColor={COLORS.brand} />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ─── Header with Gradient ─── */}
-          <LinearGradient
-            colors={["#4a90e2", "#3a7bc8", "#2d6cb5"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.header, { paddingTop: insets.top + 24 }]}
-          >
-            <View style={styles.profileSection}>
-              {userData?.avatar ? (
-                <Image source={{ uri: userData.avatar }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {userData?.firstName?.charAt(0)?.toUpperCase() || "E"}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.profileInfo}>
-                <Text style={styles.greeting}>Welcome back!</Text>
-                <Text style={styles.name}>
-                  {userData?.firstName} {userData?.lastName}
-                </Text>
-                <View style={styles.roleBadge}>
-                  <Ionicons name="shield-checkmark" size={12} color="#fff" />
-                  <Text style={styles.roleText}>Employee</Text>
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
-
-          {/* ─── Stat Grid (V3 Style) ─── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Overview</Text>
-            <View style={styles.statsGrid}>
-              <StatTile
-                icon="layers"
-                value={totalComplaints}
-                label="Total"
-                color={COLORS.brand}
-                accent
-                onPress={() => route.push("/employee/manage-requests")}
-              />
-              <StatTile
-                icon="checkmark-done"
-                value={resolvedCount}
-                label="Resolved"
-                color={COLORS.success}
-                onPress={() => route.push("/employee/manage-requests")}
-              />
-              <StatTile
-                icon="pulse"
-                value={activeCount}
-                label="Active"
-                color={COLORS.warning}
-                onPress={() => route.push("/employee/manage-requests")}
-              />
-            </View>
+    <SafeAreaView style={st.safe} edges={["left", "right"]}>
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      {/* Header exactly matching reports.tsx */}
+      <View style={[st.header, { paddingTop: insets.top + 14 }]}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <View>
+            <Text style={st.eyebrow}>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()}</Text>
+            <Text style={st.title}>Hello, {firstName}.</Text>
+            <Text style={st.subtitle}>Employee Dashboard</Text>
           </View>
-
-          {/* ─── Quick Actions (V2 List Row Style) ─── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionsContainer}>
-              <ActionRow
-                icon="list"
-                iconBg={COLORS.brandMuted}
-                title="Manage Requests"
-                subtitle="View complaints & deployments"
-                onPress={() => route.push("/employee/manage-requests")}
-              />
-              <View style={styles.actionSeparator} />
-              <ActionRow
-                icon="bar-chart"
-                iconBg={COLORS.brandMuted}
-                title="Reports & Analytics"
-                subtitle="Charts, trends & insights"
-                onPress={() => route.push("/employee/reports")}
-              />
-              <View style={styles.actionSeparator} />
-              <ActionRow
-                icon="person"
-                iconBg={COLORS.brandMuted}
-                title="My Profile"
-                subtitle="View & edit your profile"
-                onPress={() => route.push("/employee/profile")}
-              />
-            </View>
-          </View>
-
-          {/* ─── Your Information (V4 Accent Border Card) ─── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Information</Text>
-            <View style={styles.infoCard}>
-              <View style={styles.infoAccentBorder} />
-              <View style={styles.infoContent}>
-                <InfoRow icon="person" label="Name" value={`${userData?.firstName || ""} ${userData?.middleName ? userData.middleName + " " : ""}${userData?.lastName || ""}`} />
-                <InfoRow icon="mail" label="Email" value={userData?.email || "Not provided"} />
-                <InfoRow icon="call" label="Contact" value={userData?.number || "Not provided"} />
-                <InfoRow icon="location" label="Address" value={`${userData?.purok ? `Purok ${userData.purok}, ` : ""}${userData?.address || "Not provided"}`} />
-                <View style={styles.infoRowContainer}>
-                  <View style={styles.infoRowLeft}>
-                    <View style={[styles.infoIcon, { backgroundColor: `${idInfo.color}15` }]}>
-                      <Ionicons name="shield-checkmark" size={16} color={idInfo.color} />
-                    </View>
-                    <Text style={styles.infoLabel}>ID Status</Text>
-                  </View>
-                  <View style={[styles.idBadge, { backgroundColor: `${idInfo.color}18` }]}>
-                    <View style={[styles.idDot, { backgroundColor: idInfo.color }]} />
-                    <Text style={[styles.idBadgeText, { color: idInfo.color }]}>{idInfo.text}</Text>
-                  </View>
-                </View>
-                <View style={styles.infoRowContainer}>
-                  <View style={styles.infoRowLeft}>
-                    <View style={[styles.infoIcon, { backgroundColor: `${COLORS.success}15` }]}>
-                      <Ionicons name="radio-button-on" size={16} color={COLORS.success} />
-                    </View>
-                    <Text style={styles.infoLabel}>Status</Text>
-                  </View>
-                  <View style={[styles.idBadge, { backgroundColor: `${COLORS.success}18` }]}>
-                    <View style={[styles.idDot, { backgroundColor: COLORS.success }]} />
-                    <Text style={[styles.idBadgeText, { color: COLORS.success }]}>Active</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Barangay Officials Section */}
-          {officials.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Barangay Officials</Text>
-              <View style={styles.officialsCard}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {officials.map((official, index) => (
-                    <View key={index} style={styles.officialItem}>
-                      {official.picture ? (
-                        <Image source={{ uri: official.picture }} style={styles.officialAvatar} />
-                      ) : (
-                        <View style={[styles.officialAvatar, styles.officialAvatarPlaceholder]}>
-                          <Ionicons name="person" size={28} color={COLORS.textMuted} />
-                        </View>
-                      )}
-                      <Text style={styles.officialPosition} numberOfLines={2}>{official.position}</Text>
-                      <Text style={styles.officialName} numberOfLines={2}>{official.name}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-                <View style={styles.thanksContainer}>
-                  <Ionicons name="heart" size={14} color={COLORS.brand} />
-                  <Text style={styles.thanksText}>
-                    Thank you to the Barangay Officials of San Roque for supporting this project
-                  </Text>
-                </View>
-              </View>
-            </View>
+          {userData?.avatar ? (
+            <Image source={{ uri: userData.avatar }} style={st.avatar} />
+          ) : (
+            <View style={st.avatarPlaceholder}><Text style={st.avatarText}>{firstName.charAt(0)}</Text></View>
           )}
+        </View>
+      </View>
 
-          <View style={styles.spacer} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />}>
+        
+        {/* Status Box */}
+        <View style={st.section}>
+          <Text style={st.secEye}>DUTY STATUS</Text>
+          <View style={[st.card, isDeployed ? { borderColor: C.blueMid, backgroundColor: C.surface } : {}]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <View style={[st.badge, { backgroundColor: isDeployed ? C.blueLight : C.surfaceAlt, borderColor: isDeployed ? "rgba(37,99,235,0.2)" : C.border }]}>
+                <View style={[st.dot, { backgroundColor: isDeployed ? C.blueMid : C.textDim }]} />
+                <Text style={[st.badgeText, { color: isDeployed ? C.blueMid : C.textMuted }]}>{isDeployed ? "ON DUTY" : "STANDBY"}</Text>
+              </View>
+            </View>
+            <Text style={st.statusDesc}>{isDeployed ? "You have an active deployment. Stay safe." : "Awaiting your next assignment."}</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 16 }}>
+              <View style={st.pill}><Ionicons name="time-outline" size={12} color={C.textMuted} /><Text style={st.pillText}>{shift} Shift</Text></View>
+              <View style={[st.pill, { backgroundColor: statusMeta.bg, borderColor: statusMeta.bg }]}><Ionicons name={statusMeta.icon} size={12} color={statusMeta.color} /><Text style={[st.pillText, { color: statusMeta.color }]}>ID {statusMeta.text}</Text></View>
+            </View>
+          </View>
+        </View>
+
+        {/* Stats */}
+        <View style={st.section}>
+          <Text style={st.secEye}>ACTIVITY SUMMARY</Text>
+          <View style={st.statsRow}>
+            <View style={st.statBox}>
+              <View style={[st.statIcon, { backgroundColor: C.blueLight }]}><Ionicons name="layers" size={18} color={C.blueMid} /></View>
+              <Text style={st.statValue}>{totalComplaints}</Text>
+              <Text style={st.statLabel}>TOTAL CASES</Text>
+            </View>
+            <View style={st.statBox}>
+              <View style={[st.statIcon, { backgroundColor: C.successDim }]}><Ionicons name="checkmark-done" size={18} color={C.success} /></View>
+              <Text style={st.statValue}>{resolvedCount}</Text>
+              <Text style={st.statLabel}>RESOLVED</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Weekly Schedule */}
+        <View style={st.section}>
+          <Text style={st.secEye}>WEEKLY SCHEDULE</Text>
+          <View style={st.card}>
+            {weekSchedule.map((day, index) => (
+              <React.Fragment key={day.key}>
+                {index > 0 ? <View style={[st.divider, { marginLeft: 0 }]} /> : null}
+                <View style={st.scheduleRow}>
+                  <View style={st.scheduleDay}>
+                    <Text style={st.scheduleDayShort}>{day.short}</Text>
+                    <Text style={st.scheduleDayLabel}>{day.label}</Text>
+                    <Text style={st.scheduleDate}>{day.isoDate}</Text>
+                  </View>
+                  <View style={[st.scheduleValueWrap, !day.hasSchedule && st.scheduleValueWrapMuted]}>
+                    <Ionicons name={day.hasSchedule ? "calendar-outline" : "remove-circle-outline"} size={14} color={day.hasSchedule ? C.blueMid : C.textDim} />
+                    <Text style={[st.scheduleValue, !day.hasSchedule && st.scheduleValueMuted]}>{day.value}</Text>
+                  </View>
+                </View>
+              </React.Fragment>
+            ))}
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={st.section}>
+          <Text style={st.secEye}>QUICK ACTIONS</Text>
+          <View style={st.card}>
+            <Pressable style={st.actionRow} onPress={() => router.push("/employee/manage-requests")}>
+              <View style={[st.actionIcon, { backgroundColor: C.blueLight }]}><Ionicons name="shield-half" size={16} color={C.blueMid} /></View>
+              <View style={{ flex: 1 }}><Text style={st.actionTitle}>Manage Deployments</Text><Text style={st.actionSub}>View active assignments</Text></View>
+              <Ionicons name="chevron-forward" size={16} color={C.textDim} />
+            </Pressable>
+            <View style={st.divider} />
+            <Pressable style={st.actionRow} onPress={() => router.push("/employee/reports")}>
+              <View style={[st.actionIcon, { backgroundColor: C.successDim }]}><Ionicons name="pie-chart" size={16} color={C.success} /></View>
+              <View style={{ flex: 1 }}><Text style={st.actionTitle}>Reports Hub</Text><Text style={st.actionSub}>Analytics and records</Text></View>
+              <Ionicons name="chevron-forward" size={16} color={C.textDim} />
+            </Pressable>
+            <View style={st.divider} />
+            <Pressable style={st.actionRow} onPress={() => router.push("/employee/profile")}>
+              <View style={[st.actionIcon, { backgroundColor: C.goldDim }]}><Ionicons name="person-circle" size={16} color={C.gold} /></View>
+              <View style={{ flex: 1 }}><Text style={st.actionTitle}>Officer Profile</Text><Text style={st.actionSub}>Account settings</Text></View>
+              <Ionicons name="chevron-forward" size={16} color={C.textDim} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Personnel Record */}
+        <View style={st.section}>
+          <Text style={st.secEye}>IDENTITY</Text>
+          <View style={st.card}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Text style={st.recordTitle}>Barangay Tanod</Text>
+              <View style={[st.pill, { backgroundColor: statusMeta.bg, borderColor: statusMeta.bg, borderWidth: 0 }]}><Ionicons name={statusMeta.icon} size={10} color={statusMeta.color} /><Text style={[st.pillText, { color: statusMeta.color, fontSize: 9 }]}>{statusMeta.text}</Text></View>
+            </View>
+            <View style={st.divider} />
+            <View style={st.recordRow}><View style={st.recordLeft}><Ionicons name="person" size={14} color={C.textMuted} /><Text style={st.recordLabel}>Name</Text></View><Text style={st.recordValue}>{fullName}</Text></View>
+            <View style={st.recordRow}><View style={st.recordLeft}><Ionicons name="mail" size={14} color={C.textMuted} /><Text style={st.recordLabel}>Email</Text></View><Text style={st.recordValue}>{userData?.email || "--"}</Text></View>
+            <View style={st.recordRow}><View style={st.recordLeft}><Ionicons name="call" size={14} color={C.textMuted} /><Text style={st.recordLabel}>Contact</Text></View><Text style={st.recordValue}>{userData?.number || "--"}</Text></View>
+            <View style={st.recordRow}><View style={st.recordLeft}><Ionicons name="location" size={14} color={C.textMuted} /><Text style={st.recordLabel}>Address</Text></View><Text style={st.recordValue}>{userData?.purok ? `Purok ${userData.purok}, ` : ""}{userData?.address || "--"}</Text></View>
+          </View>
+        </View>
+
+        {/* Officials */}
+        {officials.length > 0 && (
+          <View style={st.section}>
+            <Text style={st.secEye}>LEADERSHIP</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 18, gap: 12, paddingBottom: 10 }}>
+              {officials.map((o, i) => {
+                const isCap = o.position.toLowerCase().includes("captain") || o.position.toLowerCase().includes("punong");
+                return (
+                  <View key={i} style={[st.officialCard, isCap && st.officialCardCap]}>
+                    {o.picture ? <Image source={{ uri: o.picture }} style={st.offAv} /> : <View style={st.offAvEmpty}><Ionicons name="person" size={20} color={C.textDim} /></View>}
+                    <Text style={st.offRole} numberOfLines={1}>{o.position}</Text>
+                    <Text style={st.offName} numberOfLines={2}>{o.name}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ─── Info Row Sub-component ───
-function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
-  return (
-    <View style={styles.infoRowContainer}>
-      <View style={styles.infoRowLeft}>
-        <View style={[styles.infoIcon, { backgroundColor: COLORS.brandMuted }]}>
-          <Ionicons name={icon} size={16} color={COLORS.brand} />
-        </View>
-        <Text style={styles.infoLabel}>{label}</Text>
-      </View>
-      <Text style={styles.infoValue} numberOfLines={2}>{value}</Text>
-    </View>
-  );
-}
+const st = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: { paddingHorizontal: 22, paddingBottom: 18, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border },
+  eyebrow: { color: C.gold, fontSize: 10, fontWeight: "900", letterSpacing: 2, marginBottom: 4 },
+  title: { fontSize: 26, fontWeight: "900", color: C.text, letterSpacing: -0.5, marginBottom: 4 },
+  subtitle: { fontSize: 13, color: C.textMuted, fontWeight: "600" },
+  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.border },
+  avatarPlaceholder: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.elevated, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
+  avatarText: { fontSize: 16, fontWeight: "800", color: C.text },
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.surface2,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surface2,
-  },
-  content: {
-    paddingBottom: 0,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: COLORS.surface2,
-  },
+  section: { paddingHorizontal: 18, marginTop: 24 },
+  secEye: { color: C.textDim, fontSize: 9, fontWeight: "900", letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 10 },
+  
+  card: { backgroundColor: C.surface, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  badge: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  dot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  badgeText: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  statusDesc: { fontSize: 16, fontWeight: "700", color: C.text, marginTop: 14, lineHeight: 22 },
+  pill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
+  pillText: { fontSize: 11, fontWeight: "800", color: C.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
 
-  // ─── Header ───
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-  },
-  profileSection: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
-  },
-  avatarImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
-  },
-  avatarText: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  greeting: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  name: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "700",
-    marginTop: 2,
-    letterSpacing: -0.3,
-  },
-  roleBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.18)",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: "flex-start",
-    marginTop: 6,
-    gap: 4,
-  },
-  roleText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600",
-  },
+  statsRow: { flexDirection: "row", gap: 10 },
+  statBox: { flex: 1, backgroundColor: C.surface, borderRadius: 20, padding: 16, alignItems: "center", borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  statIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  statValue: { fontSize: 24, fontWeight: "900", color: C.text },
+  statLabel: { fontSize: 9, color: C.textMuted, marginTop: 4, fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5 },
 
-  // ─── Sections ───
-  section: {
-    paddingHorizontal: 16,
-    marginTop: 24,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.text,
-    marginBottom: 12,
-    letterSpacing: -0.2,
-  },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 12 },
+  actionIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  actionTitle: { fontSize: 15, fontWeight: "800", color: C.text, marginBottom: 2 },
+  actionSub: { fontSize: 12, color: C.textMuted, fontWeight: "600" },
+  divider: { height: 1, backgroundColor: C.border, marginLeft: 50, marginVertical: 4 },
 
-  // ─── Stat Grid (V3) ───
-  statsGrid: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  statTile: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
-    padding: 14,
-    minWidth: 0,
-  },
-  statTileAccent: {
-    backgroundColor: COLORS.brand,
-    borderColor: "transparent",
-  },
-  statIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: COLORS.text,
-    letterSpacing: -0.5,
-  },
-  statLabel2: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-    fontWeight: "500",
-  },
+  recordTitle: { fontSize: 15, fontWeight: "900", color: C.text },
+  recordRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10 },
+  recordLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  recordLabel: { fontSize: 13, fontWeight: "700", color: C.textMuted },
+  recordValue: { fontSize: 13, fontWeight: "800", color: C.text, flex: 1, textAlign: "right", marginLeft: 20 },
 
-  // ─── Actions Container (V2 List Row) ───
-  actionsContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
-    overflow: "hidden",
-  },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
-  actionContent: {
-    flex: 1,
-  },
-  actionRowTitle: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.text,
-  },
-  actionRowSub: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  actionArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.surface2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  actionSeparator: {
-    height: 0.5,
-    backgroundColor: COLORS.border,
-    marginLeft: 72,
-  },
+  scheduleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingVertical: 12 },
+  scheduleDay: { flex: 1 },
+  scheduleDayShort: { fontSize: 10, fontWeight: "900", color: C.gold, letterSpacing: 1.4, marginBottom: 4 },
+  scheduleDayLabel: { fontSize: 14, fontWeight: "800", color: C.text },
+  scheduleDate: { fontSize: 11, fontWeight: "600", color: C.textMuted, marginTop: 3 },
+  scheduleValueWrap: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "55%", backgroundColor: C.blueLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  scheduleValueWrapMuted: { backgroundColor: C.surfaceAlt },
+  scheduleValue: { fontSize: 12, fontWeight: "700", color: C.blueMid, textAlign: "right", flexShrink: 1 },
+  scheduleValueMuted: { color: C.textMuted },
 
-  // ─── Info Card (V4 accent border) ───
-  infoCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
-    flexDirection: "row",
-    overflow: "hidden",
-  },
-  infoAccentBorder: {
-    width: 3,
-    backgroundColor: COLORS.brand,
-  },
-  infoContent: {
-    flex: 1,
-    padding: 14,
-    gap: 14,
-  },
-  infoRowContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  infoRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  infoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  infoLabel: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    fontWeight: "500",
-  },
-  infoValue: {
-    fontSize: 13,
-    color: COLORS.text,
-    fontWeight: "500",
-    maxWidth: "50%",
-    textAlign: "right",
-  },
-  idBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    gap: 6,
-  },
-  idDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  idBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  spacer: {
-    height: 20,
-  },
-  officialsCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
-    padding: 14,
-  },
-  officialItem: {
-    alignItems: "center",
-    width: 110,
-    marginHorizontal: 4,
-    paddingVertical: 8,
-  },
-  officialAvatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: COLORS.brand,
-  },
-  officialAvatarPlaceholder: {
-    backgroundColor: COLORS.surface2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  officialPosition: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: COLORS.brand,
-    textAlign: "center",
-    lineHeight: 13,
-    marginBottom: 2,
-  },
-  officialName: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: COLORS.text,
-    textAlign: "center",
-    lineHeight: 15,
-  },
-  thanksContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 0.5,
-    borderTopColor: COLORS.border,
-    gap: 6,
-  },
-  thanksText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    textAlign: "center",
-    fontStyle: "italic",
-    flex: 1,
-  },
+  officialCard: { width: 120, backgroundColor: C.surface, borderRadius: 16, padding: 14, alignItems: "center", borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
+  officialCardCap: { borderColor: C.goldBorder, backgroundColor: C.surface },
+  offAv: { width: 48, height: 48, borderRadius: 24, marginBottom: 10 },
+  offAvEmpty: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.surfaceAlt, alignItems: "center", justifyContent: "center", marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  offRole: { fontSize: 9, fontWeight: "900", color: C.gold, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4, textAlign: "center" },
+  offName: { fontSize: 12, fontWeight: "800", color: C.text, textAlign: "center", lineHeight: 16 },
 });

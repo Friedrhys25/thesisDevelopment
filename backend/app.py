@@ -32,6 +32,11 @@ GROQ_MODEL = "llama-3.3-70b-versatile"  # free tier, best accuracy
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 print("Groq key loaded:", "YES" if GROQ_API_KEY else "NO")
 
+TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+TWILIO_VERIFY_SERVICE_SID: str = os.getenv("TWILIO_VERIFY_SERVICE_SID", "").strip()
+TWILIO_ENABLED = all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID])
+
 
 # ---------------------------
 # Allowed labels/types
@@ -92,6 +97,31 @@ def looks_like_nonsense(text: str) -> bool:
     if letters / max(len(t), 1) < 0.25:
         return True
     return False
+
+
+def normalize_ph_number(value: str) -> str:
+    digits = re.sub(r"\D", "", value or "")
+    if len(digits) == 11 and digits.startswith("09"):
+        return f"+63{digits[1:]}"
+    if len(digits) == 12 and digits.startswith("639"):
+        return f"+{digits}"
+    if value.startswith("+63") and len(re.sub(r"\D", "", value)) == 12:
+        return value
+    raise ValueError("Phone number must be a valid Philippine mobile number.")
+
+
+def get_bearer_token() -> str:
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise ValueError("Missing bearer token.")
+    return auth_header.split(" ", 1)[1].strip()
+
+
+def get_twilio_client():
+    if not TWILIO_ENABLED:
+        raise RuntimeError("Twilio Verify is not configured on the backend.")
+    from twilio.rest import Client  # type: ignore
+    return Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 # ---------------------------
 # Groq: Translate Tagalog/slang to English
@@ -382,6 +412,126 @@ def faq_chat():
         return jsonify({"error": "Groq API timed out"}), 504
     except http_requests.exceptions.RequestException as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 502
+
+
+@app.route("/api/phone/send-otp", methods=["POST"])
+def send_phone_otp():
+    if not _admin_db:
+        return jsonify({"error": "Firebase Admin is not configured on the backend."}), 500
+    if not TWILIO_ENABLED:
+        return jsonify({"error": "SMS verification is not configured on the backend."}), 500
+
+    try:
+        from firebase_admin import auth as admin_auth  # type: ignore
+
+        token = get_bearer_token()
+        decoded = admin_auth.verify_id_token(token)
+        uid = decoded["uid"]
+
+        payload = request.get_json(silent=True) or {}
+        phone_number = normalize_ph_number(str(payload.get("phoneNumber", "")))
+        collection_name = str(payload.get("collectionName", "")).strip()
+        if collection_name not in {"users", "employee"}:
+            return jsonify({"error": "Invalid collection name."}), 400
+
+        doc_ref = _admin_db.collection(collection_name).document(uid)
+        doc_snap = doc_ref.get()
+        if not doc_snap.exists:
+            return jsonify({"error": "Profile record not found."}), 404
+
+        client = get_twilio_client()
+        verification = client.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verifications.create(
+            to=phone_number,
+            channel="sms",
+        )
+
+        doc_ref.set({
+            "pendingNumberVerification": {
+                "number": phone_number,
+                "status": verification.status,
+                "updatedAt": admin_firestore.SERVER_TIMESTAMP,
+            }
+        }, merge=True)
+
+        return jsonify({
+            "success": True,
+            "status": verification.status,
+            "phoneNumber": phone_number,
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print("Phone OTP send error:", repr(e))
+        return jsonify({"error": "Failed to send verification code."}), 500
+
+
+@app.route("/api/phone/check-otp", methods=["POST"])
+def check_phone_otp():
+    if not _admin_db:
+        return jsonify({"error": "Firebase Admin is not configured on the backend."}), 500
+    if not TWILIO_ENABLED:
+        return jsonify({"error": "SMS verification is not configured on the backend."}), 500
+
+    try:
+        from firebase_admin import auth as admin_auth  # type: ignore
+
+        token = get_bearer_token()
+        decoded = admin_auth.verify_id_token(token)
+        uid = decoded["uid"]
+
+        payload = request.get_json(silent=True) or {}
+        phone_number = normalize_ph_number(str(payload.get("phoneNumber", "")))
+        otp_code = str(payload.get("code", "")).strip()
+        collection_name = str(payload.get("collectionName", "")).strip()
+
+        if not otp_code:
+            return jsonify({"error": "OTP code is required."}), 400
+        if collection_name not in {"users", "employee"}:
+            return jsonify({"error": "Invalid collection name."}), 400
+
+        client = get_twilio_client()
+        result = client.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verification_checks.create(
+            to=phone_number,
+            code=otp_code,
+        )
+
+        if result.status != "approved":
+            return jsonify({"error": "Invalid or expired verification code.", "status": result.status}), 400
+
+        doc_ref = _admin_db.collection(collection_name).document(uid)
+        doc_snap = doc_ref.get()
+        if not doc_snap.exists:
+            return jsonify({"error": "Profile record not found."}), 404
+
+        existing_data = doc_snap.to_dict() or {}
+        current_number = str(existing_data.get("number") or "").strip()
+        try:
+            normalized_current = normalize_ph_number(current_number) if current_number else phone_number
+        except ValueError:
+            normalized_current = phone_number
+
+        doc_ref.set({
+            "number": current_number or phone_number,
+            "numberE164": normalized_current,
+            "numberVerificationStatus": "verified",
+            "numberVerifiedAt": admin_firestore.SERVER_TIMESTAMP,
+            "pendingNumberVerification": {
+                "number": phone_number,
+                "status": "approved",
+                "updatedAt": admin_firestore.SERVER_TIMESTAMP,
+            },
+        }, merge=True)
+
+        return jsonify({
+            "success": True,
+            "status": "approved",
+            "phoneNumber": phone_number,
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print("Phone OTP verify error:", repr(e))
+        return jsonify({"error": "Failed to verify OTP code."}), 500
 
 # ---------------------------
 # Firebase Admin + Push Notifications

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -24,18 +25,23 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const COLORS = {
-  bg: "#FFFFFF",
-  card: "#FFFFFF",
-  text: "#111827",
-  muted: "#6B7280",
-  border: "#E5E7EB",
-  primary: "#F16F24", // Adjusted to match complain.tsx primary
-  primaryDark: "#F16F24",
-  accent: "#FBE451",
+  bg: "#080f26",
+  surface: "#0f1e45",
+  surfaceAlt: "#0d1a3c",
+  elevated: "#162254",
+  text: "#E8EEFF",
+  muted: "#8895BB",
+  dim: "#4A5880",
+  border: "rgba(255,255,255,0.06)",
+  primary: "#f59e0b",
+  primaryDark: "#fbbf24",
+  accent: "rgba(245,158,11,0.15)",
+  accentBorder: "rgba(245,158,11,0.3)",
   danger: "#EF4444",
   success: "#10B981",
   warning: "#F59E0B",
-  secondaryBg: "#F9FAFB",
+  secondaryBg: "#162254",
+  blue: "#1E56D8",
 };
 
 // --- Configuration ---
@@ -318,36 +324,66 @@ export default function FAQPage() {
   return (
     <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
-      {/* Header - Consistent with Complain.tsx */}
-      <View style={[styles.topHeader, { paddingTop: insets.top + 10 }]}>
+
+      <LinearGradient
+        colors={["#07122f", "#0b1a3d", "#11306b"]}
+        locations={[0, 0.55, 1]}
+        style={[styles.topHeader, { paddingTop: insets.top + 12 }]}
+      >
+        <View style={styles.headerRing} />
         <View style={styles.headerRow}>
-            <View style={{ flex: 1 }} /> 
-            <TouchableOpacity 
-                style={styles.toggleButton}
-                onPress={() => toggleChatbot(!showChatbot)}
-            >
-                <Ionicons 
-                    name={showChatbot ? "list" : "chatbubbles"} 
-                    size={20} 
-                    color={COLORS.primary} 
-                />
-                <Text style={styles.toggleButtonText}>
-                    {showChatbot ? "FAQs" : "Chat Bot"}
-                </Text>
-            </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerEyebrow}>BARANGAY SAN ROQUE</Text>
+            <Text style={styles.headerTitle}>Help & Support</Text>
+            <Text style={styles.headerSubtitle}>Find answers or ask our AI assistant</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => toggleChatbot(!showChatbot)}
+          >
+            <Ionicons
+              name={showChatbot ? "list" : "chatbubbles"}
+              size={18}
+              color={COLORS.primary}
+            />
+            <Text style={styles.toggleButtonText}>
+              {showChatbot ? "FAQs" : "Chat Bot"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <Text style={styles.headerTitle}>Help & Support</Text>
-        <Text style={styles.headerSubtitle}>Find answers or ask our AI assistant</Text>
-      </View>
+        <View style={styles.statsStrip}>
+          <View style={styles.statPill}>
+            <Ionicons name="help-circle-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.statLabel}>FAQs</Text>
+            <Text style={styles.statValue}>{faqs.length}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statPill}>
+            <Ionicons name="chatbubbles-outline" size={16} color={COLORS.blue} />
+            <Text style={styles.statLabel}>Mode</Text>
+            <Text style={styles.statValue}>{showChatbot ? "AI" : "List"}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statPill}>
+            <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.success} />
+            <Text style={styles.statLabel}>Scope</Text>
+            <Text style={styles.statValue}>App Only</Text>
+          </View>
+        </View>
+
+        <View style={styles.headerAccentLine} />
+      </LinearGradient>
 
       {!showChatbot ? (
         <>
-          {/* FAQ List */}
           <ScrollView
             style={styles.container}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingHorizontal: 20, paddingTop: 20 }}
+            contentContainerStyle={{
+              paddingBottom: insets.bottom + 110,
+              paddingHorizontal: 18,
+              paddingTop: 18,
+            }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
@@ -357,55 +393,73 @@ export default function FAQPage() {
               />
             }
           >
-            {/* Info Banner */}
             <View style={styles.infoBanner}>
-                <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} />
-                <Text style={styles.infoBannerText}>
+              <View style={styles.infoBannerIcon}>
+                <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
+              </View>
+              <Text style={styles.infoBannerText}>
                 Tap any question to view the answer.
-                </Text>
+              </Text>
             </View>
 
-            <Text style={styles.sectionTitle}>Common Questions ({faqs.length})</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionEyebrow}>DIRECTORY</Text>
+              <Text style={styles.sectionTitle}>Common Questions ({faqs.length})</Text>
+            </View>
 
             {faqs.map((item, index) => {
-               const isExpanded = expandedFaqs.includes(index);
-               return (
-              <View key={index} style={[styles.faqCard, isExpanded && styles.faqCardExpanded]}>
-                <TouchableOpacity
-                  onPress={() => toggleFaq(index)}
-                  style={styles.faqHeader}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.faqIconBox, isExpanded && styles.faqIconBoxExpanded]}>
-                    <Ionicons name="help" size={20} color={isExpanded ? "#fff" : COLORS.primary} />
-                  </View>
-                  <Text style={[styles.faqQuestion, isExpanded && { color: COLORS.primary }]}>{item.q}</Text>
-                  <Ionicons
-                    name={isExpanded ? "chevron-up" : "chevron-down"}
-                    size={20}
-                    color={COLORS.muted}
-                  />
-                </TouchableOpacity>
-                {isExpanded && (
-                  <View style={styles.faqBody}>
-                    <Text style={styles.faqAnswer}>{item.a}</Text>
-                    <TouchableOpacity 
+              const isExpanded = expandedFaqs.includes(index);
+              return (
+                <View key={index} style={[styles.faqCard, isExpanded && styles.faqCardExpanded]}>
+                  <TouchableOpacity
+                    onPress={() => toggleFaq(index)}
+                    style={styles.faqHeader}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.faqIconBox, isExpanded && styles.faqIconBoxExpanded]}>
+                      <Ionicons
+                        name="help"
+                        size={20}
+                        color={isExpanded ? COLORS.primary : COLORS.primary}
+                      />
+                    </View>
+                    <Text style={[styles.faqQuestion, isExpanded && styles.faqQuestionExpanded]}>
+                      {item.q}
+                    </Text>
+                    <Ionicons
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color={COLORS.muted}
+                    />
+                  </TouchableOpacity>
+                  {isExpanded && (
+                    <View style={styles.faqBody}>
+                      <Text style={styles.faqAnswer}>{item.a}</Text>
+                      <TouchableOpacity
                         style={styles.askBotButton}
                         onPress={() => selectFaq(item)}
-                    >
+                      >
                         <Text style={styles.askBotText}>Ask Bot related to this</Text>
                         <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )})}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
 
-            {/* Contact Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionEyebrow}>SUPPORT</Text>
+              <Text style={styles.sectionTitle}>Still need help?</Text>
+            </View>
+
             <View style={styles.contactSection}>
-              <Text style={styles.contactTitle}>Still need help?</Text>
+              <View style={styles.contactBadge}>
+                <Ionicons name="call-outline" size={13} color={COLORS.primary} />
+                <Text style={styles.contactBadgeText}>OFFICE HOURS</Text>
+              </View>
               <Text style={styles.contactText}>
-                Contact the barangay office directly.
+                Contact the barangay office directly for concerns that need human review.
               </Text>
               <Text style={styles.contactHours}>Mon - Fri, 8:00 AM - 5:00 PM</Text>
             </View>
@@ -417,24 +471,25 @@ export default function FAQPage() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          {/* Messages */}
           <ScrollView
             ref={scrollViewRef}
             style={styles.messagesContainer}
-            contentContainerStyle={styles.messagesContent}
+            contentContainerStyle={[
+              styles.messagesContent,
+              { paddingBottom: insets.bottom + 150 },
+            ]}
             onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
             showsVerticalScrollIndicator={false}
           >
-             <View style={styles.chatWelcome}>
-                <View style={styles.botAvatarLarge}>
-                    <Ionicons name="chatbubbles" size={32} color="#fff" />
-                </View>
-                <Text style={styles.chatWelcomeText}>Barangay AI Assistant</Text>
-                <Text style={styles.chatWelcomeSub}>I can answer questions based on our FAQs.</Text>
-             </View>
+            <View style={styles.chatWelcome}>
+              <View style={styles.botAvatarLarge}>
+                <Ionicons name="chatbubbles" size={30} color="#fff" />
+              </View>
+              <Text style={styles.chatWelcomeText}>Barangay AI Assistant</Text>
+              <Text style={styles.chatWelcomeSub}>I can answer questions based on our FAQs.</Text>
+            </View>
 
-            {messages.slice(1).map((msg, index) => ( // render all except initial if customized header is used, or keep all
-             // Actually let's keep all but style the first one nicely if it's the welcome message
+            {messages.slice(1).map((msg, index) => (
               <View
                 key={index}
                 style={[
@@ -473,9 +528,8 @@ export default function FAQPage() {
               </View>
             )}
           </ScrollView>
-            
-            {/* Quick Suggestions */}
-          <View style={styles.suggestionsContainer}> 
+
+          <View style={styles.suggestionsContainer}>
              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
                 {faqs.slice(0, 5).map((faq, index) => (
                     <TouchableOpacity
@@ -489,14 +543,13 @@ export default function FAQPage() {
              </ScrollView>
           </View>
 
-          {/* Input Area */}
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 88 }]}>
             <TextInput
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
               placeholder="Type your question..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={COLORS.muted}
               returnKeyType="send"
               onSubmitEditing={handleSend}
               editable={!isLoading}
@@ -519,100 +572,133 @@ export default function FAQPage() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.bg },
-  
-  // Header
+
   topHeader: {
-    backgroundColor: COLORS.primary,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 8,
-    zIndex: 10,
+    paddingHorizontal: 22,
+    paddingBottom: 20,
+    overflow: "hidden",
+  },
+  headerRing: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.08)",
+    top: -80,
+    right: -60,
   },
   headerRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
+    gap: 14,
   },
-  backButton: {
-      padding: 8,
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      borderRadius: 12,
+  headerEyebrow: {
+    color: "rgba(245,158,11,0.7)",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 2.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
   },
   toggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     gap: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   toggleButtonText: {
     color: COLORS.primary,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: 13,
   },
-  headerTitle: { color: "#fff", fontSize: 26, fontWeight: "900", letterSpacing: -0.5 },
-  headerSubtitle: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "500", marginTop: 4 },
+  headerTitle: { color: "#fff", fontSize: 28, fontWeight: "900", letterSpacing: -0.5 },
+  headerSubtitle: { color: COLORS.muted, fontSize: 13, fontWeight: "600", marginTop: 4 },
+  statsStrip: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statPill: { flex: 1, alignItems: "center" },
+  statLabel: {
+    color: COLORS.muted,
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginTop: 4,
+    textTransform: "uppercase",
+  },
+  statValue: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  statDivider: { width: 1, backgroundColor: COLORS.border, alignSelf: "stretch", marginHorizontal: 8 },
+  headerAccentLine: { height: 1, opacity: 0.3, marginTop: 16, backgroundColor: COLORS.primary },
 
   container: { flex: 1 },
+  sectionHeader: { marginBottom: 14, marginTop: 6 },
+  sectionEyebrow: {
+    color: COLORS.dim,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 2.5,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
 
   infoBanner: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(241, 111, 36, 0.1)", // Primary opacity
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 24,
+    alignItems: "flex-start",
+    backgroundColor: COLORS.accent,
+    padding: 14,
+    borderRadius: 18,
+    marginBottom: 16,
     gap: 12,
     borderWidth: 1,
-    borderColor: "rgba(241, 111, 36, 0.2)",
+    borderColor: COLORS.accentBorder,
+  },
+  infoBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(245,158,11,0.18)",
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
+    justifyContent: "center",
+    alignItems: "center",
   },
   infoBannerText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.text,
-    lineHeight: 20,
-    fontWeight: "500",
+    lineHeight: 19,
+    fontWeight: "600",
   },
   sectionTitle: {
-      fontSize: 18,
-      fontWeight: "800",
-      color: COLORS.text,
-      marginBottom: 16,
-      letterSpacing: 0.5,
+    fontSize: 18,
+    fontWeight: "900",
+    color: COLORS.text,
   },
 
-  // FAQ Card
   faqCard: {
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   faqCardExpanded: {
-      borderColor: COLORS.primary,
-      backgroundColor: "#fff",
-      shadowColor: COLORS.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
-      shadowRadius: 12,
-      elevation: 4,
+    borderColor: COLORS.accentBorder,
+    backgroundColor: COLORS.surface,
   },
   faqHeader: {
     flexDirection: "row",
@@ -624,17 +710,19 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: COLORS.secondaryBg,
+    backgroundColor: COLORS.elevated,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     justifyContent: "center",
     alignItems: "center",
   },
   faqIconBoxExpanded: {
-      backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accentBorder,
   },
+  faqQuestionExpanded: { color: COLORS.primary },
   faqQuestion: {
-    flex: 1,
-    fontSize: 15, // 16px requirement (close enough for list item) or should be 16
-    fontWeight: "600",
+    flex: 1, fontSize: 15, fontWeight: "700",
     color: COLORS.text,
     lineHeight: 22,
   },
@@ -649,25 +737,51 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   askBotButton: {
-      marginTop: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      alignSelf: 'flex-start',
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: COLORS.accent,
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   askBotText: {
-      fontSize: 13,
-      fontWeight: "700",
-      color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
 
   contactSection: {
-    backgroundColor: COLORS.secondaryBg,
-    padding: 24,
-    borderRadius: 24,
-    marginTop: 24,
+    backgroundColor: COLORS.surface,
+    padding: 18,
+    borderRadius: 22,
+    marginTop: 6,
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
+  },
+  contactBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: COLORS.accent,
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    marginBottom: 12,
+  },
+  contactBadgeText: {
+    color: COLORS.primary,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
   },
   contactTitle: {
     fontSize: 18,
@@ -676,133 +790,124 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   contactText: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.muted,
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 8,
+    lineHeight: 20,
   },
   contactHours: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "800",
     color: COLORS.primary,
   },
 
-  // Chat Interface
   chatWrapper: {
     flex: 1,
-    backgroundColor: COLORS.secondaryBg,
+    backgroundColor: COLORS.bg,
   },
   chatWelcome: {
-      alignItems: 'center',
-      paddingVertical: 32,
+    alignItems: "center",
+    paddingVertical: 28,
   },
   botAvatarLarge: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: COLORS.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 16,
-      shadowColor: COLORS.primary,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.3,
-      shadowRadius: 16,
-      elevation: 6,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
   },
   chatWelcomeText: {
-      fontSize: 20,
-      fontWeight: "800",
-      color: COLORS.text,
-      marginBottom: 4,
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginBottom: 4,
   },
   chatWelcomeSub: {
-      fontSize: 14,
-      color: COLORS.muted,
+    fontSize: 14,
+    color: COLORS.muted,
   },
-  
+
   messagesContainer: { flex: 1 },
   messagesContent: { padding: 16, paddingBottom: 16 },
 
   messageRow: {
-      marginBottom: 24, // Increased from 16
-      flexDirection: 'row',
-      maxWidth: '85%',
-      alignItems: 'flex-end', // Align avatar to bottom of bubble
+    marginBottom: 24,
+    flexDirection: "row",
+    maxWidth: "85%",
+    alignItems: "flex-end",
   },
   messageRowUser: {
-      alignSelf: 'flex-end',
-      flexDirection: 'row-reverse',
+    alignSelf: "flex-end",
+    flexDirection: "row-reverse",
   },
   messageRowBot: {
-      alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   botAvatarSmall: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: COLORS.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 4, // Align slightly lower
-      marginRight: 8, // Added margin instead of gap
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+    marginRight: 8,
   },
   messageBubble: {
     padding: 14,
     borderRadius: 20,
-    flexShrink: 1, // Prevent overflow
+    flexShrink: 1,
   },
   bubbleUser: {
-      backgroundColor: COLORS.primary,
-      borderBottomRightRadius: 4,
+    backgroundColor: COLORS.primary,
+    borderBottomRightRadius: 4,
   },
   bubbleBot: {
-      backgroundColor: "#fff",
-      borderBottomLeftRadius: 4,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 1,
+    backgroundColor: COLORS.surface,
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   messageText: {
-      fontSize: 15,
-      lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 22,
   },
   textUser: { color: "#fff" },
   textBot: { color: COLORS.text },
 
   suggestionsContainer: {
-      maxHeight: 50,
-      marginBottom: 8,
+    maxHeight: 50,
+    marginBottom: 8,
   },
   suggestionPill: {
-      backgroundColor: "#fff",
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      marginRight: 8,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: 8,
   },
   suggestionText: {
-      fontSize: 13,
-      fontWeight: "600",
-      color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.text,
   },
 
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    paddingBottom: 100, // Increased for navbar space
   },
   textInput: {
     flex: 1,
-    backgroundColor: COLORS.secondaryBg,
+    backgroundColor: COLORS.elevated,
     borderRadius: 24,
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -817,17 +922,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     width: 48,
     height: 48,
-    borderRadius: 24, // Circle
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
   },
   sendButtonDisabled: {
     backgroundColor: COLORS.muted,
-    shadowOpacity: 0,
   }
 });

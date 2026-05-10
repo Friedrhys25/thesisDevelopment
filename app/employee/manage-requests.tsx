@@ -1,562 +1,320 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, firestore } from "../../backend/firebaseConfig";
-import {
-  savePushTokenToFirestore,
-  showLocalNotification,
-} from "../../utils/notifications";
+import { savePushTokenToFirestore, showLocalNotification } from "../../utils/notifications";
 
-interface CoDeployedTanod {
-  uid: string;
-  name: string;
+// Light theme exactly matching reports.tsx
+const C = {
+  bg: "#F8FAFC", surface: "#FFFFFF", surfaceAlt: "#F1F5F9", elevated: "#E2E8F0",
+  text: "#0F172A", textMuted: "#64748B", textDim: "#94A3B8",
+  gold: "#D97706", goldLight: "#F59E0B", goldDim: "rgba(217,119,6,0.08)", goldBorder: "rgba(217,119,6,0.2)",
+  blue: "#1447c0", blueMid: "#2563EB", blueLight: "rgba(37,99,235,0.08)",
+  red: "#DC2626", success: "#059669", successDim: "rgba(5,150,105,0.08)",
+  border: "#E2E8F0", borderStrong: "#CBD5E1",
+};
+
+function AnimStat({ icon, value, label, color, bg }: any) {
+  return (
+    <View style={st.statBox}>
+      <View style={[st.statIcon, { backgroundColor: bg }]}><Ionicons name={icon} size={18} color={color} /></View>
+      <Text style={st.statValue}>{value}</Text>
+      <Text style={st.statLabel}>{label}</Text>
+    </View>
+  );
 }
-
-interface ActiveDeployment {
-  complaintKey: string;
-  userId: string;
-  complainantName: string;
-  type: string;
-  incidentPurok: string;
-  description: string;
-  deployedAt: string;
-  coDeployedTanods: CoDeployedTanod[];
-}
-
-interface HistoryEntry {
-  complaintKey: string;
-  userId: string;
-  complainantName: string;
-  type: string;
-  incidentPurok: string;
-  description: string;
-  deployedAt: string;
-  resolvedAt: string;
-  status: string;
-  tanodRating: number | null;
-  tanodComment: string | null;
-  coDeployedTanods: CoDeployedTanod[];
-}
-
-interface ComplaintCard {
-  id: string;
-  type: string;
-  description: string;
-  complainantName: string;
-  date: string;
-  status: string;
-  incidentPurok: string;
-  coDeployedTanods: CoDeployedTanod[];
-  userId?: string;
-  complaintKey?: string;
-  tanodRating?: number | null;
-}
-
-type FilterType = "all" | "active" | "resolved";
 
 export default function ManageRequests() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [activeDeployment, setActiveDeployment] = useState<ActiveDeployment | null>(null);
-  const [deploymentHistory, setDeploymentHistory] = useState<HistoryEntry[]>([]);
+  const [activeDeployment, setActiveDeployment] = useState<any>(null);
+  const [deploymentHistory, setDeploymentHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [selectedComplaint, setSelectedComplaint] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
-  const [cardToResolve, setCardToResolve] = useState<ComplaintCard | null>(null);
-  const [idStatus, setIdStatus] = useState<string>("Pending");
+  const [cardToResolve, setCardToResolve] = useState<any>(null);
+  const [idStatus, setIdStatus] = useState("Pending");
+  const [resolutionPhoto, setResolutionPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const user = auth.currentUser;
-    if (!user) {
-      router.replace("/");
-      return;
-    }
+    if (!user) { router.replace("/"); return; }
 
-    // Register push token for this employee
     savePushTokenToFirestore("employee");
 
-    // Track previous deployment status to detect new deployments
     let prevDeploymentStatus: string | null = null;
-
-    // Listen to tanod's own employee document for current deployment + ID status
-    const tanodRef = doc(firestore, "employee", user.uid);
-    const unsubTanod = onSnapshot(tanodRef, async (snapshot) => {
-      if (!snapshot.exists()) {
-        setActiveDeployment(null);
-        setLoading(false);
-        return;
-      }
+    const unsubTanod = onSnapshot(doc(firestore, "employee", user.uid), async (snapshot) => {
+      if (!snapshot.exists()) { setActiveDeployment(null); setLoading(false); return; }
       const data = snapshot.data();
       let status = data.idstatus || "";
-      // Also check "users" collection if employee doc doesn't have idstatus
       if (!status) {
-        try {
-          const userDoc = await getDoc(doc(firestore, "users", user.uid));
-          if (userDoc.exists()) {
-            status = userDoc.data().idstatus || "Pending";
-          }
-        } catch (e) {
-          console.error("Error fetching user doc:", e);
-        }
+        try { const userDoc = await getDoc(doc(firestore, "users", user.uid)); if (userDoc.exists()) status = userDoc.data().idstatus || "Pending"; } catch (e) {}
       }
       setIdStatus(status || "Pending");
 
-      // Detect new deployment and trigger notification
-      const currentDeploymentStatus = data.deploymentStatus || "available";
-      if (
-        prevDeploymentStatus !== null &&
-        prevDeploymentStatus !== "deployed" &&
-        currentDeploymentStatus === "deployed" &&
-        data.deployedTo
-      ) {
-        const deployed = data.deployedTo;
-        showLocalNotification(
-          "New Complaint Assigned",
-          `You have been deployed to a ${deployed.type} complaint in Purok ${deployed.incidentPurok}.`,
-          { screen: "manage-requests", complaintKey: deployed.complaintKey }
-        );
+      const curr = data.deploymentStatus || "available";
+      if (prevDeploymentStatus !== null && prevDeploymentStatus !== "deployed" && curr === "deployed" && data.deployedTo) {
+        showLocalNotification("New Duty Assigned", `Purok ${data.deployedTo.incidentPurok} - ${data.deployedTo.type}`, { screen: "manage-requests" });
       }
-      prevDeploymentStatus = currentDeploymentStatus;
-
-      if (data.deploymentStatus === "deployed" && data.deployedTo) {
-        setActiveDeployment(data.deployedTo as ActiveDeployment);
-      } else {
-        setActiveDeployment(null);
-      }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error listening to tanod document:", error);
+      prevDeploymentStatus = curr;
+      setActiveDeployment((curr === "deployed" && data.deployedTo) ? data.deployedTo : null);
       setLoading(false);
     });
 
-    // Listen to deployment history
-    const historyRef = collection(firestore, "employee", user.uid, "deploymentHistory");
-    const historyQuery = query(historyRef, orderBy("resolvedAt", "desc"));
-    const unsubHistory = onSnapshot(historyQuery, (snapshot) => {
-      const history = snapshot.docs.map((d) => ({
-        ...d.data(),
-        complaintKey: d.id,
-      })) as HistoryEntry[];
-      setDeploymentHistory(history);
-    }, (error) => {
-      console.error("Error listening to deployment history:", error);
+    const unsubHistory = onSnapshot(query(collection(firestore, "employee", user.uid, "deploymentHistory"), orderBy("resolvedAt", "desc")), (snap) => {
+      setDeploymentHistory(snap.docs.map(e => ({ ...e.data(), complaintKey: e.id })));
     });
 
-    return () => {
-      unsubTanod();
-      unsubHistory();
-    };
+    return () => { unsubTanod(); unsubHistory(); };
   }, []);
 
-  // Build cards from active deployment + history
-  const allCards: ComplaintCard[] = [];
-
+  const allCards: any[] = [];
   if (activeDeployment) {
     allCards.push({
-      id: `active-${activeDeployment.complaintKey}`,
-      type: activeDeployment.type,
-      description: activeDeployment.description,
-      complainantName: activeDeployment.complainantName,
-      date: activeDeployment.deployedAt,
-      status: "in-progress",
-      incidentPurok: activeDeployment.incidentPurok,
-      coDeployedTanods: activeDeployment.coDeployedTanods || [],
-      userId: activeDeployment.userId,
-      complaintKey: activeDeployment.complaintKey,
+      id: `active-${activeDeployment.complaintKey}`, type: activeDeployment.type, description: activeDeployment.description,
+      complainantName: activeDeployment.complainantName, date: activeDeployment.deployedAt, status: "in-progress",
+      incidentPurok: activeDeployment.incidentPurok, coDeployedTanods: activeDeployment.coDeployedTanods || [],
+      userId: activeDeployment.userId, complaintKey: activeDeployment.complaintKey,
+      deployedAt: activeDeployment.deployedAt,
     });
   }
-
-  deploymentHistory.forEach((entry) => {
+  deploymentHistory.forEach(entry => {
     allCards.push({
-      id: `history-${entry.complaintKey}`,
-      type: entry.type,
-      description: entry.description,
-      complainantName: entry.complainantName,
-      date: entry.resolvedAt || entry.deployedAt,
-      status: entry.status,
-      incidentPurok: entry.incidentPurok,
-      coDeployedTanods: entry.coDeployedTanods || [],
-      userId: entry.userId,
-      complaintKey: entry.complaintKey,
-      tanodRating: entry.tanodRating,
+      id: `history-${entry.complaintKey}`, type: entry.type, description: entry.description, complainantName: entry.complainantName,
+      date: entry.resolvedAt || entry.deployedAt, status: entry.status, incidentPurok: entry.incidentPurok,
+      coDeployedTanods: entry.coDeployedTanods || [], userId: entry.userId, complaintKey: entry.complaintKey,
+      deployedAt: entry.deployedAt,
     });
   });
 
-  // Filter cards
-  const filteredCards = allCards.filter((card) => {
-    if (activeFilter === "all") return true;
-    if (activeFilter === "active") return card.status === "in-progress";
-    if (activeFilter === "resolved") return card.status === "resolved";
-    return true;
-  });
+  const filteredCards = allCards.filter(c => activeFilter === "all" || (activeFilter === "active" && c.status === "in-progress") || (activeFilter === "resolved" && c.status === "resolved"));
 
-  const handleViewDetails = async (card: ComplaintCard) => {
-    if (!card.userId || !card.complaintKey) return;
-    setDetailLoading(true);
-    setDetailModalVisible(true);
+  const handleViewDetails = async (c: any) => {
+    if (!c.userId || !c.complaintKey) return;
+    setDetailLoading(true); setDetailModalVisible(true);
     try {
-      const complaintRef = doc(firestore, "users", card.userId, "userComplaints", card.complaintKey);
-      const complaintSnap = await getDoc(complaintRef);
-      if (complaintSnap.exists()) {
-        setSelectedComplaint({ ...complaintSnap.data(), ...card });
-      } else {
-        setSelectedComplaint(card);
-      }
-    } catch (error) {
-      console.error("Error fetching complaint details:", error);
-      Alert.alert("Error", "Failed to load complaint details");
-      setDetailModalVisible(false);
-    } finally {
-      setDetailLoading(false);
-    }
+      const snap = await getDoc(doc(firestore, "users", c.userId, "userComplaints", c.complaintKey));
+      setSelectedComplaint(snap.exists() ? { ...snap.data(), ...c } : c);
+    } catch { Alert.alert("Error", "Load fail."); setDetailModalVisible(false); }
+    finally { setDetailLoading(false); }
   };
 
-  const handleResolve = (card: ComplaintCard) => {
-    if (!card.userId || !card.complaintKey) return;
-    setCardToResolve(card);
-    setResolveModalVisible(true);
-  };
+  const handleResolve = (c: any) => { setCardToResolve(c); setResolveModalVisible(true); };
 
   const confirmResolve = async () => {
     if (!cardToResolve) return;
+    if (!resolutionPhoto) { Alert.alert("Required", "Upload photo."); return; }
     setResolving(true);
     try {
-      const user = auth.currentUser;
-      if (!user) return;
+      const user = auth.currentUser; if (!user) return;
+      await updateDoc(doc(firestore, "users", cardToResolve.userId, "userComplaints", cardToResolve.complaintKey), { status: "resolved", resolvedAt: serverTimestamp(), resolutionPhoto });
 
-      // 1. Update complaint status to resolved
-      await updateDoc(
-        doc(firestore, "users", cardToResolve.userId!, "userComplaints", cardToResolve.complaintKey!),
-        { status: "resolved", resolvedAt: serverTimestamp() }
-      );
-
-      // 2. Get deployed tanods from the complaint or from activeDeployment
-      const tanodsToResolve: { uid: string; name: string }[] = [];
+      const tanods = [];
       if (activeDeployment && activeDeployment.complaintKey === cardToResolve.complaintKey) {
-        // Current user is deployed
-        tanodsToResolve.push({ uid: user.uid, name: "" });
-        // Add co-deployed tanods
-        if (activeDeployment.coDeployedTanods) {
-          tanodsToResolve.push(...activeDeployment.coDeployedTanods);
-        }
-      } else {
-        tanodsToResolve.push({ uid: user.uid, name: "" });
-      }
+        tanods.push({ uid: user.uid, name: "" });
+        if (activeDeployment.coDeployedTanods) tanods.push(...activeDeployment.coDeployedTanods);
+      } else { tanods.push({ uid: user.uid, name: "" }); }
 
-      // 3. For each tanod: save to deploymentHistory and clear deployment
-      for (const tanod of tanodsToResolve) {
-        const tanodRef = doc(firestore, "employee", tanod.uid);
-        const tanodSnap = await getDoc(tanodRef);
-        const deployedTo = tanodSnap.exists() ? tanodSnap.data().deployedTo : null;
-
-        const coDeployedTanods = tanodsToResolve.filter((t) => t.uid !== tanod.uid);
-
-        // Save to history subcollection
-        await setDoc(
-          doc(firestore, "employee", tanod.uid, "deploymentHistory", cardToResolve.complaintKey!),
-          {
-            complaintKey: cardToResolve.complaintKey,
-            userId: cardToResolve.userId,
-            complainantName: cardToResolve.complainantName,
-            type: cardToResolve.type,
-            incidentPurok: cardToResolve.incidentPurok,
-            description: cardToResolve.description,
-            deployedAt: deployedTo?.deployedAt || null,
-            resolvedAt: new Date().toISOString(),
-            status: "resolved",
-            tanodRating: null,
-            tanodComment: null,
-            coDeployedTanods,
-          }
-        );
-
-        // Clear current deployment
-        await updateDoc(tanodRef, {
-          deploymentStatus: "available",
-          deployedTo: null,
+      for (const t of tanods) {
+        const tRef = doc(firestore, "employee", t.uid);
+        const tSnap = await getDoc(tRef);
+        const dep = tSnap.exists() ? tSnap.data().deployedTo : null;
+        await setDoc(doc(firestore, "employee", t.uid, "deploymentHistory", cardToResolve.complaintKey), {
+          ...cardToResolve, deployedAt: dep?.deployedAt || null, resolvedAt: new Date().toISOString(), status: "resolved", tanodRating: null, tanodComment: null,
+          coDeployedTanods: tanods.filter(item => item.uid !== t.uid),
         });
+        await updateDoc(tRef, { deploymentStatus: "available", deployedTo: null });
       }
-
-      setResolveModalVisible(false);
-      setCardToResolve(null);
-      Alert.alert("Success", "Complaint has been marked as resolved.");
-    } catch (error) {
-      console.error("Error resolving complaint:", error);
-      Alert.alert("Error", "Failed to resolve complaint. Please try again.");
-    } finally {
-      setResolving(false);
-    }
+      setResolveModalVisible(false); setCardToResolve(null); setResolutionPhoto(null);
+    } catch { Alert.alert("Error", "Resolve fail."); }
+    finally { setResolving(false); }
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "N/A";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  const pickImage = async () => {
+    const p = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!p.granted) return Alert.alert("Required", "Need library access.");
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.3, base64: true });
+    if (!res.canceled && res.assets[0].base64) setResolutionPhoto(`data:image/jpeg;base64,${res.assets[0].base64}`);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "#ff9800";
-      case "in-progress":
-        return "#2196f3";
-      case "resolved":
-        return "#4caf50";
-      default:
-        return "#999";
-    }
+  const takePhoto = async () => {
+    const p = await ImagePicker.requestCameraPermissionsAsync();
+    if (!p.granted) return Alert.alert("Required", "Need camera access.");
+    const res = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.3, base64: true });
+    if (!res.canceled && res.assets[0].base64) setResolutionPhoto(`data:image/jpeg;base64,${res.assets[0].base64}`);
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4a90e2" />
-          <Text style={styles.loadingText}>Loading complaints...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const toDate = (ds: any) => { if (!ds) return null; if (ds.toDate) return ds.toDate(); const d = new Date(ds); return isNaN(d.getTime()) ? null : d; };
+  const formatDate = (ds: any) => { const d = toDate(ds); return d ? d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "--"; };
+  const formatTime = (ds: any) => { const d = toDate(ds); return d ? d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "--"; };
 
-  // Block access if ID is not verified (case-insensitive check)
-  const isIdVerified = idStatus?.toLowerCase() === "verified" || idStatus?.toLowerCase() === "approved";
-  if (!isIdVerified) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <View style={styles.loadingContainer}>
-          <Ionicons name="shield-outline" size={80} color="#ff9800" />
-          <Text style={{ fontSize: 20, fontWeight: "bold", color: "#2c3e50", marginTop: 20, textAlign: "center" }}>
-            ID Verification Required
-          </Text>
-          <Text style={{ fontSize: 15, color: "#666", marginTop: 12, textAlign: "center", paddingHorizontal: 40 }}>
-            {idStatus === "Pending"
-              ? "Your ID is still being verified. Please wait for admin approval before accessing complaint management."
-              : "Your ID verification was denied. Please upload a valid ID in your profile to regain access."}
-          </Text>
-          <TouchableOpacity
-            style={{ marginTop: 24, backgroundColor: "#4a90e2", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }}
-            onPress={() => router.push("/employee/profile")}
-          >
-            <Text style={{ color: "#fff", fontWeight: "600", fontSize: 15 }}>Go to Profile</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const getStatusMeta = (s: string) => {
+    if (s === "pending") return { label: "Pending", color: C.gold, bg: C.goldDim, icon: "time" };
+    if (s === "in-progress") return { label: "Active", color: C.blueMid, bg: C.blueLight, icon: "pulse" };
+    if (s === "resolved") return { label: "Resolved", color: C.success, bg: C.successDim, icon: "checkmark" };
+    return { label: "Unknown", color: C.textMuted, bg: C.surfaceAlt, icon: "help" };
+  };
+
+  const counts = useMemo(() => ({ all: allCards.length, active: allCards.filter(c => c.status === "in-progress").length, resolved: allCards.filter(c => c.status === "resolved").length }), [allCards.length]);
+
+  if (loading) return <SafeAreaView style={st.safe}><View style={st.center}><ActivityIndicator size="large" color={C.gold} /></View></SafeAreaView>;
+
+  if (idStatus?.toLowerCase() !== "verified" && idStatus?.toLowerCase() !== "approved") return (
+    <SafeAreaView style={st.safe}>
+      <View style={st.center}>
+        <Ionicons name="shield-half" size={64} color={C.gold} style={{ marginBottom: 16 }} />
+        <Text style={st.title}>Verification Required</Text>
+        <Text style={[st.subtitle, { textAlign: "center", marginHorizontal: 40, marginTop: 10, marginBottom: 24 }]}>ID review is pending or denied. Please ensure you have uploaded a valid ID.</Text>
+        <TouchableOpacity style={st.btnPrimary} onPress={() => router.push("/employee/profile")}><Text style={st.btnPrimaryText}>Go to Profile</Text></TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
-          <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-        <Text style={styles.title}>My Deployments</Text>
-        <Text style={styles.subtitle}>View your assigned complaints & deployment history</Text>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.filterButtons}>
-          {(["all", "active", "resolved"] as FilterType[]).map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              style={[styles.filterBtn, activeFilter === filter && styles.filterBtnActive]}
-              onPress={() => setActiveFilter(filter)}
-            >
-              <Text style={[styles.filterText, activeFilter === filter && styles.filterTextActive]}>
-                {filter === "all" ? `All (${allCards.length})` : filter === "active" ? `Active (${allCards.filter(c => c.status === "in-progress").length})` : `Resolved (${allCards.filter(c => c.status === "resolved").length})`}
-              </Text>
-            </TouchableOpacity>
-          ))}
+    <SafeAreaView style={st.safe} edges={["left", "right"]}>
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {/* Header */}
+        <View style={[st.header, { paddingTop: insets.top + 14 }]}>
+          <Text style={st.eyebrow}>OPERATIONS</Text>
+          <Text style={st.title}>Deployments</Text>
+          <Text style={st.subtitle}>Manage your assignments</Text>
         </View>
 
-        {filteredCards.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyTitle}>
-              {activeFilter === "active" ? "No Active Deployment" : activeFilter === "resolved" ? "No Resolved Complaints" : "No Complaints Yet"}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {activeFilter === "active" ? "You are currently not deployed to any complaint." : "Your deployment history will appear here."}
-            </Text>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false}>
+          {/* Summary */}
+          <View style={st.section}>
+            <Text style={st.secEye}>METRICS</Text>
+            <View style={st.statsRow}>
+              <AnimStat icon="layers" value={counts.all} label="TOTAL" color={C.text} bg={C.surfaceAlt} />
+              <AnimStat icon="pulse" value={counts.active} label="ACTIVE" color={C.blueMid} bg={C.blueLight} />
+              <AnimStat icon="checkmark-done" value={counts.resolved} label="RESOLVED" color={C.success} bg={C.successDim} />
+            </View>
           </View>
-        ) : (
-          filteredCards.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={[styles.requestCard, card.status === "in-progress" && styles.activeCard]}
-              onPress={() => handleViewDetails(card)}
-            >
-              <View style={styles.requestHeader}>
-                <View style={styles.requestTitleSection}>
-                  <View style={[styles.typeBadge, { backgroundColor: "#e74c3c" }]}>
-                    <Text style={styles.typeBadgeText}>{card.type}</Text>
-                  </View>
-                  <Text style={styles.requestTitle} numberOfLines={2}>{card.description}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(card.status) }]}>
-                  <Text style={styles.statusText}>{card.status}</Text>
-                </View>
-              </View>
 
-              <View style={styles.requestDetails}>
-                <Ionicons name="person" size={16} color="#999" />
-                <Text style={styles.detailText}>{card.complainantName}</Text>
-                <Text style={styles.separator}>•</Text>
-                <Ionicons name="location" size={16} color="#999" />
-                <Text style={styles.detailText}>Purok {card.incidentPurok}</Text>
-              </View>
-
-              <View style={styles.requestDetails}>
-                <Ionicons name="calendar" size={16} color="#999" />
-                <Text style={styles.detailText}>{formatDate(card.date)}</Text>
-                {card.tanodRating != null && (
-                  <>
-                    <Text style={styles.separator}>•</Text>
-                    <Ionicons name="star" size={16} color="#f39c12" />
-                    <Text style={styles.detailText}>{card.tanodRating}/5</Text>
-                  </>
-                )}
-              </View>
-
-              {card.coDeployedTanods.length > 0 && (
-                <View style={styles.coDeployedRow}>
-                  <Ionicons name="people" size={16} color="#999" />
-                  <Text style={styles.coDeployedText}>
-                    With: {card.coDeployedTanods.map(t => t.name).join(", ")}
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.actionButton} onPress={() => handleViewDetails(card)}>
-                  <Ionicons name="eye" size={18} color="#4a90e2" />
-                  <Text style={styles.actionText}>View Details</Text>
+          {/* Filters (like tabs in reports.tsx) */}
+          <View style={st.section}>
+            <Text style={st.secEye}>FILTER VIEW</Text>
+            <View style={st.tabRow}>
+              {(["all", "active", "resolved"] as const).map(m => (
+                <TouchableOpacity key={m} style={[st.tab, activeFilter === m && st.tabActive]} onPress={() => setActiveFilter(m)}>
+                  <Text style={[st.tabText, activeFilter === m && st.tabTextActive]}>{m}</Text>
                 </TouchableOpacity>
-                {card.status === "in-progress" && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.resolveButton]}
-                    onPress={() => handleResolve(card)}
-                    disabled={resolving}
-                  >
-                    <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                    <Text style={styles.resolveButtonText}>
-                      {resolving ? "Resolving..." : "Resolve"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
+              ))}
+            </View>
+          </View>
 
-      <View style={styles.spacer} />
+          {/* List */}
+          <View style={st.section}>
+            <Text style={st.secEye}>RECORDS</Text>
+            {filteredCards.length === 0 ? (
+              <View style={st.emptyWrap}>
+                <Ionicons name="document-text-outline" size={40} color={C.textDim} />
+                <Text style={st.emptyText}>No records found</Text>
+              </View>
+            ) : (
+              filteredCards.map(c => {
+                const meta = getStatusMeta(c.status);
+                return (
+                  <TouchableOpacity key={c.id} style={[st.histCard, c.status === "in-progress" && st.histCardActive]} onPress={() => handleViewDetails(c)}>
+                    <View style={st.histTop}>
+                      <View style={[st.histBadge, { backgroundColor: meta.bg, borderColor: meta.color + "33" }]}><Ionicons name={meta.icon as any} size={14} color={meta.color} /></View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={st.histType}>{c.type}</Text>
+                        <Text style={st.histPurok}>Purok {c.incidentPurok}</Text>
+                      </View>
+                      <View style={[st.durationPill, { backgroundColor: meta.bg }]}><Text style={[st.durationText, { color: meta.color }]}>{meta.label}</Text></View>
+                    </View>
+                    
+                    <View style={st.histExpand}>
+                      <Text style={st.histDesc} numberOfLines={2}>{c.description}</Text>
+                      <View style={st.histDivider} />
+                      <View style={st.histRow}><Ionicons name="person-outline" size={14} color={C.textDim} /><Text style={st.histLabel}>Citizen</Text><Text style={st.histVal}>{c.complainantName}</Text></View>
+                      <View style={st.histRow}><Ionicons name="calendar-outline" size={14} color={C.textDim} /><Text style={st.histLabel}>Date</Text><Text style={st.histVal}>{formatDate(c.date)} {formatTime(c.date)}</Text></View>
+                      {c.coDeployedTanods.length > 0 && <View style={st.histRow}><Ionicons name="people-outline" size={14} color={C.textDim} /><Text style={st.histLabel}>Team</Text><Text style={st.histVal}>{c.coDeployedTanods.map((t:any)=>t.name).join(", ")}</Text></View>}
+                      
+                      <View style={st.btnRow}>
+                        <TouchableOpacity style={st.btnSecondary} onPress={() => handleViewDetails(c)}>
+                          <Ionicons name="document-text-outline" size={14} color={C.textMuted} /><Text style={st.btnSecondaryText}>Details</Text>
+                        </TouchableOpacity>
+                        {c.status === "in-progress" && (
+                          <TouchableOpacity style={st.btnPrimary} onPress={() => handleResolve(c)}>
+                            <Ionicons name="checkmark-circle-outline" size={14} color={C.surface} /><Text style={st.btnPrimaryText}>Mark Done</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Detail Modal */}
+      {/* DETAIL MODAL */}
       <Modal visible={detailModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {detailLoading ? (
-              <View style={styles.modalLoading}>
-                <ActivityIndicator size="large" color="#4a90e2" />
-                <Text style={styles.loadingText}>Loading details...</Text>
-              </View>
-            ) : selectedComplaint ? (
+        <View style={st.modalOverlay}>
+          <View style={st.modalContent}>
+            {detailLoading ? <View style={st.center}><ActivityIndicator size="large" color={C.gold} /></View> : selectedComplaint ? (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Complaint Details</Text>
-                  <TouchableOpacity onPress={() => setDetailModalVisible(false)}>
-                    <Ionicons name="close-circle" size={28} color="#999" />
-                  </TouchableOpacity>
+                <View style={st.modalHeader}>
+                  <Text style={st.modalTitle}>Record Details</Text>
+                  <TouchableOpacity style={st.modalClose} onPress={() => setDetailModalVisible(false)}><Ionicons name="close" size={20} color={C.textMuted} /></TouchableOpacity>
                 </View>
-
-                <View style={[styles.typeBadge, { backgroundColor: "#e74c3c", alignSelf: "flex-start", marginBottom: 12 }]}>
-                  <Text style={styles.typeBadgeText}>{selectedComplaint.type}</Text>
+                <View style={st.pillWrap}>
+                  <View style={st.modalPill}><Text style={st.modalPillText}>{selectedComplaint.type}</Text></View>
+                  <View style={[st.modalPill, { backgroundColor: getStatusMeta(selectedComplaint.status).bg, borderColor: getStatusMeta(selectedComplaint.status).color + "33" }]}>
+                    <Text style={[st.modalPillText, { color: getStatusMeta(selectedComplaint.status).color }]}>{getStatusMeta(selectedComplaint.status).label}</Text>
+                  </View>
                 </View>
+                
+                <Text style={st.secEye}>DESCRIPTION</Text>
+                <Text style={st.modalDesc}>{selectedComplaint.description || selectedComplaint.message}</Text>
+                
+                <Text style={st.secEye}>INFORMATION</Text>
+                <View style={st.card}>
+                  <View style={st.recordRow}><Text style={st.recordLabel}>Citizen</Text><Text style={st.recordVal}>{selectedComplaint.complainantName}</Text></View>
+                  <View style={st.divider} />
+                  <View style={st.recordRow}><Text style={st.recordLabel}>Complaint ID</Text><Text style={st.recordVal}>{selectedComplaint.complaintKey || "--"}</Text></View>
+                  <View style={st.divider} />
+                  <View style={st.recordRow}><Text style={st.recordLabel}>Location</Text><Text style={st.recordVal}>Purok {selectedComplaint.incidentPurok || selectedComplaint.purok || "--"}</Text></View>
+                  {selectedComplaint.specificLocation && (
+                    <><View style={st.divider} /><View style={st.recordRow}><Text style={st.recordLabel}>Landmark</Text><Text style={st.recordVal}>{selectedComplaint.specificLocation}</Text></View></>
+                  )}
+                  <View style={st.divider} />
+                  <View style={st.recordRow}><Text style={st.recordLabel}>Date Sent</Text><Text style={st.recordVal}>{formatDate(selectedComplaint.date)} {formatTime(selectedComplaint.date)}</Text></View>
+                  <View style={st.divider} />
+                  <View style={st.recordRow}><Text style={st.recordLabel}>Deployed</Text><Text style={st.recordVal}>{formatDate(selectedComplaint.deployedAt)} {formatTime(selectedComplaint.deployedAt)}</Text></View>
+                  
+                  {selectedComplaint.coDeployedTanods && selectedComplaint.coDeployedTanods.length > 0 && (
+                    <><View style={st.divider} /><View style={st.recordRow}><Text style={st.recordLabel}>Team</Text><Text style={st.recordVal}>{selectedComplaint.coDeployedTanods.map((t:any)=>t.name).join(", ")}</Text></View></>
+                  )}
 
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedComplaint.status), alignSelf: "flex-start", marginBottom: 16 }]}>
-                  <Text style={styles.statusText}>{selectedComplaint.status}</Text>
+                  {selectedComplaint.resolvedAt && (
+                    <><View style={st.divider} /><View style={st.recordRow}><Text style={st.recordLabel}>Resolved</Text><Text style={st.recordVal}>{formatDate(selectedComplaint.resolvedAt)} {formatTime(selectedComplaint.resolvedAt)}</Text></View></>
+                  )}
                 </View>
-
-                <Text style={styles.modalLabel}>Description</Text>
-                <Text style={styles.modalValue}>{selectedComplaint.description || selectedComplaint.message}</Text>
-
-                <Text style={styles.modalLabel}>Complainant</Text>
-                <Text style={styles.modalValue}>{selectedComplaint.complainantName}</Text>
-
-                <Text style={styles.modalLabel}>Purok</Text>
-                <Text style={styles.modalValue}>Purok {selectedComplaint.incidentPurok}</Text>
-
-                {selectedComplaint.incidentLocation && (
-                  <>
-                    <Text style={styles.modalLabel}>Location</Text>
-                    <Text style={styles.modalValue}>{selectedComplaint.incidentLocation}</Text>
-                  </>
-                )}
-
-                <Text style={styles.modalLabel}>Deployed At</Text>
-                <Text style={styles.modalValue}>{formatDate(selectedComplaint.deployedAt || selectedComplaint.date)}</Text>
-
-                {selectedComplaint.resolvedAt && (
-                  <>
-                    <Text style={styles.modalLabel}>Resolved At</Text>
-                    <Text style={styles.modalValue}>{formatDate(selectedComplaint.resolvedAt)}</Text>
-                  </>
-                )}
 
                 {selectedComplaint.evidencePhoto && (
-                  <>
-                    <Text style={styles.modalLabel}>Evidence</Text>
-                    <Image source={{ uri: selectedComplaint.evidencePhoto }} style={styles.evidenceImage} resizeMode="cover" />
-                  </>
+                  <><Text style={st.secEye}>EVIDENCE PHOTO</Text><Image source={{ uri: selectedComplaint.evidencePhoto }} style={st.evidenceImg} /></>
+                )}
+                
+                {selectedComplaint.resolutionPhoto && (
+                  <><Text style={[st.secEye, { marginTop: 16 }]}>RESOLUTION PHOTO</Text><Image source={{ uri: selectedComplaint.resolutionPhoto }} style={st.evidenceImg} /></>
                 )}
 
-                {selectedComplaint.coDeployedTanods?.length > 0 && (
-                  <>
-                    <Text style={styles.modalLabel}>Co-Deployed Tanods</Text>
-                    {selectedComplaint.coDeployedTanods.map((t: CoDeployedTanod) => (
-                      <Text key={t.uid} style={styles.modalValue}>• {t.name}</Text>
-                    ))}
-                  </>
-                )}
-
-                {selectedComplaint.tanodRating != null && (
-                  <>
-                    <Text style={styles.modalLabel}>Rating</Text>
-                    <View style={{ flexDirection: "row", gap: 4, marginBottom: 8 }}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Ionicons
-                          key={star}
-                          name={star <= (selectedComplaint.tanodRating || 0) ? "star" : "star-outline"}
-                          size={24}
-                          color="#f39c12"
-                        />
-                      ))}
-                    </View>
-                  </>
-                )}
-
-                {selectedComplaint.tanodComment && (
-                  <>
-                    <Text style={styles.modalLabel}>Feedback</Text>
-                    <Text style={styles.modalValue}>{selectedComplaint.tanodComment}</Text>
-                  </>
-                )}
-
-                <TouchableOpacity style={styles.closeButton} onPress={() => setDetailModalVisible(false)}>
-                  <Text style={styles.closeButtonText}>Close</Text>
+                <TouchableOpacity style={[st.btnPrimary, { marginTop: 24 }]} onPress={() => setDetailModalVisible(false)}>
+                  <Text style={st.btnPrimaryText}>Close</Text>
                 </TouchableOpacity>
               </ScrollView>
             ) : null}
@@ -564,54 +322,34 @@ export default function ManageRequests() {
         </View>
       </Modal>
 
-      {/* Resolve Confirmation Modal */}
+      {/* RESOLVE MODAL */}
       <Modal visible={resolveModalVisible} animationType="fade" transparent>
-        <View style={[styles.modalOverlay, { justifyContent: "center" }]}>
-          <View style={styles.resolveModalContent}>
-            <View style={styles.resolveModalIcon}>
-              <Ionicons name="checkmark-circle" size={48} color="#4caf50" />
-            </View>
-            <Text style={styles.resolveModalTitle}>Mark as Resolved</Text>
-            <Text style={styles.resolveModalMessage}>
-              Are you sure you want to mark this complaint as resolved?
-            </Text>
-            {cardToResolve && (
-              <View style={styles.resolveModalDetails}>
-                <Text style={styles.resolveModalDetailText}>
-                  <Text style={{ fontWeight: "600" }}>Type:</Text> {cardToResolve.type}
-                </Text>
-                <Text style={styles.resolveModalDetailText}>
-                  <Text style={{ fontWeight: "600" }}>Complainant:</Text> {cardToResolve.complainantName}
-                </Text>
-                <Text style={styles.resolveModalDetailText}>
-                  <Text style={{ fontWeight: "600" }}>Purok:</Text> {cardToResolve.incidentPurok}
-                </Text>
+        <View style={[st.modalOverlay, { justifyContent: "center", padding: 20 }]}>
+          <View style={[st.modalContent, { borderRadius: 24, padding: 24, maxHeight: "auto", flex: 0 }]}>
+            <View style={st.modalIconWrap}><Ionicons name="camera" size={28} color={C.blueMid} /></View>
+            <Text style={[st.modalTitle, { textAlign: "center", marginBottom: 8 }]}>Finalize Duty</Text>
+            <Text style={[st.modalDesc, { textAlign: "center", marginBottom: 24 }]}>Upload a photo of the resolved incident.</Text>
+
+            <View style={st.uploadArea}>
+              {resolutionPhoto ? <Image source={{ uri: resolutionPhoto }} style={st.previewImg} /> : (
+                <View style={st.uploadEmpty}><Ionicons name="image-outline" size={32} color={C.textDim} /><Text style={st.uploadEmptyText}>No photo attached</Text></View>
+              )}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity style={st.btnOutline} onPress={takePhoto}>
+                  <Ionicons name="camera-outline" size={16} color={C.text} />
+                  <Text style={st.btnOutlineText}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={st.btnOutline} onPress={pickImage}>
+                  <Ionicons name="image-outline" size={16} color={C.text} />
+                  <Text style={st.btnOutlineText}>Gallery</Text>
+                </TouchableOpacity>
               </View>
-            )}
-            <View style={styles.resolveModalButtons}>
-              <TouchableOpacity
-                style={styles.resolveModalCancelBtn}
-                onPress={() => {
-                  setResolveModalVisible(false);
-                  setCardToResolve(null);
-                }}
-                disabled={resolving}
-              >
-                <Text style={styles.resolveModalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.resolveModalConfirmBtn, resolving && { opacity: 0.6 }]}
-                onPress={confirmResolve}
-                disabled={resolving}
-              >
-                {resolving ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark" size={18} color="#fff" />
-                    <Text style={styles.resolveModalConfirmText}>Resolve</Text>
-                  </>
-                )}
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 24 }}>
+              <TouchableOpacity style={st.btnGhost} onPress={() => { setResolveModalVisible(false); setResolutionPhoto(null); }}><Text style={st.btnGhostText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[st.btnPrimary, { flex: 1.5 }, resolving && { opacity: 0.6 }]} onPress={confirmResolve} disabled={resolving}>
+                {resolving ? <ActivityIndicator color="#FFF" /> : <Text style={st.btnPrimaryText}>Submit Record</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -621,321 +359,78 @@ export default function ManageRequests() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f5f7fa",
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f7fa",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f5f7fa",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#666",
-  },
-  header: {
-    backgroundColor: "#4a90e2",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#e3f2fd",
-  },
-  section: {
-    padding: 20,
-  },
-  filterButtons: {
-    flexDirection: "row",
-    marginBottom: 20,
-    gap: 8,
-  },
-  filterBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    backgroundColor: "#fff",
-  },
-  filterBtnActive: {
-    borderColor: "#4a90e2",
-    backgroundColor: "#e6f4fe",
-  },
-  filterText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#555",
-  },
-  filterTextActive: {
-    color: "#4a90e2",
-  },
-  requestCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-  },
-  activeCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: "#4a90e2",
-  },
-  requestHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  requestTitleSection: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  typeBadgeText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-  requestTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#2c3e50",
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-  requestDetails: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-    gap: 6,
-  },
-  detailText: {
-    fontSize: 13,
-    color: "#666",
-  },
-  separator: {
-    color: "#ccc",
-    marginHorizontal: 4,
-  },
-  coDeployedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  coDeployedText: {
-    fontSize: 13,
-    color: "#666",
-    flex: 1,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: "#f0f4f9",
-    gap: 6,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4a90e2",
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#999",
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: "#bbb",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  spacer: {
-    height: 20,
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: "85%",
-  },
-  modalLoading: {
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2c3e50",
-  },
-  modalLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#999",
-    marginTop: 12,
-    marginBottom: 4,
-    textTransform: "uppercase",
-  },
-  modalValue: {
-    fontSize: 15,
-    color: "#2c3e50",
-    marginBottom: 4,
-  },
-  evidenceImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 12,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  closeButton: {
-    backgroundColor: "#4a90e2",
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  resolveButton: {
-    backgroundColor: "#4caf50",
-  },
-  resolveButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  resolveModalContent: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
-    marginHorizontal: 30,
-    alignItems: "center",
-  },
-  resolveModalIcon: {
-    marginBottom: 12,
-  },
-  resolveModalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginBottom: 8,
-  },
-  resolveModalMessage: {
-    fontSize: 15,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  resolveModalDetails: {
-    backgroundColor: "#f5f7fa",
-    borderRadius: 10,
-    padding: 12,
-    width: "100%",
-    marginBottom: 20,
-  },
-  resolveModalDetailText: {
-    fontSize: 14,
-    color: "#2c3e50",
-    marginBottom: 4,
-  },
-  resolveModalButtons: {
-    flexDirection: "row",
-    gap: 12,
-    width: "100%",
-  },
-  resolveModalCancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    alignItems: "center",
-  },
-  resolveModalCancelText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#666",
-  },
-  resolveModalConfirmBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "#4caf50",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  resolveModalConfirmText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#fff",
-  },
+const st = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: { paddingHorizontal: 22, paddingBottom: 18, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border },
+  eyebrow: { color: C.gold, fontSize: 10, fontWeight: "900", letterSpacing: 2, marginBottom: 4 },
+  title: { fontSize: 26, fontWeight: "900", color: C.text, letterSpacing: -0.5, marginBottom: 4 },
+  subtitle: { fontSize: 13, color: C.textMuted, fontWeight: "600" },
+
+  section: { paddingHorizontal: 18, marginTop: 24 },
+  secEye: { color: C.textDim, fontSize: 9, fontWeight: "900", letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 10 },
+  
+  statsRow: { flexDirection: "row", gap: 10 },
+  statBox: { flex: 1, backgroundColor: C.surface, borderRadius: 20, padding: 16, alignItems: "center", borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  statIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  statValue: { fontSize: 28, fontWeight: "900", color: C.text },
+  statLabel: { fontSize: 9, color: C.textMuted, marginTop: 4, fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5 },
+
+  tabRow: { flexDirection: "row", backgroundColor: C.surfaceAlt, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: C.border },
+  tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12 },
+  tabActive: { backgroundColor: C.text },
+  tabText: { fontSize: 12, fontWeight: "800", letterSpacing: 1, color: C.textMuted, textTransform: "uppercase" },
+  tabTextActive: { color: "#FFF" },
+
+  emptyWrap: { alignItems: "center", paddingVertical: 40 },
+  emptyText: { color: C.textMuted, marginTop: 12, fontSize: 14, fontWeight: "600" },
+
+  histCard: { backgroundColor: C.surface, borderRadius: 22, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  histCardActive: { borderColor: C.blueMid },
+  histTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+  histBadge: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  histType: { fontSize: 15, fontWeight: "900", color: C.text },
+  histPurok: { fontSize: 12, fontWeight: "600", color: C.textMuted, marginTop: 2 },
+  durationPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  durationText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
+  
+  histExpand: { marginTop: 16 },
+  histDesc: { fontSize: 15, color: C.text, fontWeight: "600", lineHeight: 22 },
+  histDivider: { height: 1, backgroundColor: C.border, marginVertical: 14 },
+  histRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  histLabel: { flex: 1, fontSize: 13, fontWeight: "700", color: C.textMuted },
+  histVal: { fontSize: 13, fontWeight: "800", color: C.text, maxWidth: "60%", textAlign: "right" },
+
+  btnRow: { flexDirection: "row", gap: 10, marginTop: 14 },
+  btnSecondary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
+  btnSecondaryText: { fontSize: 13, fontWeight: "800", color: C.text },
+  btnPrimary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12, backgroundColor: C.blueMid },
+  btnPrimaryText: { fontSize: 13, fontWeight: "800", color: "#FFF" },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15,23,42,0.6)", justifyContent: "flex-end" },
+  modalContent: { backgroundColor: C.bg, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: "90%", flex: 1 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  modalTitle: { fontSize: 22, fontWeight: "900", color: C.text, letterSpacing: -0.5 },
+  modalClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.elevated, alignItems: "center", justifyContent: "center" },
+  pillWrap: { flexDirection: "row", gap: 8, marginBottom: 24 },
+  modalPill: { backgroundColor: C.elevated, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: C.border },
+  modalPillText: { fontSize: 11, fontWeight: "800", color: C.text, textTransform: "uppercase", letterSpacing: 0.5 },
+  modalDesc: { fontSize: 16, color: C.text, fontWeight: "600", lineHeight: 24, marginBottom: 24 },
+
+  card: { backgroundColor: C.surface, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: C.border },
+  recordRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
+  recordLabel: { fontSize: 13, fontWeight: "700", color: C.textMuted },
+  recordVal: { fontSize: 14, fontWeight: "800", color: C.text, textAlign: "right" },
+  divider: { height: 1, backgroundColor: C.border, marginVertical: 12 },
+  evidenceImg: { width: "100%", height: 200, borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated },
+
+  modalIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.blueLight, alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 16 },
+  uploadArea: { backgroundColor: C.bg, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border, borderStyle: "dashed", marginBottom: 16 },
+  uploadEmpty: { height: 120, alignItems: "center", justifyContent: "center", marginBottom: 16 },
+  uploadEmptyText: { fontSize: 13, fontWeight: "700", color: C.textMuted, marginTop: 8 },
+  previewImg: { width: "100%", height: 160, borderRadius: 12, marginBottom: 16 },
+  btnOutline: { flex: 1, flexDirection: "row", paddingVertical: 12, borderRadius: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderStrong, alignItems: "center", justifyContent: "center", gap: 6 },
+  btnOutlineText: { fontSize: 13, fontWeight: "800", color: C.text },
+  btnGhost: { flex: 1, paddingVertical: 14, alignItems: "center", justifyContent: "center", borderRadius: 12 },
+  btnGhostText: { fontSize: 14, fontWeight: "800", color: C.textMuted },
 });
